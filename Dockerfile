@@ -1,16 +1,28 @@
-FROM node:20-alpine AS build
+FROM node:20-alpine AS builder
 WORKDIR /app
+
 COPY package*.json ./
-RUN npm install
+RUN npm ci --ignore-scripts
+
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine
+FROM node:20-alpine AS runner
 WORKDIR /app
-COPY --from=build /app/package*.json ./
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-# Install curl for healthcheck if needed
+
 RUN apk add --no-cache curl
-EXPOSE 3000
-CMD ["npm", "start"]
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/dist ./dist
+
+RUN npm ci --omit=dev --ignore-scripts
+
+EXPOSE 5000
+
+ENV NODE_ENV=production
+ENV PORT=5000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:5000/api/health || exit 1
+
+CMD ["node", "dist/server.cjs"]

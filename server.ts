@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import { Pool } from "pg";
 import { createVoucher } from "./src/server/mikrotik";
@@ -632,6 +631,7 @@ async function startServer() {
 
   // ─── VITE / STATIC ────────────────────────────────────────────────────────
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

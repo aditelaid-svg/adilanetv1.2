@@ -1,31 +1,87 @@
-version: '3.8'
+version: "3.9"
+
+# ============================================================
+#  AdilaNet — WiFi Voucher Mikrotik
+#  Deploy via Dockge / Docker Compose
+#
+#  SEBELUM RUNNING — edit bagian ini:
+#    1. Ganti GITHUB_REPO di service "app" dengan URL repo kamu
+#    2. Isi SANPAY_API_KEY dan SANPAY_MERCHANT_ID jika pakai payment
+#    3. Ubah password DB sesuai kebutuhan
+# ============================================================
 
 services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DB_HOST=db
-      - DB_USER=root
-      - DB_PASSWORD=admin
-      - DB_NAME=wifivoucher
-    depends_on:
-      - db
-    restart: always
 
+  # ── Database PostgreSQL ─────────────────────────────────────
   db:
-    image: mariadb:10.11
-    ports:
-      - "3306:3306"
+    image: postgres:16-alpine
+    container_name: adilanet_db
+    restart: unless-stopped
     environment:
-      - MYSQL_ROOT_PASSWORD=admin
-      - MYSQL_DATABASE=wifivoucher
+      POSTGRES_DB: adilanet
+      POSTGRES_USER: adilanet
+      POSTGRES_PASSWORD: adilanet_pass_2024   # ← ganti ini
     volumes:
-      - db_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    restart: always
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adilanet -d adilanet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - adilanet_net
+
+  # ── Aplikasi AdilaNet ───────────────────────────────────────
+  app:
+    build:
+      # Ganti URL ini dengan repo GitHub kamu setelah push
+      # Contoh: https://github.com/namakamu/adilanet.git
+      context: https://github.com/GITHUB_USERNAME/NAMA_REPO.git
+      # Untuk build dari folder lokal (tanpa GitHub), ganti baris di atas dengan:
+      # context: .
+    container_name: adilanet_app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"       # Akses lewat http://IP_SERVER:5000
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      # PostgreSQL — sesuaikan password dengan service db di atas
+      DATABASE_URL: postgres://adilanet:adilanet_pass_2024@db:5432/adilanet
+      # Payment Gateway Sanpay (opsional)
+      SANPAY_API_KEY: ""
+      SANPAY_MERCHANT_ID: ""
+      # URL publik server kamu (untuk webhook QRIS)
+      APP_URL: "http://IP_SERVER_KAMU:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    networks:
+      - adilanet_net
+
+  # ── Auto-update otomatis dari GitHub (opsional) ─────────────
+  # Watchtower akan cek image baru setiap 5 menit dan restart app
+  # Hapus atau comment service ini jika tidak dibutuhkan
+  watchtower:
+    image: containrrr/watchtower
+    container_name: adilanet_watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 --cleanup adilanet_app
+    networks:
+      - adilanet_net
+
+networks:
+  adilanet_net:
+    driver: bridge
 
 volumes:
   db_data:
+    driver: local
