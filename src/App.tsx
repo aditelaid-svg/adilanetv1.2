@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useAppContext } from './AppContext';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
 
 // Layouts
 import UserLayout from './components/UserLayout';
@@ -73,6 +74,7 @@ export default function App() {
     <AppProvider>
       <BrowserRouter>
         <AppRoutes />
+        <PwaInstallPrompt />
       </BrowserRouter>
     </AppProvider>
   );

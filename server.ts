@@ -577,6 +577,47 @@ async function startServer() {
     }
   });
 
+  // ─── MIKROTIK PROFILES ───────────────────────────────────────────────────
+  app.get("/api/routers/:id/profiles", async (req, res) => {
+    try {
+      const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      const router = rows[0];
+
+      const fallbackProfiles = [
+        { id: "default", name: "default", sessionTimeout: "Unlimited", sharedUsers: "1", rateLimit: "N/A" },
+        { id: "1jam", name: "1jam", sessionTimeout: "1 Jam", sharedUsers: "1", rateLimit: "2M/2M" },
+        { id: "3jam", name: "3jam", sessionTimeout: "3 Jam", sharedUsers: "1", rateLimit: "5M/5M" },
+        { id: "1hari", name: "1hari", sessionTimeout: "1 Hari", sharedUsers: "1", rateLimit: "10M/10M" },
+        { id: "7hari", name: "7hari", sessionTimeout: "7 Hari", sharedUsers: "2", rateLimit: "20M/20M" },
+        { id: "30hari", name: "30hari", sessionTimeout: "30 Hari", sharedUsers: "3", rateLimit: "50M/50M" },
+      ];
+
+      try {
+        // Race Mikrotik connection against 4 second timeout
+        const { getProfiles } = await import("./src/server/mikrotik");
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Mikrotik connection timeout")), 4000)
+        );
+        const profiles = await Promise.race([
+          getProfiles({ host: router.ip_address, user: router.username, pass: router.password }),
+          timeoutPromise,
+        ]);
+        return res.json({ success: true, data: profiles, source: "mikrotik" });
+      } catch (mikrotikErr: any) {
+        console.warn(`[Mikrotik] Router ${router.name} tidak terjangkau: ${mikrotikErr.message}`);
+        return res.json({
+          success: true,
+          data: fallbackProfiles,
+          source: "demo",
+          warning: "Router tidak terjangkau, menampilkan profil demo."
+        });
+      }
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // ─── MIKROTIK VOUCHER ─────────────────────────────────────────────────────
   app.post("/api/router/create-voucher", async (req, res) => {
     try {
