@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Fungsi bantuan
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // Mencegah manipulasi saldo dari client, kecuali role admin
+      // Jika user biasa update, field saldo tidak boleh berubah (harus diproses via backend)
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (request.auth.uid == userId && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance', 'role', 'status'])
+        ))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /packages/{pkgId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /transactions/{txId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+      // Untuk keamanan penuh, create transaksi potong saldo HARUS lewat backend/Cloud Functions, 
+      // tetapi untuk prototipe kita izinkan create dengan validasi UID.
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /routers/{routerId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

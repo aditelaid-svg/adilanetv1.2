@@ -1,0 +1,54 @@
+{
+  "collections": {
+    "users": {
+      "description": "Data profil pengguna, role, dan saldo e-wallet lokal",
+      "documentId": "User UID dari Firebase Auth",
+      "sampleDocument": {
+        "name": "Ahmad Pelanggan",
+        "email": "user@demo.com",
+        "phone_number": "081234567890",
+        "role": "user",
+        "balance": 50000,
+        "status": "active",
+        "pin": "123456"
+      }
+    },
+    "packages": {
+      "description": "Katalog paket voucher internet/WiFi",
+      "documentId": "auto",
+      "sampleDocument": {
+        "name": "Paket 1 Hari",
+        "price": 5000,
+        "duration": "24 Jam",
+        "speed": "3 Mbps",
+        "quota": "Unlimited"
+      }
+    },
+    "transactions": {
+      "description": "Riwayat transaksi pembelian voucher",
+      "documentId": "auto",
+      "sampleDocument": {
+        "user_id": "UID_Pengguna",
+        "package_id": "ID_Paket",
+        "amount": 5000,
+        "payment_method": "saldo",
+        "status": "success",
+        "date": "2024-06-17T05:00:00Z",
+        "voucher_code": "WFI-ABCD12"
+      }
+    },
+    "routers": {
+      "description": "Daftar perangkat Mikrotik untuk manajemen via API",
+      "documentId": "auto",
+      "sampleDocument": {
+        "name": "Router Pusat",
+        "ip_address": "192.168.1.1",
+        "api_port": "8728",
+        "username": "admin",
+        "password": "encrypted_password",
+        "status": "online",
+        "connected_users": 15
+      }
+    }
+  }
+}
