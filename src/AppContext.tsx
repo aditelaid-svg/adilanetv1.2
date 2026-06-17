@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
 // Types
 export type User = {
@@ -6,7 +6,6 @@ export type User = {
   name: string;
   email: string;
   phone_number?: string;
-  password?: string;
   pin?: string;
   role: 'admin' | 'user';
   balance: number;
@@ -42,8 +41,20 @@ export type Transaction = {
   amount: number;
   payment_method: 'saldo' | 'qris';
   status: 'pending' | 'success' | 'failed';
-  date: string;
+  created_at: string;
+  user_name?: string;
+  package_name?: string;
 };
+
+const API = '';
+
+async function apiFetch(path: string, options?: RequestInit) {
+  const res = await fetch(`${API}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  return res.json();
+}
 
 type AppContextType = {
   currentUser: User | null;
@@ -52,202 +63,256 @@ type AppContextType = {
   routers: RouterDevice[];
   packages: Package[];
   transactions: Transaction[];
-  // Mock mutations
-  updateUser: (userId: number, data: Partial<User>) => void;
-  buyPackage: (pkg: Package, method: 'saldo' | 'qris', pin?: string) => { success: boolean; error?: string };
-  topupBalance: (amount: number) => void;
-  registerUser: (name: string, email: string) => boolean;
-  addRouter: (router: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => void;
-  syncRouter: (routerId: number) => void;
-  deleteRouter: (routerId: number) => void;
-  deleteUser: (userId: number) => void;
-  deleteVoucher: (voucherId: number) => void;
-  addPackage: (pkg: Omit<Package, 'id'>) => void;
-  deletePackage: (packageId: number) => void;
+  loading: boolean;
+  refreshData: () => Promise<void>;
+  login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => void;
+  registerUser: (name: string, email: string, phone_number: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  updateUser: (userId: number, data: Partial<User & { password?: string }>) => Promise<void>;
+  topupBalance: (userId: number, amount: number) => Promise<void>;
+  buyPackage: (pkg: Package, method: 'saldo' | 'qris', pin?: string) => Promise<{ success: boolean; error?: string; voucher_code?: string }>;
+  addRouter: (router: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => Promise<void>;
+  syncRouter: (routerId: number) => Promise<void>;
+  deleteRouter: (routerId: number) => Promise<void>;
+  deleteUser: (userId: number) => Promise<void>;
+  deleteVoucher: (txId: number) => Promise<void>;
+  addPackage: (pkg: Omit<Package, 'id'>) => Promise<void>;
+  deletePackage: (packageId: number) => Promise<void>;
   generateVoucherReal: (routerId: number, profile: string, name: string, password: string) => Promise<any>;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+function loadSession(): User | null {
+  try {
+    const raw = localStorage.getItem('wifi_session');
+    if (!raw) return null;
+    return JSON.parse(raw) as User;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(user: User | null) {
+  if (user) {
+    localStorage.setItem('wifi_session', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('wifi_session');
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 1,
-    name: 'Ahmad Pelanggan',
-    email: 'user@demo.com',
-    role: 'user',
-    balance: 50000,
-    status: 'active'
-  }); // Starts logged in as user for demo
+  const [currentUser, _setCurrentUser] = useState<User | null>(loadSession);
+  const [users, setUsers] = useState<User[]>([]);
+  const [routers, setRouters] = useState<RouterDevice[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const [users, setUsers] = useState<User[]>([
-    { id: 1, name: 'Ahmad Pelanggan', email: 'user@demo.com', phone_number: '081234567890', password: 'user123', pin: '123456', role: 'user', balance: 50000, status: 'active' },
-    { id: 2, name: 'Admin Net', email: 'admin@demo.com', phone_number: '08999999999', password: 'admin', role: 'admin', balance: 0, status: 'active' },
-    { id: 3, name: 'Budi W', email: 'budi@demo.com', phone_number: '08111111111', password: 'user123', pin: '123456', role: 'user', balance: 15000, status: 'active' },
-  ]);
-
-  const [routers, setRouters] = useState<RouterDevice[]>([
-    { id: 1, name: 'Router Pusat', ip_address: '192.168.1.1', api_port: '8728', username: 'admin', password: 'password', status: 'online', connected_users: 142 },
-    { id: 2, name: 'Cabang Utara', ip_address: '192.168.2.1', api_port: '8728', username: 'admin', password: 'password', status: 'warning', connected_users: 38 },
-  ]);
-
-  const [packages, setPackages] = useState<Package[]>([
-    { id: 1, name: 'Harian Hemat', speed: '10 Mbps', quota: 'Unlimited', duration: '1 Hari', price: 5000, badge_color: 'blue' },
-    { id: 2, name: 'Mingguan Ngebut', speed: '20 Mbps', quota: 'Unlimited', duration: '7 Hari', price: 25000, badge_color: 'purple' },
-    { id: 3, name: 'Bulanan Pro', speed: '50 Mbps', quota: 'Unlimited', duration: '30 Hari', price: 95000, badge_color: 'cyan' },
-    { id: 4, name: 'Gaming VIP', speed: '100 Mbps', quota: 'Unlimited', duration: '30 Hari', price: 150000, badge_color: 'emerald' },
-  ]);
-
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    { id: 101, user_id: 1, package_id: 1, voucher_code: 'WFI-1A2B3C', amount: 5000, payment_method: 'saldo', status: 'success', date: new Date().toISOString() },
-    { id: 102, user_id: 3, package_id: 2, voucher_code: 'WFI-X8Y9Z0', amount: 25000, payment_method: 'qris', status: 'success', date: new Date(Date.now() - 86400000).toISOString() },
-  ]);
-
-  const registerUser = (name: string, email: string) => {
-    if (users.find(u => u.email === email)) return false;
-    const newUser: User = {
-      id: Math.floor(Math.random() * 10000) + 1000,
-      name,
-      email,
-      role: 'user',
-      balance: 0,
-      status: 'active'
-    };
-    setUsers([...users, newUser]);
-    setCurrentUser(newUser);
-    return true;
+  const setCurrentUser = (user: User | null) => {
+    _setCurrentUser(user);
+    saveSession(user);
   };
 
-  const addRouter = (r: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => {
-    const newRouter: RouterDevice = {
-      ...r,
-      id: Math.floor(Math.random() * 10000) + 1000,
-      status: 'online',
-      connected_users: 0
-    };
-    setRouters([...routers, newRouter]);
-  };
+  const refreshData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Always load packages (needed for user view)
+      const pkgRes = await apiFetch('/api/packages');
+      if (pkgRes.success) setPackages(pkgRes.data);
 
-  const syncRouter = (routerId: number) => {
-    // Simulate syncing: update users count and maybe add a mock package that was read from mikrotik
-    setRouters(routers.map(r => r.id === routerId ? { ...r, connected_users: r.connected_users + Math.floor(Math.random() * 10) } : r));
-    
-    // Add a mocked profile as a package if not exists
-    const pkgName = `Paket Sync ${Math.floor(Math.random()*100)}`;
-    setPackages([...packages, { 
-      id: Math.floor(Math.random()*1000)+1000, 
-      name: pkgName, 
-      speed: '10 Mbps', 
-      quota: 'Unlimited', 
-      duration: '1 Hari', 
-      price: 5000, 
-      badge_color: 'fuchsia' 
-    }]);
-  };
-
-  const updateUser = (userId: number, data: Partial<User>) => {
-    // Keamanan Frontend (Anticipasi Injeksi React Context):
-    // Memblokir manipulasi saldo, role, atau block secara langsung jika dijalankan oleh bukan Admin.
-    if ('balance' in data || 'role' in data || 'status' in data) {
-      if (currentUser?.role !== 'admin') {
-        console.error("KEAMANAN TERPICU: Upaya manipulasi data sensitif digagalkan (saldo/role/status). Akses ditolak.");
-        return;
-      }
-    }
-
-    setUsers(prev => prev.map(u => {
-      if (u.id === userId) {
-        const updated = { ...u, ...data };
-        if (currentUser?.id === userId) {
-          setCurrentUser(updated as User);
+      // Load user-specific or admin data
+      if (currentUser) {
+        if (currentUser.role === 'admin') {
+          const [usersRes, routersRes, txRes] = await Promise.all([
+            apiFetch('/api/users'),
+            apiFetch('/api/routers'),
+            apiFetch('/api/transactions'),
+          ]);
+          if (usersRes.success) setUsers(usersRes.data);
+          if (routersRes.success) setRouters(routersRes.data);
+          if (txRes.success) setTransactions(txRes.data);
+        } else {
+          const [usersRes, routersRes, txRes] = await Promise.all([
+            apiFetch('/api/users'),
+            apiFetch('/api/routers'),
+            apiFetch(`/api/transactions?user_id=${currentUser.id}`),
+          ]);
+          if (usersRes.success) setUsers(usersRes.data);
+          if (routersRes.success) setRouters(routersRes.data);
+          if (txRes.success) setTransactions(txRes.data);
         }
-        return updated;
       }
-      return u;
-    }));
-  };
-
-  const buyPackage = (pkg: Package, method: 'saldo' | 'qris', pin?: string) => {
-    if (!currentUser) return { success: false, error: 'Akses ditolak: User belum login.' };
-    
-    // Keamanan Frontend: Validasi Paket dan Harga
-    if (!pkg || pkg.price <= 0) return { success: false, error: 'Paket tidak valid.' };
-    
-    if (method === 'saldo') {
-      if (!currentUser.pin && pin) return { success: false, error: 'PIN transaksi Anda belum dikonfigurasi.' };
-      if (currentUser.pin && currentUser.pin !== pin) return { success: false, error: 'Otorisasi Gagal: PIN salah.' };
-      if (currentUser.balance < pkg.price) return { success: false, error: 'Saldo tidak mencukupi untuk transaksi ini.' };
-      
-      // Amankan mutasi state saldo
-      const updatedUser = { ...currentUser, balance: currentUser.balance - pkg.price };
-      setCurrentUser(updatedUser);
-      setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
+    } catch (err) {
+      console.error("Gagal memuat data:", err);
+    } finally {
+      setLoading(false);
     }
+  }, [currentUser]);
 
-    const newTx: Transaction = {
-      id: Math.floor(Math.random() * 10000) + 1000,
-      user_id: currentUser.id,
-      package_id: pkg.id,
-      voucher_code: `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`,
-      amount: pkg.price,
-      payment_method: method,
-      status: 'success',
-      date: new Date().toISOString()
-    };
-    setTransactions([newTx, ...transactions]);
-    return { success: true };
+  useEffect(() => {
+    refreshData();
+  }, [currentUser?.id]);
+
+  // ─── AUTH ─────────────────────────────────────────────────────────────
+  const login = async (identifier: string, password: string) => {
+    const res = await apiFetch('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, password }),
+    });
+    if (res.success) {
+      setCurrentUser(res.data);
+      return { success: true };
+    }
+    return { success: false, error: res.error };
   };
 
-  const topupBalance = (amount: number) => {
-    if (!currentUser) return;
-    const updatedUser = { ...currentUser, balance: currentUser.balance + amount };
-    setCurrentUser(updatedUser);
-    setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
+  const logout = () => {
+    setCurrentUser(null);
+    setUsers([]);
+    setRouters([]);
+    setTransactions([]);
   };
 
-  const deleteRouter = (routerId: number) => {
-    setRouters(routers.filter(r => r.id !== routerId));
+  const registerUser = async (name: string, email: string, phone_number: string, password: string) => {
+    const res = await apiFetch('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, phone_number, password }),
+    });
+    if (res.success) {
+      setCurrentUser(res.data);
+      return { success: true };
+    }
+    return { success: false, error: res.error };
   };
 
-  const deleteUser = (userId: number) => {
-    setUsers(users.filter(u => u.id !== userId));
+  // ─── USERS ────────────────────────────────────────────────────────────
+  const updateUser = async (userId: number, data: Partial<User & { password?: string }>) => {
+    const res = await apiFetch(`/api/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    if (res.success) {
+      const updated = res.data;
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updated } : u));
+      if (currentUser?.id === userId) {
+        setCurrentUser({ ...currentUser, ...updated });
+      }
+    }
   };
 
-  const deleteVoucher = (txId: number) => {
-    setTransactions(transactions.filter(t => t.id !== txId));
+  const topupBalance = async (userId: number, amount: number) => {
+    const res = await apiFetch(`/api/users/${userId}/topup`, {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    });
+    if (res.success) {
+      const newBalance = res.data.balance;
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, balance: newBalance } : u));
+      if (currentUser?.id === userId) {
+        setCurrentUser({ ...currentUser, balance: newBalance });
+      }
+    }
   };
 
-  const deletePackage = (packageId: number) => {
-    setPackages(packages.filter(p => p.id !== packageId));
+  // ─── PACKAGES ─────────────────────────────────────────────────────────
+  const addPackage = async (pkg: Omit<Package, 'id'>) => {
+    const res = await apiFetch('/api/packages', {
+      method: 'POST',
+      body: JSON.stringify(pkg),
+    });
+    if (res.success) {
+      setPackages(prev => [...prev, res.data]);
+    }
   };
 
-  const addPackage = (pkg: Omit<Package, 'id'>) => {
-    const newPackage: Package = {
-      ...pkg,
-      id: Math.floor(Math.random() * 10000) + 1000,
-    };
-    setPackages([...packages, newPackage]);
+  const deletePackage = async (packageId: number) => {
+    await apiFetch(`/api/packages/${packageId}`, { method: 'DELETE' });
+    setPackages(prev => prev.filter(p => p.id !== packageId));
   };
 
+  // ─── ROUTERS ──────────────────────────────────────────────────────────
+  const addRouter = async (r: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => {
+    const res = await apiFetch('/api/routers', {
+      method: 'POST',
+      body: JSON.stringify(r),
+    });
+    if (res.success) {
+      setRouters(prev => [...prev, res.data]);
+    }
+  };
+
+  const syncRouter = async (routerId: number) => {
+    const res = await apiFetch(`/api/routers/${routerId}/sync`, { method: 'POST' });
+    if (res.success) {
+      setRouters(prev => prev.map(r => r.id === routerId ? res.data : r));
+    }
+  };
+
+  const deleteRouter = async (routerId: number) => {
+    await apiFetch(`/api/routers/${routerId}`, { method: 'DELETE' });
+    setRouters(prev => prev.filter(r => r.id !== routerId));
+  };
+
+  // ─── TRANSACTIONS ─────────────────────────────────────────────────────
+  const buyPackage = async (pkg: Package, method: 'saldo' | 'qris', pin?: string) => {
+    if (!currentUser) return { success: false, error: 'Akses ditolak: User belum login.' };
+
+    const res = await apiFetch('/api/transactions', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: currentUser.id,
+        package_id: pkg.id,
+        payment_method: method,
+        pin,
+      }),
+    });
+
+    if (res.success) {
+      const { transaction, voucher_code, new_balance } = res.data;
+      // Update local balance
+      if (method === 'saldo') {
+        setCurrentUser({ ...currentUser, balance: new_balance });
+        setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, balance: new_balance } : u));
+      }
+      // Add to transactions list
+      setTransactions(prev => [transaction, ...prev]);
+      return { success: true, voucher_code };
+    }
+    return { success: false, error: res.error };
+  };
+
+  const deleteVoucher = async (txId: number) => {
+    await apiFetch(`/api/transactions/${txId}`, { method: 'DELETE' });
+    setTransactions(prev => prev.filter(t => t.id !== txId));
+  };
+
+  // ─── MIKROTIK ─────────────────────────────────────────────────────────
   const generateVoucherReal = async (routerId: number, profile: string, name: string, password: string) => {
     const router = routers.find(r => r.id === routerId);
     if (!router) throw new Error("Router tidak ditemukan");
-
     const response = await fetch("/api/router/create-voucher", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ host: router.ip_address, user: router.username, pass: router.password, profile, name, password })
     });
-    
     if (!response.ok) throw new Error("Gagal membuat voucher di Mikrotik");
     return await response.json();
   };
 
   return (
-    <AppContext.Provider value={{ 
-      currentUser, setCurrentUser, users, routers, packages, transactions, 
-      updateUser, buyPackage, topupBalance, registerUser, addRouter, syncRouter,
-      deleteRouter, deleteUser, deleteVoucher,
-      addPackage, deletePackage, generateVoucherReal
+    <AppContext.Provider value={{
+      currentUser, setCurrentUser,
+      users, routers, packages, transactions,
+      loading, refreshData,
+      login, logout, registerUser,
+      updateUser, topupBalance, buyPackage,
+      addRouter, syncRouter, deleteRouter,
+      deleteUser: async (userId) => {
+        await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
+        setUsers(prev => prev.filter(u => u.id !== userId));
+      },
+      deleteVoucher, addPackage, deletePackage, generateVoucherReal,
     }}>
       {children}
     </AppContext.Provider>

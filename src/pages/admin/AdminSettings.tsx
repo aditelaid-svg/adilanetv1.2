@@ -49,6 +49,7 @@ export default function AdminSettings() {
                 sanpayApiKey: qrisKey,
                 merchantId: merchantId,
                 telegramToken: telegramToken,
+                telegramChatId: telegramChatId,
                 qrisEnabled: qrisEnabled
             })
         });

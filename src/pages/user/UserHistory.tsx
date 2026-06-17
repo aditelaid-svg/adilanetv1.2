@@ -6,11 +6,14 @@ import { motion } from 'motion/react';
 export default function UserHistory() {
   const { transactions, currentUser, packages } = useAppContext();
   const [copiedId, setCopiedId] = useState<number | null>(null);
-  
-  const userHistory = transactions.filter(t => t.user_id === currentUser?.id);
-  const totalBelanja = userHistory.reduce((acc, curr) => acc + curr.amount, 0);
 
-  const getPackageInfo = (pkgId: number) => packages.find(p => p.id === pkgId);
+  const userHistory = transactions.filter(t => t.user_id === currentUser?.id);
+  const totalBelanja = userHistory.filter(t => t.status === 'success').reduce((acc, curr) => acc + curr.amount, 0);
+
+  const getPackageName = (pkgId: number) => {
+    const pkg = packages.find(p => p.id === pkgId);
+    return pkg?.name || 'Paket Tidak Diketahui';
+  };
 
   const copyCode = (id: number, code: string) => {
     navigator.clipboard.writeText(code);
@@ -18,67 +21,74 @@ export default function UserHistory() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const dateFormatted = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeFormatted = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+    return `${dateFormatted}, ${timeFormatted}`;
+  };
+
+  const statusColor = {
+    success: { bg: 'bg-[#34C759]/10', text: 'text-[#34C759]', label: 'Berhasil' },
+    pending: { bg: 'bg-[#FF9F0A]/10', text: 'text-[#FF9F0A]', label: 'Pending' },
+    failed: { bg: 'bg-[#FF453A]/10', text: 'text-[#FF453A]', label: 'Gagal' },
+  };
+
   return (
     <div className="p-5 pb-24 mt-2">
-       <div className="mb-6 pt-2">
+      <div className="mb-6 pt-2">
         <h1 className="text-[28px] font-bold tracking-tight text-white mb-1">Riwayat</h1>
-        <p className="text-slate-400 text-[13px] font-medium">Total belanja: Rp {totalBelanja.toLocaleString('id-ID')}</p>
+        <p className="text-white/50 text-[13px] font-medium">Total berhasil: Rp {totalBelanja.toLocaleString('id-ID')}</p>
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-[#1C1C1E] border border-white/5 rounded-[20px] p-4 flex flex-col items-center justify-center shadow-sm">
-             <span className="text-[22px] font-bold text-[#34C759] mb-0.5">{userHistory.filter(t => t.status === 'success').length}</span>
-             <span className="text-[11px] text-white/50 font-medium tracking-wide">Berhasil</span>
-          </div>
-          <div className="bg-[#1C1C1E] border border-white/5 rounded-[20px] p-4 flex flex-col items-center justify-center shadow-sm">
-             <span className="text-[22px] font-bold text-[#FF9F0A] mb-0.5">{userHistory.filter(t => t.status === 'pending').length}</span>
-             <span className="text-[11px] text-white/50 font-medium tracking-wide">Pending</span>
-          </div>
-          <div className="bg-[#1C1C1E] border border-white/5 rounded-[20px] p-4 flex flex-col items-center justify-center shadow-sm">
-             <span className="text-[22px] font-bold text-[#FF453A] mb-0.5">{userHistory.filter(t => t.status === 'failed').length}</span>
-             <span className="text-[11px] text-white/50 font-medium tracking-wide">Gagal</span>
-          </div>
+        <div className="bg-[#1C1C1E] border border-white/5 rounded-[20px] p-4 flex flex-col items-center justify-center shadow-sm">
+          <span className="text-[22px] font-bold text-[#34C759] mb-0.5">{userHistory.filter(t => t.status === 'success').length}</span>
+          <span className="text-[11px] text-white/50 font-medium tracking-wide">Berhasil</span>
+        </div>
+        <div className="bg-[#1C1C1E] border border-white/5 rounded-[20px] p-4 flex flex-col items-center justify-center shadow-sm">
+          <span className="text-[22px] font-bold text-[#FF9F0A] mb-0.5">{userHistory.filter(t => t.status === 'pending').length}</span>
+          <span className="text-[11px] text-white/50 font-medium tracking-wide">Pending</span>
+        </div>
+        <div className="bg-[#1C1C1E] border border-white/5 rounded-[20px] p-4 flex flex-col items-center justify-center shadow-sm">
+          <span className="text-[22px] font-bold text-[#FF453A] mb-0.5">{userHistory.filter(t => t.status === 'failed').length}</span>
+          <span className="text-[11px] text-white/50 font-medium tracking-wide">Gagal</span>
+        </div>
       </div>
 
       <div className="space-y-4">
         {userHistory.length === 0 ? (
           <div className="text-center py-12 flex flex-col items-center">
             <div className="w-16 h-16 bg-[#1C1C1E] rounded-full flex items-center justify-center mb-4">
-               <Clock className="w-8 h-8 text-white/20" />
+              <Clock className="w-8 h-8 text-white/20" />
             </div>
             <p className="text-white/40 font-medium text-[15px]">Belum ada transaksi</p>
           </div>
         ) : (
           userHistory.map((tx, index) => {
-            const pkg = getPackageInfo(tx.package_id);
-            const dateStr = new Date(tx.date).toLocaleDateString('id-ID', {
-              day: 'numeric', month: 'short', year: 'numeric'
-            });
-            const timeStr = new Date(tx.date).toLocaleTimeString('id-ID', {
-              hour: '2-digit', minute: '2-digit'
-            }).replace('.', ':');
-
+            const st = statusColor[tx.status] || statusColor.pending;
             return (
-              <motion.div 
+              <motion.div
                 key={tx.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+                transition={{ delay: index * 0.05 }}
                 className="bg-[#1C1C1E] border border-white/5 rounded-[24px] p-5 shadow-sm"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-[12px] bg-[#34C759]/10 border border-[#34C759]/20 flex items-center justify-center shrink-0 mt-0.5">
-                       <Check className="w-5 h-5 text-[#34C759]" />
+                    <div className={`w-10 h-10 rounded-[12px] ${st.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                      <Check className={`w-5 h-5 ${st.text}`} />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-[15px] text-white leading-tight mb-1">{pkg?.name}</h4>
-                      <p className="text-[13px] text-white/50 mb-2 font-medium">RT Maju Jaya - Blok A</p>
+                      <h4 className="font-semibold text-[15px] text-white leading-tight mb-1">
+                        {tx.package_name || getPackageName(tx.package_id)}
+                      </h4>
                       <div className="flex gap-2 mb-2">
-                        <span className="bg-[#34C759]/10 text-[#34C759] text-[10px] font-bold px-2 py-0.5 rounded-md">Berhasil</span>
+                        <span className={`${st.bg} ${st.text} text-[10px] font-bold px-2 py-0.5 rounded-md`}>{st.label}</span>
                         <span className="bg-white/5 text-white/60 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">{tx.payment_method}</span>
                       </div>
-                      <span className="text-[11px] font-medium text-white/40">{dateStr}, {timeStr}</span>
+                      <span className="text-[11px] font-medium text-white/40">{formatDate(tx.created_at)}</span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -86,12 +96,12 @@ export default function UserHistory() {
                   </div>
                 </div>
 
-                {tx.status === 'success' && (
+                {tx.status === 'success' && tx.voucher_code && (
                   <div className="mt-4 pt-4 border-t border-white/5">
                     <p className="text-[11px] font-semibold text-white/40 mb-2 tracking-wide uppercase">Kode Voucher</p>
-                    <div className="bg-white/[0.02] border border-white/5 rounded-[16px] p-4 flex justify-between items-center group">
+                    <div className="bg-white/[0.02] border border-white/5 rounded-[16px] p-4 flex justify-between items-center">
                       <p className="font-mono font-bold tracking-widest text-[#0A84FF] text-[15px]">{tx.voucher_code}</p>
-                      <button 
+                      <button
                         onClick={() => copyCode(tx.id, tx.voucher_code)}
                         className="flex items-center gap-1.5 text-white/40 hover:text-white transition-colors"
                       >
@@ -102,7 +112,7 @@ export default function UserHistory() {
                   </div>
                 )}
               </motion.div>
-            )
+            );
           })
         )}
       </div>
