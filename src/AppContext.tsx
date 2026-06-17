@@ -72,8 +72,10 @@ type AppContextType = {
   topupBalance: (userId: number, amount: number) => Promise<void>;
   buyPackage: (pkg: Package, method: 'saldo' | 'qris', pin?: string) => Promise<{ success: boolean; error?: string; voucher_code?: string }>;
   addRouter: (router: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => Promise<void>;
+  updateRouter: (routerId: number, data: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => Promise<void>;
   syncRouter: (routerId: number) => Promise<void>;
   deleteRouter: (routerId: number) => Promise<void>;
+  testRouterConnection: (routerId: number) => Promise<{ connected: boolean; message: string; latency?: number }>;
   deleteUser: (userId: number) => Promise<void>;
   deleteVoucher: (txId: number) => Promise<void>;
   addPackage: (pkg: Omit<Package, 'id'>) => Promise<void>;
@@ -249,9 +251,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateRouter = async (routerId: number, data: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => {
+    const res = await apiFetch(`/api/routers/${routerId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    if (res.success) {
+      setRouters(prev => prev.map(r => r.id === routerId ? res.data : r));
+    }
+  };
+
   const deleteRouter = async (routerId: number) => {
     await apiFetch(`/api/routers/${routerId}`, { method: 'DELETE' });
     setRouters(prev => prev.filter(r => r.id !== routerId));
+  };
+
+  const testRouterConnection = async (routerId: number) => {
+    const res = await apiFetch(`/api/routers/${routerId}/test`, { method: 'POST' });
+    if (res.success) {
+      setRouters(prev => prev.map(r =>
+        r.id === routerId ? { ...r, status: res.connected ? 'online' : 'offline' } : r
+      ));
+      return { connected: res.connected, message: res.message, latency: res.latency };
+    }
+    return { connected: false, message: res.error || 'Gagal test koneksi' };
   };
 
   // ─── TRANSACTIONS ─────────────────────────────────────────────────────
@@ -307,7 +330,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loading, refreshData,
       login, logout, registerUser,
       updateUser, topupBalance, buyPackage,
-      addRouter, syncRouter, deleteRouter,
+      addRouter, updateRouter, syncRouter, deleteRouter, testRouterConnection,
       deleteUser: async (userId) => {
         await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
         setUsers(prev => prev.filter(u => u.id !== userId));

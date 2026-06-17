@@ -108,26 +108,6 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-white/5">
-          <p className="text-[11px] font-semibold text-white/40 text-center mb-3 tracking-widest uppercase">Kredensial Demo</p>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => fillDemo('08999999999', 'admin')}
-              className="py-2.5 text-[12px] font-semibold bg-white/[0.03] hover:bg-white/[0.08] text-white/80 rounded-[12px] border border-white/5 transition-colors active:scale-95 flex flex-col items-center gap-0.5"
-            >
-              <span>Admin</span>
-              <span className="text-white/30 text-[10px]">08999999999</span>
-            </button>
-            <button
-              onClick={() => fillDemo('081234567890', 'user123')}
-              className="py-2.5 text-[12px] font-semibold bg-white/[0.03] hover:bg-white/[0.08] text-white/80 rounded-[12px] border border-white/5 transition-colors active:scale-95 flex flex-col items-center gap-0.5"
-            >
-              <span>User</span>
-              <span className="text-white/30 text-[10px]">081234567890</span>
-            </button>
-          </div>
-        </div>
-
         <div className="mt-8 text-center flex items-center justify-center gap-1.5">
           <span className="text-[13px] font-medium text-white/40">Belum punya akun?</span>
           <Link to="/register" className="text-[13px] font-semibold text-[#0A84FF]">Daftar</Link>

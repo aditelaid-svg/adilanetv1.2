@@ -357,6 +357,47 @@ async function startServer() {
     }
   });
 
+  app.put("/api/routers/:id", async (req, res) => {
+    try {
+      const { name, ip_address, api_port, username, password } = req.body;
+      const { rows } = await pool.query(
+        `UPDATE routers SET name=$1, ip_address=$2, api_port=$3, username=$4, password=$5 WHERE id=$6 RETURNING *`,
+        [name, ip_address, api_port || '8728', username, password, req.params.id]
+      );
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      res.json({ success: true, data: rows[0] });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/routers/:id/test", async (req, res) => {
+    try {
+      const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      const router = rows[0];
+      const start = Date.now();
+      try {
+        const { getProfiles } = await import("./src/server/mikrotik");
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Connection timeout (4s)")), 4000)
+        );
+        await Promise.race([
+          getProfiles({ host: router.ip_address, user: router.username, pass: router.password }),
+          timeoutPromise,
+        ]);
+        const latency = Date.now() - start;
+        await pool.query(`UPDATE routers SET status='online' WHERE id=$1`, [router.id]);
+        return res.json({ success: true, connected: true, latency, message: `Terhubung dalam ${latency}ms` });
+      } catch (connErr: any) {
+        await pool.query(`UPDATE routers SET status='offline' WHERE id=$1`, [router.id]);
+        return res.json({ success: true, connected: false, message: connErr.message });
+      }
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   app.post("/api/routers/:id/sync", async (req, res) => {
     try {
       const newCount = Math.floor(Math.random() * 20) + 5;
