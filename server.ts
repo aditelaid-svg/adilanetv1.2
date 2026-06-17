@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import cors from "cors";
+import { createVoucher } from "./src/server/mikrotik";
 
 // Mock mariadb pool instantiation that can be expanded later
 // import mariadb from "mariadb";
@@ -118,6 +119,17 @@ async function startServer() {
     }
   });
   // --- END SANPAY INTEGRATION ---
+
+  app.post("/api/router/create-voucher", async (req, res) => {
+    try {
+      const { host, user, pass, profile, name, password } = req.body;
+      const result = await createVoucher({ host, user, pass }, profile, name, password);
+      res.json({ success: true, data: result });
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

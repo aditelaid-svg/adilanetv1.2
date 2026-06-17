@@ -4,7 +4,7 @@ import { Router, Plus, MoreVertical, Wifi, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function AdminRouters() {
-  const { routers, addRouter, syncRouter } = useAppContext();
+  const { routers, addRouter, syncRouter, deleteRouter } = useAppContext();
   const [showAdd, setShowAdd] = useState(false);
   const [newRouter, setNewRouter] = useState({ name: '', ip_address: '', api_port: '8728', username: '', password: '' });
 
@@ -14,6 +14,12 @@ export default function AdminRouters() {
       addRouter(newRouter);
       setShowAdd(false);
       setNewRouter({ name: '', ip_address: '', api_port: '8728', username: '', password: '' });
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm('Yakin ingin menghapus router ini?')) {
+        deleteRouter(id);
     }
   };
 
@@ -51,8 +57,10 @@ export default function AdminRouters() {
                       <p className="font-mono text-[11px] text-[#0A84FF]">{router.ip_address}</p>
                     </div>
                   </div>
-                  <button className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/50 hover:text-white hover:bg-white/10 transition-colors">
-                      <MoreVertical className="w-4 h-4" />
+                  <button 
+                    onClick={() => handleDelete(router.id)}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/50 hover:text-[#FF453A] hover:bg-[#FF453A]/10 transition-colors">
+                       <X className="w-4 h-4" />
                   </button>
                 </div>
 

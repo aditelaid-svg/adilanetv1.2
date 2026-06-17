@@ -4,7 +4,7 @@ import { Users, Search, Target, UserCheck, UserX, Wallet, CreditCard, X } from '
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function AdminUsers() {
-  const { users, updateUser } = useAppContext();
+  const { users, updateUser, deleteUser } = useAppContext();
   
   const [topupModalUser, setTopupModalUser] = useState<number | null>(null);
   const [topupAmount, setTopupAmount] = useState<string>('');
@@ -21,6 +21,12 @@ export default function AdminUsers() {
       }
       setTopupModalUser(null);
       setTopupAmount('');
+    }
+  };
+
+  const handleDelete = (userId: number) => {
+    if (window.confirm('Yakin ingin menghapus pengguna ini?')) {
+        deleteUser(userId);
     }
   };
 
@@ -121,12 +127,12 @@ export default function AdminUsers() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                     <button 
                         onClick={() => setTopupModalUser(user.id)}
                         className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 active:bg-white/15 text-white/80 font-medium py-2 rounded-[12px] text-[12px] transition-colors"
                     >
-                        <Wallet className="w-3.5 h-3.5" /> Top Up Saldo
+                        <Wallet className="w-3.5 h-3.5" /> Top Up
                     </button>
                     {user.status === 'active' ? (
                         <button 
@@ -140,9 +146,15 @@ export default function AdminUsers() {
                             onClick={() => toggleBlockStatus(user.id, user.status)}
                             className="flex items-center justify-center gap-1.5 bg-[#34C759]/10 hover:bg-[#34C759]/20 active:bg-[#34C759]/30 text-[#34C759] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
                         >
-                            <UserCheck className="w-3.5 h-3.5" /> Buka Blokir
+                            <UserCheck className="w-3.5 h-3.5" /> Buka
                         </button>
                     )}
+                    <button 
+                        onClick={() => handleDelete(user.id)}
+                        className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-[#FF453A]/20 active:bg-[#FF453A]/30 text-white/50 hover:text-[#FF453A] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
+                    >
+                        <X className="w-3.5 h-3.5" /> Hapus
+                    </button>
                 </div>
             </motion.div>
         ))}

@@ -23,6 +23,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-router-dom": "^7.18.0",
+    "routeros-api": "^1.0.2",
     "tailwind-merge": "^3.6.0",
     "vite": "^6.2.3"
   },

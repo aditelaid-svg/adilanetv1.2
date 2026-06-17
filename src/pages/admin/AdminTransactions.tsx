@@ -1,9 +1,15 @@
 import React from 'react';
 import { useAppContext } from '../../AppContext';
-import { Search, Download, CheckCircle2, Clock, XCircle, ArrowUpRight } from 'lucide-react';
+import { Search, Download, CheckCircle2, Clock, XCircle, ArrowUpRight, Trash2 } from 'lucide-react';
 
 export default function AdminTransactions() {
-  const { transactions, users, packages } = useAppContext();
+  const { transactions, users, packages, deleteVoucher } = useAppContext();
+  
+  const handleDelete = (txId: number) => {
+    if (window.confirm('Yakin ingin menghapus data transaksi/voucher ini?')) {
+        deleteVoucher(txId);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -96,6 +102,14 @@ export default function AdminTransactions() {
                                <div className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${tx.status === 'success' ? 'bg-[#34C759]/20 text-[#34C759]' : tx.status === 'pending' ? 'bg-[#FF9F0A]/20 text-[#FF9F0A]' : 'bg-[#FF453A]/20 text-[#FF453A]'}`}>
                                    {tx.status === 'success' ? <CheckCircle2 className="w-3 h-3" /> : tx.status === 'pending' ? <Clock className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                                </div>
+                           </td>
+                           <td className="px-4 py-2.5 whitespace-nowrap text-center">
+                               <button 
+                                 onClick={() => handleDelete(tx.id)}
+                                 className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-[#FF453A] hover:bg-[#FF453A]/10 transition-colors"
+                               >
+                                   <Trash2 className="w-3.5 h-3.5" />
+                               </button>
                            </td>
                         </tr>
                     )

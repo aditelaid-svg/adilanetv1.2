@@ -4,8 +4,15 @@ import { Plus, Edit, Trash2, Clock, Zap, Wifi, Eye, Link as LinkIcon, Check } fr
 import { motion } from 'motion/react';
 
 export default function AdminPackages() {
-  const { packages } = useAppContext();
+  const { packages, deletePackage } = useAppContext();
   const [copiedLink, setCopiedLink] = useState<number | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const handleDelete = (id: number) => {
+    if (window.confirm('Yakin ingin menghapus paket ini?')) {
+        deletePackage(id);
+    }
+  };
 
   const handleCopyLink = (packageId: number) => {
     // Construct the public link
@@ -22,7 +29,9 @@ export default function AdminPackages() {
           <h1 className="text-[28px] font-bold tracking-tight text-white mb-1">Paket Voucher</h1>
           <p className="text-white/50 text-[13px] font-medium">{packages.length} paket tersedia</p>
         </div>
-        <button className="bg-[#0A84FF] hover:bg-[#0070e0] active:scale-95 text-white px-3.5 py-2 rounded-[14px] text-[13px] font-semibold flex items-center gap-1.5 transition-all">
+        <button 
+            onClick={() => setShowAddModal(true)}
+            className="bg-[#0A84FF] hover:bg-[#0070e0] active:scale-95 text-white px-3.5 py-2 rounded-[14px] text-[13px] font-semibold flex items-center gap-1.5 transition-all">
           <Plus className="w-4 h-4" /> Tambah
         </button>
       </div>
@@ -54,7 +63,9 @@ export default function AdminPackages() {
                 <button className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-white transition-colors">
                   <Edit className="w-3.5 h-3.5" />
                 </button>
-                <button className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-[#FF453A] hover:bg-[#FF453A]/10 transition-colors">
+                <button 
+                  onClick={() => handleDelete(pkg.id)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-[#FF453A] hover:bg-[#FF453A]/10 transition-colors">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -92,6 +103,14 @@ export default function AdminPackages() {
           </motion.div>
         ))}
       </div>
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm">
+                <h2 className="text-xl font-bold text-white mb-4">Tambah Paket</h2>
+                <button onClick={() => setShowAddModal(false)} className="text-white/50 hover:text-white">Close</button>
+            </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -59,7 +59,12 @@ type AppContextType = {
   registerUser: (name: string, email: string) => boolean;
   addRouter: (router: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => void;
   syncRouter: (routerId: number) => void;
-  generateVouchers: (qty: number, packageId: number, routerId: number) => string[];
+  deleteRouter: (routerId: number) => void;
+  deleteUser: (userId: number) => void;
+  deleteVoucher: (voucherId: number) => void;
+  addPackage: (pkg: Omit<Package, 'id'>) => void;
+  deletePackage: (packageId: number) => void;
+  generateVoucherReal: (routerId: number, profile: string, name: string, password: string) => Promise<any>;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -199,18 +204,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
   };
 
-  const generateVouchers = (qty: number, packageId: number, routerId: number) => {
-    const codes: string[] = [];
-    for(let i=0; i<qty; i++) {
-        codes.push(`WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`);
-    }
-    return codes;
+  const deleteRouter = (routerId: number) => {
+    setRouters(routers.filter(r => r.id !== routerId));
+  };
+
+  const deleteUser = (userId: number) => {
+    setUsers(users.filter(u => u.id !== userId));
+  };
+
+  const deleteVoucher = (txId: number) => {
+    setTransactions(transactions.filter(t => t.id !== txId));
+  };
+
+  const deletePackage = (packageId: number) => {
+    setPackages(packages.filter(p => p.id !== packageId));
+  };
+
+  const addPackage = (pkg: Omit<Package, 'id'>) => {
+    const newPackage: Package = {
+      ...pkg,
+      id: Math.floor(Math.random() * 10000) + 1000,
+    };
+    setPackages([...packages, newPackage]);
+  };
+
+  const generateVoucherReal = async (routerId: number, profile: string, name: string, password: string) => {
+    const router = routers.find(r => r.id === routerId);
+    if (!router) throw new Error("Router tidak ditemukan");
+
+    const response = await fetch("/api/router/create-voucher", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ host: router.ip_address, user: router.username, pass: router.password, profile, name, password })
+    });
+    
+    if (!response.ok) throw new Error("Gagal membuat voucher di Mikrotik");
+    return await response.json();
   };
 
   return (
     <AppContext.Provider value={{ 
       currentUser, setCurrentUser, users, routers, packages, transactions, 
-      updateUser, buyPackage, topupBalance, registerUser, addRouter, syncRouter, generateVouchers 
+      updateUser, buyPackage, topupBalance, registerUser, addRouter, syncRouter,
+      deleteRouter, deleteUser, deleteVoucher,
+      addPackage, deletePackage, generateVoucherReal
     }}>
       {children}
     </AppContext.Provider>
