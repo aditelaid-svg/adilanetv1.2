@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Router as RouterIcon, Ticket, Receipt, Users, Settings, Menu, X, LogOut, ChevronLeft, Megaphone } from 'lucide-react';
 import { cn } from './UserLayout';
 import { useAppContext } from '../AppContext';
 import { motion, AnimatePresence } from 'motion/react';
+import AnimatedOutlet from './AnimatedOutlet';
 
 const adminNav = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/' },
@@ -53,7 +54,7 @@ export default function AdminLayout() {
 
         {/* Main Content Area */}
         <main className="relative z-10 flex-1 overflow-y-auto pb-10 scroll-smooth hide-scrollbar p-5 pt-4">
-           <Outlet />
+           <AnimatedOutlet />
         </main>
 
         {/* Sidebar Drawer */}

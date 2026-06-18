@@ -1,9 +1,10 @@
 import React from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { Home, Package, ShoppingCart, Clock, User as UserIcon } from 'lucide-react';
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useAppContext } from '../AppContext';
+import AnimatedOutlet from './AnimatedOutlet';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -31,7 +32,7 @@ export default function UserLayout() {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto pb-28 scroll-smooth hide-scrollbar relative z-10">
-          <Outlet />
+          <AnimatedOutlet />
         </main>
 
         {/* Bottom Navigation */}
