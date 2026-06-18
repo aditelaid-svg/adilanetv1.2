@@ -114,6 +114,9 @@ async function initDb() {
       status VARCHAR(10) DEFAULT 'pending',
       created_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reference_id VARCHAR(100);
+    DROP INDEX IF EXISTS transactions_reference_id_uniq;
+    CREATE UNIQUE INDEX IF NOT EXISTS transactions_reference_id_key ON transactions(reference_id);
 
     CREATE TABLE IF NOT EXISTS settings (
       id SERIAL PRIMARY KEY,
@@ -709,6 +712,21 @@ async function startServer() {
 
       const voucherCode = await generateUniqueVoucher();
 
+      // For instant (saldo) purchases, create the voucher on Mikrotik now.
+      // If provisioning fails, refund the deducted balance so the buyer isn't charged.
+      if (payment_method === 'saldo') {
+        try {
+          await provisionVoucher(pkg, voucherCode);
+        } catch (provErr: any) {
+          await pool.query(
+            `UPDATE users SET balance = balance + $1, updated_at = NOW() WHERE id = $2`,
+            [amount, user_id]
+          );
+          console.error(`[Transaksi] Gagal provision voucher, saldo dikembalikan: ${provErr.message}`);
+          return res.status(502).json({ success: false, error: `Gagal membuat voucher di Mikrotik: ${provErr.message}` });
+        }
+      }
+
       // Create transaction
       const { rows: txRows } = await pool.query(
         `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -845,13 +863,52 @@ async function startServer() {
       const { reference_id, status, user_id, package_id } = req.body;
       console.log(`[Webhook] Pembayaran ${reference_id}: ${status}`);
       let voucherCode = null;
-      if ((status === "Success" || status === "PAID") && user_id && package_id) {
-        voucherCode = await generateUniqueVoucher();
-        await pool.query(
-          `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status) 
-           SELECT $1, $2, $3, price, 'qris', 'success' FROM packages WHERE id = $2`,
-          [user_id, package_id, voucherCode]
-        );
+      if (status === "Success" || status === "PAID") {
+        // reference_id is mandatory so the callback is idempotent (no bypass).
+        if (!reference_id) {
+          return res.status(400).json({ received: false, error: "reference_id wajib untuk konfirmasi pembayaran." });
+        }
+        if (user_id && package_id) {
+          const { rows: pkgRows } = await pool.query(`SELECT * FROM packages WHERE id = $1`, [package_id]);
+          if (pkgRows.length > 0) {
+            // Atomically claim this payment reference BEFORE provisioning. The row
+            // is 'pending' with voucher_code = NULL until the hotspot user is
+            // actually created on Mikrotik — so a concurrent/duplicate callback
+            // never receives a code that isn't valid yet.
+            const { rows: claim } = await pool.query(
+              `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status, reference_id)
+               VALUES ($1, $2, NULL, $3, 'qris', 'pending', $4)
+               ON CONFLICT (reference_id) DO NOTHING RETURNING id`,
+              [user_id, package_id, parseFloat(pkgRows[0].price), reference_id]
+            );
+            if (claim.length === 0) {
+              // Already claimed/processed — only expose the code once it succeeded
+              const { rows: existing } = await pool.query(
+                `SELECT voucher_code, status FROM transactions WHERE reference_id = $1`,
+                [reference_id]
+              );
+              const row = existing[0];
+              return res.status(200).json({
+                received: true,
+                voucher_code: row && row.status === "success" ? row.voucher_code : null,
+              });
+            }
+            const claimedId = claim[0].id;
+            try {
+              const code = await generateUniqueVoucher();
+              await provisionVoucher(pkgRows[0], code);
+              await pool.query(
+                `UPDATE transactions SET voucher_code = $1, status = 'success' WHERE id = $2`,
+                [code, claimedId]
+              );
+              voucherCode = code;
+            } catch (provErr: any) {
+              // Provisioning failed — release the claim so the payment can be retried
+              await pool.query(`DELETE FROM transactions WHERE id = $1`, [claimedId]);
+              console.error(`[Webhook] Gagal provision voucher untuk ${reference_id}: ${provErr.message}`);
+            }
+          }
+        }
       }
       res.status(200).json({ received: true, voucher_code: voucherCode });
     } catch (err) {
@@ -869,6 +926,14 @@ async function startServer() {
       if (pkgRows.length === 0) return res.status(404).json({ success: false, error: "Paket tidak ditemukan." });
       const pkg = pkgRows[0];
       const voucherCode = await generateUniqueVoucher();
+      // Create the voucher on the Mikrotik router first — if this fails the buyer
+      // gets no usable voucher, so we abort instead of saving a dead transaction.
+      try {
+        await provisionVoucher(pkg, voucherCode);
+      } catch (provErr: any) {
+        console.error(`[PublicBuy] Gagal provision voucher: ${provErr.message}`);
+        return res.status(502).json({ success: false, error: `Gagal membuat voucher di Mikrotik: ${provErr.message}` });
+      }
       const { rows: txRows } = await pool.query(
         `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status) VALUES (NULL, $1, $2, $3, 'qris', 'success') RETURNING *`,
         [package_id, voucherCode, parseFloat(pkg.price)]
@@ -928,6 +993,29 @@ async function startServer() {
     if (rows.length === 0) return null;
     const r = rows[0];
     return { host: r.ip_address, user: r.username, pass: r.password, port: r.api_port };
+  }
+
+  // Create the actual hotspot voucher on the package's Mikrotik router using its
+  // configured profile (profile defines duration & rate/quota limits).
+  // Throws a clear error if the package is misconfigured or the router is unreachable.
+  async function provisionVoucher(pkg: any, voucherCode: string) {
+    if (!pkg.router_id) {
+      throw new Error("Paket belum terhubung ke router Mikrotik. Hubungi admin.");
+    }
+    if (!pkg.mikrotik_profile) {
+      throw new Error("Paket belum memiliki profil Mikrotik. Hubungi admin.");
+    }
+    const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [pkg.router_id]);
+    if (rows.length === 0) {
+      throw new Error("Router untuk paket ini tidak ditemukan.");
+    }
+    const r = rows[0];
+    await createVoucher(
+      { host: r.ip_address, user: r.username, pass: r.password, port: r.api_port },
+      pkg.mikrotik_profile,
+      voucherCode,
+      voucherCode
+    );
   }
 
   // Validate hotspot profile fields before sending to RouterOS

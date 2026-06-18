@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 
 export default function UserBuy() {
-  const { packages, currentUser, buyPackage } = useAppContext();
+  const { packages, currentUser, buyPackage, refreshData } = useAppContext();
   const location = useLocation();
   const [selectedPkg, setSelectedPkg] = useState<Package | null>(
     packages.find(p => p.id === location.state?.packageId) || null
@@ -77,8 +77,9 @@ export default function UserBuy() {
     if (!selectedPkg) return;
     setIsProcessing(true);
     try {
-      // Simulate QRIS payment via webhook
-      await fetch('/api/webhook/sanpay', {
+      // Confirm QRIS payment — the webhook provisions the voucher on Mikrotik
+      // and returns the real voucher code for this payment.
+      const response = await fetch('/api/webhook/sanpay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -88,13 +89,13 @@ export default function UserBuy() {
           package_id: selectedPkg.id,
         }),
       });
-      // Create the actual transaction record
-      const result = await buyPackage(selectedPkg, 'qris');
-      if (result.success) {
-        setSuccessCode(result.voucher_code || `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`);
+      const data = await response.json();
+      if (data.voucher_code) {
+        setSuccessCode(data.voucher_code);
         setShowQrisCode(false);
+        await refreshData();
       } else {
-        setError(result.error || 'Gagal memproses pembayaran.');
+        setError('Pembayaran belum terverifikasi atau voucher gagal dibuat di Mikrotik. Coba lagi.');
       }
     } catch {
       setError('Terjadi kesalahan.');
