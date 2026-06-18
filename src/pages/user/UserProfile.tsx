@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../AppContext';
-import { User as UserIcon, LogOut, ChevronRight, Hash, Phone, Mail, KeyRound, ShieldAlert, X } from 'lucide-react';
+import { User as UserIcon, LogOut, ChevronRight, Hash, Phone, Mail, KeyRound, ShieldAlert, X, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 
 export default function UserProfile() {
   const { currentUser, logout, updateUser } = useAppContext();
+  const navigate = useNavigate();
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -131,6 +133,22 @@ export default function UserProfile() {
               <ChevronRight className="w-[18px] h-[18px] text-slate-300" />
             </button>
           </div>
+        </div>
+
+        <div className="glass rounded-[28px] overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200/60">
+            <h2 className="font-semibold text-[12px] tracking-wide uppercase text-slate-400">Dukungan</h2>
+          </div>
+          <button
+            onClick={() => navigate('/user/help')}
+            className="w-full flex justify-between items-center p-5 hover:bg-white/40 transition-colors active:bg-white/60"
+          >
+            <div className="flex items-center gap-3 text-slate-700">
+              <MessageCircle className="w-[18px] h-[18px] text-emerald-500" strokeWidth={1.8} />
+              <span className="text-[15px] font-medium">Pusat Bantuan</span>
+            </div>
+            <ChevronRight className="w-[18px] h-[18px] text-slate-300" />
+          </button>
         </div>
 
         <button

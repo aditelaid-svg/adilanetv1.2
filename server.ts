@@ -247,7 +247,9 @@ async function initDb() {
       ('voucherCharset', 'alphanumeric'),
       ('voucherLength', '8'),
       ('voucherPrefix', 'WFI-'),
-      ('hotspotLoginUrl', '')
+      ('hotspotLoginUrl', ''),
+      ('whatsappNumber', ''),
+      ('whatsappMessage', 'Halo Admin AdilaNet, saya butuh bantuan.')
       ON CONFLICT DO NOTHING;
     `);
   }
@@ -259,7 +261,9 @@ async function initDb() {
       ('voucherCharset', 'alphanumeric'),
       ('voucherLength', '8'),
       ('voucherPrefix', 'WFI-'),
-      ('hotspotLoginUrl', '')
+      ('hotspotLoginUrl', ''),
+      ('whatsappNumber', ''),
+      ('whatsappMessage', 'Halo Admin AdilaNet, saya butuh bantuan.')
     ON CONFLICT (config_key) DO NOTHING;
   `);
 
@@ -1025,7 +1029,9 @@ async function startServer() {
           voucherCharset: s.voucherCharset || 'alphanumeric',
           voucherLength: parseInt(s.voucherLength || '8', 10),
           voucherPrefix: s.voucherPrefix !== undefined ? s.voucherPrefix : 'WFI-',
-          hotspotLoginUrl: s.hotspotLoginUrl || ''
+          hotspotLoginUrl: s.hotspotLoginUrl || '',
+          whatsappNumber: s.whatsappNumber || '',
+          whatsappMessage: s.whatsappMessage !== undefined ? s.whatsappMessage : 'Halo Admin AdilaNet, saya butuh bantuan.'
         }
       });
     } catch (err: any) {
@@ -1036,7 +1042,8 @@ async function startServer() {
   app.post("/api/settings", requireAdmin, async (req, res) => {
     try {
       const { sanpayApiKey, merchantId, telegramToken, telegramChatId, qrisEnabled,
-              voucherCharset, voucherLength, voucherPrefix, hotspotLoginUrl } = req.body;
+              voucherCharset, voucherLength, voucherPrefix, hotspotLoginUrl,
+              whatsappNumber, whatsappMessage } = req.body;
 
       // Validate & sanitize the hotspot login URL (used for one-tap WiFi login
       // after purchase). Must be empty or a valid http/https URL.
@@ -1057,6 +1064,17 @@ async function startServer() {
         ? voucherPrefix.toUpperCase().replace(/[^A-Z0-9-]/g, '') : 'WFI-';
       if (vprefix.length > 10) vprefix = vprefix.slice(0, 10);
 
+      // WhatsApp helpdesk number: keep only digits (international format, no +).
+      // Empty disables the help-center button on the user side.
+      let waNum = typeof whatsappNumber === 'string' ? whatsappNumber.replace(/[^0-9]/g, '') : '';
+      if (waNum.startsWith('0')) waNum = '62' + waNum.slice(1);
+      if (waNum.length > 20) waNum = waNum.slice(0, 20);
+      if (waNum.length > 0 && waNum.length < 8) {
+        return res.status(400).json({ success: false, error: "Nomor WhatsApp tidak valid. Contoh: 081234567890" });
+      }
+      let waMsg = typeof whatsappMessage === 'string' ? whatsappMessage.trim() : '';
+      if (waMsg.length > 300) waMsg = waMsg.slice(0, 300);
+
       const updates = [
         ['sanpayApiKey', sanpayApiKey ?? ''],
         ['merchantId', merchantId ?? ''],
@@ -1067,6 +1085,8 @@ async function startServer() {
         ['voucherLength', String(vlen)],
         ['voucherPrefix', vprefix],
         ['hotspotLoginUrl', hsUrl],
+        ['whatsappNumber', waNum],
+        ['whatsappMessage', waMsg],
       ];
       for (const [key, val] of updates) {
         await pool.query(
@@ -1083,9 +1103,14 @@ async function startServer() {
   app.get("/api/config/public", async (req, res) => {
     try {
       const s = await getSettings();
-      res.json({ success: true, data: { qrisEnabled: s.qrisEnabled !== 'false', hotspotLoginUrl: s.hotspotLoginUrl || '' } });
+      res.json({ success: true, data: {
+        qrisEnabled: s.qrisEnabled !== 'false',
+        hotspotLoginUrl: s.hotspotLoginUrl || '',
+        whatsappNumber: s.whatsappNumber || '',
+        whatsappMessage: s.whatsappMessage !== undefined ? s.whatsappMessage : 'Halo Admin AdilaNet, saya butuh bantuan.'
+      } });
     } catch {
-      res.json({ success: true, data: { qrisEnabled: true, hotspotLoginUrl: '' } });
+      res.json({ success: true, data: { qrisEnabled: true, hotspotLoginUrl: '', whatsappNumber: '', whatsappMessage: '' } });
     }
   });
 

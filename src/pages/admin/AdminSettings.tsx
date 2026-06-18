@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy, Ticket, Wifi } from 'lucide-react';
+import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy, Ticket, Wifi, MessageCircle } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
 
 export default function AdminSettings() {
@@ -17,6 +17,9 @@ export default function AdminSettings() {
   const [voucherPrefix, setVoucherPrefix] = useState('WFI-');
 
   const [hotspotLoginUrl, setHotspotLoginUrl] = useState('');
+
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [whatsappMessage, setWhatsappMessage] = useState('');
 
   const [adminPassword, setAdminPassword] = useState('');
   const [passwordSaved, setPasswordSaved] = useState(false);
@@ -45,6 +48,8 @@ export default function AdminSettings() {
           setVoucherLength(json.data.voucherLength || 8);
           setVoucherPrefix(json.data.voucherPrefix ?? 'WFI-');
           setHotspotLoginUrl(json.data.hotspotLoginUrl || '');
+          setWhatsappNumber(json.data.whatsappNumber || '');
+          setWhatsappMessage(json.data.whatsappMessage ?? '');
         }
       } catch (err) {
         console.error("Gagal memuat setting:", err);
@@ -70,7 +75,9 @@ export default function AdminSettings() {
                 voucherCharset: voucherCharset,
                 voucherLength: voucherLength,
                 voucherPrefix: voucherPrefix,
-                hotspotLoginUrl: hotspotLoginUrl
+                hotspotLoginUrl: hotspotLoginUrl,
+                whatsappNumber: whatsappNumber,
+                whatsappMessage: whatsappMessage
             })
         });
         const json = await res.json();
@@ -322,6 +329,53 @@ export default function AdminSettings() {
               <p className="text-[12px] font-semibold text-teal-700">Cara kerja</p>
               <p className="text-[12px] text-slate-500 leading-relaxed">
                 Jika diisi, pelanggan yang membeli voucher dari aplikasi (sambil terhubung ke WiFi) akan melihat tombol <b>“Login WiFi Sekarang”</b> yang langsung menghubungkan mereka ke internet — tanpa ketik kode manual. Kosongkan untuk menyembunyikan tombol.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.19 }}
+          className="glass-strong rounded-[24px] p-5"
+        >
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-[12px] bg-emerald-100 text-emerald-600 flex items-center justify-center">
+              <MessageCircle className="w-5 h-5" strokeWidth={1.8} />
+            </div>
+            <h2 className="font-semibold text-[15px] text-slate-800">Pusat Bantuan (WhatsApp)</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[13px] font-medium text-slate-600 mb-2">Nomor WhatsApp Admin</label>
+              <input
+                type="tel"
+                inputMode="numeric"
+                value={whatsappNumber}
+                onChange={e => setWhatsappNumber(e.target.value)}
+                placeholder="081234567890"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] font-mono focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition-colors"
+              />
+              <p className="text-[11px] text-slate-400 mt-1.5">Nomor tujuan saat pelanggan menekan tombol bantuan. Awalan 0 otomatis diubah ke 62.</p>
+            </div>
+
+            <div>
+              <label className="block text-[13px] font-medium text-slate-600 mb-2">Pesan Otomatis (opsional)</label>
+              <textarea
+                value={whatsappMessage}
+                onChange={e => setWhatsappMessage(e.target.value)}
+                placeholder="Halo Admin AdilaNet, saya butuh bantuan."
+                rows={2}
+                maxLength={300}
+                className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[14px] focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-300 transition-colors resize-none"
+              />
+              <p className="text-[11px] text-slate-400 mt-1.5">Teks yang sudah terisi otomatis di chat WhatsApp pelanggan.</p>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-100 rounded-[16px] p-4 space-y-1.5">
+              <p className="text-[12px] font-semibold text-emerald-700">Cara kerja</p>
+              <p className="text-[12px] text-slate-500 leading-relaxed">
+                Menu <b>“Pusat Bantuan”</b> di halaman Profil pelanggan menampilkan halaman bantuan (FAQ) dengan tombol chat WhatsApp ke nomor ini. Jika nomor dikosongkan, tombol WhatsApp otomatis disembunyikan dan hanya FAQ yang tampil.
               </p>
             </div>
           </div>

@@ -17,6 +17,7 @@ import UserBuy from './pages/user/UserBuy';
 import UserHistory from './pages/user/UserHistory';
 import UserProfile from './pages/user/UserProfile';
 import UserNotifications from './pages/user/UserNotifications';
+import UserHelp from './pages/user/UserHelp';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminRouters from './pages/admin/AdminRouters';
@@ -59,6 +60,7 @@ function AppRoutes() {
           <Route path="buy" element={<UserBuy />} />
           <Route path="history" element={<UserHistory />} />
           <Route path="notifications" element={<UserNotifications />} />
+          <Route path="help" element={<UserHelp />} />
           <Route path="profile" element={<UserProfile />} />
           <Route path="*" element={<Navigate to="/user" replace />} />
         </Route>
