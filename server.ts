@@ -209,7 +209,8 @@ async function initDb() {
       ('qrisEnabled', 'true'),
       ('voucherCharset', 'alphanumeric'),
       ('voucherLength', '8'),
-      ('voucherPrefix', 'WFI-')
+      ('voucherPrefix', 'WFI-'),
+      ('hotspotLoginUrl', '')
       ON CONFLICT DO NOTHING;
     `);
   }
@@ -220,7 +221,8 @@ async function initDb() {
     INSERT INTO settings (config_key, config_value) VALUES
       ('voucherCharset', 'alphanumeric'),
       ('voucherLength', '8'),
-      ('voucherPrefix', 'WFI-')
+      ('voucherPrefix', 'WFI-'),
+      ('hotspotLoginUrl', '')
     ON CONFLICT (config_key) DO NOTHING;
   `);
 
@@ -889,7 +891,8 @@ async function startServer() {
           qrisEnabled: s.qrisEnabled !== 'false',
           voucherCharset: s.voucherCharset || 'alphanumeric',
           voucherLength: parseInt(s.voucherLength || '8', 10),
-          voucherPrefix: s.voucherPrefix !== undefined ? s.voucherPrefix : 'WFI-'
+          voucherPrefix: s.voucherPrefix !== undefined ? s.voucherPrefix : 'WFI-',
+          hotspotLoginUrl: s.hotspotLoginUrl || ''
         }
       });
     } catch (err: any) {
@@ -900,7 +903,16 @@ async function startServer() {
   app.post("/api/settings", requireAdmin, async (req, res) => {
     try {
       const { sanpayApiKey, merchantId, telegramToken, telegramChatId, qrisEnabled,
-              voucherCharset, voucherLength, voucherPrefix } = req.body;
+              voucherCharset, voucherLength, voucherPrefix, hotspotLoginUrl } = req.body;
+
+      // Validate & sanitize the hotspot login URL (used for one-tap WiFi login
+      // after purchase). Must be empty or a valid http/https URL.
+      let hsUrl = typeof hotspotLoginUrl === 'string' ? hotspotLoginUrl.trim() : '';
+      if (hsUrl.length > 0) {
+        if (hsUrl.length > 255 || !/^https?:\/\/[^\s]+$/i.test(hsUrl)) {
+          return res.status(400).json({ success: false, error: "URL Login Hotspot tidak valid. Contoh: http://10.5.50.1/login" });
+        }
+      }
 
       // Validate & sanitize voucher-format settings.
       const charset = ['alphanumeric', 'numeric', 'alpha'].includes(voucherCharset)
@@ -921,6 +933,7 @@ async function startServer() {
         ['voucherCharset', charset],
         ['voucherLength', String(vlen)],
         ['voucherPrefix', vprefix],
+        ['hotspotLoginUrl', hsUrl],
       ];
       for (const [key, val] of updates) {
         await pool.query(
@@ -937,9 +950,9 @@ async function startServer() {
   app.get("/api/config/public", async (req, res) => {
     try {
       const s = await getSettings();
-      res.json({ success: true, data: { qrisEnabled: s.qrisEnabled !== 'false' } });
+      res.json({ success: true, data: { qrisEnabled: s.qrisEnabled !== 'false', hotspotLoginUrl: s.hotspotLoginUrl || '' } });
     } catch {
-      res.json({ success: true, data: { qrisEnabled: true } });
+      res.json({ success: true, data: { qrisEnabled: true, hotspotLoginUrl: '' } });
     }
   });
 

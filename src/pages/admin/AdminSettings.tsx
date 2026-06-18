@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy, Ticket } from 'lucide-react';
+import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy, Ticket, Wifi } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
 
 export default function AdminSettings() {
@@ -15,6 +15,8 @@ export default function AdminSettings() {
   const [voucherCharset, setVoucherCharset] = useState('alphanumeric');
   const [voucherLength, setVoucherLength] = useState(8);
   const [voucherPrefix, setVoucherPrefix] = useState('WFI-');
+
+  const [hotspotLoginUrl, setHotspotLoginUrl] = useState('');
 
   const [adminPassword, setAdminPassword] = useState('');
   const [passwordSaved, setPasswordSaved] = useState(false);
@@ -42,6 +44,7 @@ export default function AdminSettings() {
           setVoucherCharset(json.data.voucherCharset || 'alphanumeric');
           setVoucherLength(json.data.voucherLength || 8);
           setVoucherPrefix(json.data.voucherPrefix ?? 'WFI-');
+          setHotspotLoginUrl(json.data.hotspotLoginUrl || '');
         }
       } catch (err) {
         console.error("Gagal memuat setting:", err);
@@ -66,7 +69,8 @@ export default function AdminSettings() {
                 qrisEnabled: qrisEnabled,
                 voucherCharset: voucherCharset,
                 voucherLength: voucherLength,
-                voucherPrefix: voucherPrefix
+                voucherPrefix: voucherPrefix,
+                hotspotLoginUrl: hotspotLoginUrl
             })
         });
         const json = await res.json();
@@ -286,6 +290,39 @@ export default function AdminSettings() {
                 })()}
               </code>
               <p className="text-[11px] text-white/35 mt-2">Username & password Mikrotik memakai kode yang sama.</p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
+          className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
+        >
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-[12px] bg-success/20 text-success flex items-center justify-center">
+              <Wifi className="w-5 h-5" />
+            </div>
+            <h2 className="font-semibold text-[15px] text-white">Login WiFi Otomatis</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">URL Login Hotspot</label>
+              <input
+                type="text"
+                value={hotspotLoginUrl}
+                onChange={e => setHotspotLoginUrl(e.target.value)}
+                placeholder="http://10.5.50.1/login"
+                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] font-mono focus:outline-none focus:border-success/50 transition-colors"
+              />
+              <p className="text-[11px] text-white/35 mt-1.5">Alamat halaman login hotspot Mikrotik (gateway), bukan IP API.</p>
+            </div>
+
+            <div className="bg-success/8 border border-success/20 rounded-[16px] p-4 space-y-1.5">
+              <p className="text-[12px] font-semibold text-success">Cara kerja</p>
+              <p className="text-[12px] text-white/55 leading-relaxed">
+                Jika diisi, pelanggan yang membeli voucher dari aplikasi (sambil terhubung ke WiFi) akan melihat tombol <b>“Login WiFi Sekarang”</b> yang langsung menghubungkan mereka ke internet — tanpa ketik kode manual. Kosongkan untuk menyembunyikan tombol.
+              </p>
             </div>
           </div>
         </motion.div>

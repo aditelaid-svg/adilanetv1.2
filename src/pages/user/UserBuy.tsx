@@ -26,6 +26,7 @@ export default function UserBuy() {
   const [refId, setRefId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [qrisEnabled, setQrisEnabled] = useState(true);
+  const [hotspotLoginUrl, setHotspotLoginUrl] = useState('');
 
   useEffect(() => {
     if (showPinInput && pinInputRef.current) {
@@ -36,9 +37,35 @@ export default function UserBuy() {
   useEffect(() => {
     fetch('/api/config/public')
       .then(r => r.json())
-      .then(json => { if (json.success) setQrisEnabled(json.data.qrisEnabled ?? true); })
+      .then(json => {
+        if (json.success) {
+          setQrisEnabled(json.data.qrisEnabled ?? true);
+          setHotspotLoginUrl(json.data.hotspotLoginUrl || '');
+        }
+      })
       .catch(() => {});
   }, []);
+
+  // One-tap WiFi login: submit the voucher (username = password = code) to the
+  // Mikrotik hotspot login page. Works when the buyer is already on the WiFi.
+  const loginToWifi = () => {
+    if (!hotspotLoginUrl || !successCode) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = hotspotLoginUrl;
+    const add = (name: string, value: string) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    };
+    add('username', successCode);
+    add('password', successCode);
+    add('dst', 'http://www.google.com');
+    document.body.appendChild(form);
+    form.submit();
+  };
 
   const initiateBuy = async () => {
     setError(null);
@@ -344,12 +371,32 @@ export default function UserBuy() {
                     </button>
                   </div>
 
-                  <button
-                    onClick={closeModals}
-                    className="w-full bg-white/10 active:bg-white/20 text-white font-semibold py-4 rounded-[16px] transition-all text-[15px]"
-                  >
-                    Selesai
-                  </button>
+                  {hotspotLoginUrl ? (
+                    <>
+                      <button
+                        onClick={loginToWifi}
+                        className="w-full bg-brand hover:bg-brand-hover active:scale-[0.98] text-white font-semibold py-4 rounded-[16px] transition-all text-[15px] flex items-center justify-center gap-2 mb-3"
+                      >
+                        <Wifi className="w-5 h-5" /> Login WiFi Sekarang
+                      </button>
+                      <p className="text-white/35 text-[11px] mb-4 px-2">
+                        Pastikan HP Anda terhubung ke jaringan WiFi AdilaNet. Internet langsung aktif setelah klik.
+                      </p>
+                      <button
+                        onClick={closeModals}
+                        className="w-full bg-white/10 active:bg-white/20 text-white/70 font-semibold py-3.5 rounded-[16px] transition-all text-[14px]"
+                      >
+                        Nanti Saja
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={closeModals}
+                      className="w-full bg-white/10 active:bg-white/20 text-white font-semibold py-4 rounded-[16px] transition-all text-[15px]"
+                    >
+                      Selesai
+                    </button>
+                  )}
                 </div>
               )}
             </motion.div>
