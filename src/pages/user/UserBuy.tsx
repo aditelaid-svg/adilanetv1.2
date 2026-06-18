@@ -289,7 +289,7 @@ export default function UserBuy() {
                     />
                   </div>
                   <p className="text-center text-white/30 text-[12px]">
-                    {!currentUser?.pin ? 'Anda belum mengatur PIN. Masukkan sembarang untuk lanjut.' : ''}
+                    {!currentUser?.has_pin ? 'Anda belum mengatur PIN. Masukkan sembarang untuk lanjut.' : ''}
                   </p>
                 </>
               ) : showQrisCode && !successCode ? (

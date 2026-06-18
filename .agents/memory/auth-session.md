@@ -13,6 +13,7 @@ description: How login/session/authz works server-side and what the frontend mus
 
 **How to apply:**
 - Never return `password`/`pin` in any response or SELECT *; routers GET also omits `password`, and router PUT only overwrites password when a non-empty one is sent.
+- The frontend must NOT use `currentUser.pin` to show "PIN set" state — pin is hashed & stripped, so it's always absent. Instead every user payload (login, /api/auth/me, register, PATCH /api/users/:id) returns a computed `has_pin` boolean; UI (UserProfile status/label, UserBuy hint) keys off `has_pin`. Same pattern applies to any future "secret is set" indicator.
 - `requireAuth` / `requireAdmin` guard routes; PATCH/GET users are self-or-admin. Regular users' transactions are session-scoped server-side — the frontend must NOT call `/api/users` or `/api/routers` for non-admins (they 403).
 - Balance deduction on purchase is an atomic conditional UPDATE (`balance >= amount`) to prevent overdraft/races; user_id comes from the session, never the request body.
 - Voucher codes use `generateUniqueVoucher()` (crypto + DB-uniqueness retry), not `Math.random`.

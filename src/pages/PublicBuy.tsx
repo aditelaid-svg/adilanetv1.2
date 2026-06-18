@@ -34,6 +34,26 @@ export default function PublicBuy() {
       .catch(() => {});
   }, []);
 
+  // Poll payment status while the QRIS is shown. The voucher is only issued
+  // server-side after SanPay confirms the payment via its signed webhook.
+  useEffect(() => {
+    if (step !== 'qris' || !refId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const r = await fetch(`/api/payment/status/${refId}`);
+        const d = await r.json();
+        if (active && d.success && d.data.status === 'success' && d.data.voucher_code) {
+          setSuccessCode(d.data.voucher_code);
+          setStep('success');
+        }
+      } catch { /* ignore transient network errors while polling */ }
+    };
+    const id = setInterval(poll, 4000);
+    poll();
+    return () => { active = false; clearInterval(id); };
+  }, [step, refId]);
+
   if (!pkg) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
       <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -68,26 +88,6 @@ export default function PublicBuy() {
       setIsProcessing(false);
     }
   };
-
-  // Poll payment status while the QRIS is shown. The voucher is only issued
-  // server-side after SanPay confirms the payment via its signed webhook.
-  useEffect(() => {
-    if (step !== 'qris' || !refId) return;
-    let active = true;
-    const poll = async () => {
-      try {
-        const r = await fetch(`/api/payment/status/${refId}`);
-        const d = await r.json();
-        if (active && d.success && d.data.status === 'success' && d.data.voucher_code) {
-          setSuccessCode(d.data.voucher_code);
-          setStep('success');
-        }
-      } catch { /* ignore transient network errors while polling */ }
-    };
-    const id = setInterval(poll, 4000);
-    poll();
-    return () => { active = false; clearInterval(id); };
-  }, [step, refId]);
 
   const copyCode = () => {
     if (successCode) {

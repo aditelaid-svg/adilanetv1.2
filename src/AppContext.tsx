@@ -7,6 +7,7 @@ export type User = {
   email: string;
   phone_number?: string;
   pin?: string;
+  has_pin?: boolean;
   role: 'superadmin' | 'admin' | 'user';
   balance: number;
   status: 'active' | 'blocked';

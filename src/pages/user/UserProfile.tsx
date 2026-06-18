@@ -98,8 +98,8 @@ export default function UserProfile() {
                 <ShieldAlert className="w-[18px] h-[18px] text-white/40" />
                 <span className="text-[15px] font-medium">PIN Transaksi</span>
               </div>
-              <span className={`text-[13px] font-semibold px-2 py-0.5 rounded ${currentUser?.pin ? 'bg-success/10 text-success' : 'bg-gold/10 text-gold'}`}>
-                {currentUser?.pin ? 'Aktif' : 'Belum Diatur'}
+              <span className={`text-[13px] font-semibold px-2 py-0.5 rounded ${currentUser?.has_pin ? 'bg-success/10 text-success' : 'bg-gold/10 text-gold'}`}>
+                {currentUser?.has_pin ? 'Aktif' : 'Belum Diatur'}
               </span>
             </div>
           </div>
@@ -126,7 +126,7 @@ export default function UserProfile() {
             >
               <div className="flex items-center gap-3 text-slate-300">
                 <ShieldAlert className="w-[18px] h-[18px] text-white/40" />
-                <span className="text-[15px] font-medium">PIN Transaksi {currentUser?.pin ? '(Ubah)' : '(Buat)'}</span>
+                <span className="text-[15px] font-medium">PIN Transaksi {currentUser?.has_pin ? '(Ubah)' : '(Buat)'}</span>
               </div>
               <ChevronRight className="w-[18px] h-[18px] text-white/20" />
             </button>

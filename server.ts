@@ -371,7 +371,7 @@ async function startServer() {
       req.session.userId = user.id;
       req.session.role = user.role;
       const { password: _pw, pin: _pin, ...safeUser } = user;
-      res.json({ success: true, data: { ...safeUser, balance: parseFloat(safeUser.balance) } });
+      res.json({ success: true, data: { ...safeUser, balance: parseFloat(safeUser.balance), has_pin: !!_pin } });
     } catch (err: any) {
       console.error(err);
       res.status(500).json({ success: false, error: err.message });
@@ -384,7 +384,7 @@ async function startServer() {
     }
     try {
       const { rows } = await pool.query(
-        `SELECT id, name, email, phone_number, role, balance, status FROM users WHERE id = $1`,
+        `SELECT id, name, email, phone_number, role, balance, status, (pin IS NOT NULL AND pin <> '') AS has_pin FROM users WHERE id = $1`,
         [req.session.userId]
       );
       if (rows.length === 0 || rows[0].status === 'blocked') {
@@ -419,7 +419,7 @@ async function startServer() {
       req.session.userId = user.id;
       req.session.role = user.role;
       const { password: _pw, pin: _pin, ...safeUser } = user;
-      res.json({ success: true, data: { ...safeUser, balance: parseFloat(safeUser.balance) } });
+      res.json({ success: true, data: { ...safeUser, balance: parseFloat(safeUser.balance), has_pin: !!_pin } });
     } catch (err: any) {
       if (err.code === '23505') {
         return res.status(409).json({ success: false, error: "Email atau nomor HP sudah terdaftar." });
@@ -511,7 +511,7 @@ async function startServer() {
       fields.push(`updated_at = NOW()`);
       values.push(targetId);
       const { rows } = await pool.query(
-        `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, name, email, phone_number, role, balance, status`,
+        `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, name, email, phone_number, role, balance, status, (pin IS NOT NULL AND pin <> '') AS has_pin`,
         values
       );
       if (rows.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
