@@ -67,18 +67,11 @@ services:
     networks:
       - adilanet_net
 
-  # ── Auto-update otomatis dari GitHub (opsional) ─────────────
-  # Watchtower akan cek image baru setiap 5 menit dan restart app
-  # Hapus atau comment service ini jika tidak dibutuhkan
-  watchtower:
-    image: containrrr/watchtower
-    container_name: adilanet_watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300 --cleanup adilanet_app
-    networks:
-      - adilanet_net
+  # ── Cara update saat ada perubahan di GitHub ────────────────
+  # Karena image di-build langsung dari repo GitHub (bukan dari registry),
+  # update dilakukan dari Dockge: buka stack ini lalu klik "Update" / "Re-deploy".
+  # Dockge akan menarik ulang kode terbaru dari GitHub, build ulang, dan restart.
+  # (Watchtower tidak dipakai karena hanya bekerja untuk image dari registry.)
 
 networks:
   adilanet_net:
