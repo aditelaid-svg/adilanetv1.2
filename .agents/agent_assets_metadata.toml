@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "8uXWfpgcNgjIHD8wEfgtg"
+uri = "file://public/logo.png"
+type = "image"
+title = "Logo AdilaNet HD (1024×1024, transparan)"

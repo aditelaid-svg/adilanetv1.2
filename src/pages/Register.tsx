@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, UserPlus, Phone } from 'lucide-react';
+import { ArrowRight, Phone } from 'lucide-react';
 import { useAppContext } from '../AppContext';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -42,8 +42,8 @@ export default function Register() {
         className="w-full max-w-sm glass-strong rounded-[32px] p-8 relative z-10"
       >
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-[20px] bg-gradient-to-br from-sky-500 to-teal-400 flex items-center justify-center shadow-[0_10px_30px_rgba(14,165,233,0.35)] mb-5">
-            <UserPlus className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 rounded-[20px] bg-white flex items-center justify-center shadow-[0_10px_30px_rgba(14,165,233,0.25)] ring-1 ring-sky-100 mb-5 p-2.5">
+            <img src="/logo.png" alt="AdilaNet" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-[26px] font-bold text-slate-800 tracking-tight">Daftar Akun</h1>
           <p className="text-slate-500 text-[13px] font-medium mt-1">Buat akun untuk akses AdilaNet</p>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, ArrowRight, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAppContext } from '../AppContext';
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -47,8 +47,8 @@ export default function Login() {
         className="w-full max-w-sm glass-strong rounded-[32px] p-8 relative z-10"
       >
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-[20px] bg-sky-500 flex items-center justify-center shadow-[0_10px_30px_rgba(14,165,233,0.4)] mb-5 relative">
-            <ShieldCheck className="w-8 h-8 text-white relative z-10" />
+          <div className="w-16 h-16 rounded-[20px] bg-white flex items-center justify-center shadow-[0_10px_30px_rgba(14,165,233,0.25)] ring-1 ring-sky-100 mb-5 p-2.5 relative">
+            <img src="/logo.png" alt="AdilaNet" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-[26px] font-bold text-slate-800 tracking-tight">AdilaNet Login</h1>
           <p className="text-slate-500 text-[13px] font-medium mt-1 text-center">Keamanan Tinggi Diaktifkan</p>

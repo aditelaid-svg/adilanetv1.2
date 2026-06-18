@@ -6,7 +6,7 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#000000",
+  "background_color": "#e0f2fe",
   "theme_color": "#0A84FF",
   "categories": ["utilities", "business"],
   "icons": [
@@ -53,9 +53,9 @@
       "purpose": "maskable"
     },
     {
-      "src": "/icons/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/icons/favicon.png",
+      "sizes": "128x128",
+      "type": "image/png"
     }
   ],
   "shortcuts": [

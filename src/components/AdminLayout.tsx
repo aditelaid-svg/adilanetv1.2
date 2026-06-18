@@ -80,8 +80,8 @@ export default function AdminLayout() {
               >
                 <div className="p-5 flex items-center justify-between border-b border-slate-100 mt-safe">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-[10px] bg-sky-500 flex items-center justify-center shadow-[0_8px_20px_rgba(14,165,233,0.3)]">
-                      <RouterIcon className="w-5 h-5 text-white" strokeWidth={1.8} />
+                    <div className="w-10 h-10 rounded-[10px] bg-white flex items-center justify-center shadow-[0_8px_20px_rgba(14,165,233,0.25)] ring-1 ring-sky-100 p-1.5">
+                      <img src="/logo.png" alt="AdilaNet" className="w-full h-full object-contain" />
                     </div>
                     <div>
                         <h2 className="font-bold text-slate-800 text-[17px] leading-tight tracking-tight">AdilaNet</h2>

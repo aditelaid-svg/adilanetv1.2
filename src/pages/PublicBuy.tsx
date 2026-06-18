@@ -117,8 +117,8 @@ export default function PublicBuy() {
         className="w-full max-w-sm relative z-10"
       >
         <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 rounded-[18px] bg-sky-500 flex items-center justify-center shadow-[0_8px_20px_rgba(14,165,233,0.3)] mb-4">
-            <ShieldCheck className="w-7 h-7 text-white" strokeWidth={1.8} />
+          <div className="w-14 h-14 rounded-[18px] bg-white flex items-center justify-center shadow-[0_8px_20px_rgba(14,165,233,0.25)] ring-1 ring-sky-100 mb-4 p-2">
+            <img src="/logo.png" alt="AdilaNet" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-[20px] font-bold text-slate-800 tracking-tight">AdilaNet</h1>
           <p className="text-slate-500 text-[12px] font-medium mt-0.5">Portal Voucher WiFi</p>
