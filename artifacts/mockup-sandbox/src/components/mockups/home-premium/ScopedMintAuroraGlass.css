@@ -1,0 +1,89 @@
+/* ScopedMintAuroraGlass.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+.mint-container {
+  font-family: -apple-system, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mint-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #a7f3d0 0%, #d8b4fe 50%, #bae6fd 100%);
+  z-index: 0;
+  overflow: hidden;
+}
+
+.mint-blob-1 {
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 60%;
+  height: 60%;
+  background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+  border-radius: 50%;
+  filter: blur(60px);
+  animation: mint-float 15s ease-in-out infinite alternate;
+}
+
+.mint-blob-2 {
+  position: absolute;
+  bottom: -20%;
+  right: -10%;
+  width: 70%;
+  height: 70%;
+  background: radial-gradient(circle, rgba(216,180,254,0.6) 0%, rgba(216,180,254,0) 70%);
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: mint-float 20s ease-in-out infinite alternate-reverse;
+}
+
+.mint-blob-3 {
+  position: absolute;
+  top: 40%;
+  left: 30%;
+  width: 50%;
+  height: 50%;
+  background: radial-gradient(circle, rgba(167,243,208,0.7) 0%, rgba(167,243,208,0) 70%);
+  border-radius: 50%;
+  filter: blur(70px);
+  animation: mint-float 18s ease-in-out infinite alternate;
+}
+
+@keyframes mint-float {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+.mint-glass {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.05);
+}
+
+.mint-glass-heavy {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+.mint-glass-pill {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.mint-hide-scroll::-webkit-scrollbar {
+  display: none;
+}
+.mint-hide-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

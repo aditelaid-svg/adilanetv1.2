@@ -3,8 +3,11 @@ type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/home-premium/AureliaCouture.tsx": () => import("../components/mockups/home-premium/AureliaCouture.tsx"),
   "./components/mockups/home-premium/AuroraGlass.tsx": () => import("../components/mockups/home-premium/AuroraGlass.tsx"),
+  "./components/mockups/home-premium/CoastalGlass.tsx": () => import("../components/mockups/home-premium/CoastalGlass.tsx"),
   "./components/mockups/home-premium/EditorialPremium.tsx": () => import("../components/mockups/home-premium/EditorialPremium.tsx"),
   "./components/mockups/home-premium/LiquidMesh.tsx": () => import("../components/mockups/home-premium/LiquidMesh.tsx"),
+  "./components/mockups/home-premium/MintAuroraGlass.tsx": () => import("../components/mockups/home-premium/MintAuroraGlass.tsx"),
   "./components/mockups/home-premium/ObsidianGold.tsx": () => import("../components/mockups/home-premium/ObsidianGold.tsx"),
+  "./components/mockups/home-premium/SunsetGlass.tsx": () => import("../components/mockups/home-premium/SunsetGlass.tsx"),
   "./components/mockups/home-premium/VibrantNeo.tsx": () => import("../components/mockups/home-premium/VibrantNeo.tsx")
 };
