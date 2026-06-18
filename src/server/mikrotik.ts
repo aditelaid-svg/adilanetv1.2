@@ -11,6 +11,8 @@ export interface MikrotikProfile {
   id: string;
   name: string;
   sessionTimeout: string;
+  validity: string;
+  validityRaw: string;
   sharedUsers: string;
   rateLimit: string;
 }
@@ -31,6 +33,75 @@ function parseTimeout(timeout: string): string {
   return timeout;
 }
 
+// Name of the single global scheduler that enforces fixed-validity expiry.
+const REAPER_NAME = 'an-voucher-reaper';
+
+// Convert a raw RouterOS-style duration ("30m" / "10h" / "7d") to total minutes.
+function validityToMinutes(raw: string): number {
+  const m = String(raw).match(/^(\d+)([mhd])$/);
+  if (!m) return 0;
+  const v = parseInt(m[1], 10);
+  return m[2] === 'm' ? v : m[2] === 'h' ? v * 60 : v * 1440;
+}
+
+// Convert total minutes back to the shortest single-unit raw string.
+function minutesToRaw(min: number): string {
+  if (!min || min <= 0) return '';
+  if (min % 1440 === 0) return `${min / 1440}d`;
+  if (min % 60 === 0) return `${min / 60}h`;
+  return `${min}m`;
+}
+
+// Turn a raw RouterOS duration like "10h" / "30m" / "7d" into a human label.
+function humanizeValidity(raw: string): string {
+  if (!raw) return '';
+  const d = raw.match(/(\d+)d/);
+  const h = raw.match(/(\d+)h/);
+  const m = raw.match(/(\d+)m/);
+  const parts: string[] = [];
+  if (d) parts.push(`${parseInt(d[1])} Hari`);
+  if (h) parts.push(`${parseInt(h[1])} Jam`);
+  if (m) parts.push(`${parseInt(m[1])} Menit`);
+  return parts.join(' ') || raw;
+}
+
+// Read the configured validity back out of the profile's on-login arming script.
+// The arming script stamps the remaining minutes into the user comment, e.g.
+// `... set comment=600 ...`, so we recover the duration from that number.
+function parseOnLoginValidity(script: string): string {
+  if (!script) return '';
+  const m = String(script).match(/comment=(\d+)/);
+  return m ? minutesToRaw(parseInt(m[1], 10)) : '';
+}
+
+// on-login arming script: on the FIRST login only (comment still empty), stamp
+// the remaining validity in MINUTES into the hotspot user's comment. The global
+// reaper scheduler then counts that number down once per minute. Counting starts
+// at first login and runs on wall-clock time regardless of usage/reconnects.
+function buildExpiryScript(validityRaw: string): string {
+  const minutes = validityToMinutes(validityRaw);
+  return `:local id [/ip hotspot user find name=$user]; :if ([:len $id]>0) do={:if ([/ip hotspot user get $id comment]="") do={/ip hotspot user set comment=${minutes} $id}}`;
+}
+
+// on-event for the single global reaper scheduler. Every minute it decrements the
+// minute-counter stored in each armed user's comment and removes the user when it
+// reaches zero. No per-user schedulers, no date math, no immediate-fire risk.
+function reaperScript(): string {
+  return `:foreach u in=[/ip hotspot user find where comment~"^[0-9]+\\$"] do={:local r [:tonum [/ip hotspot user get $u comment]]; :if ($r<=1) do={/ip hotspot user remove $u} else={/ip hotspot user set comment=($r-1) $u}}`;
+}
+
+// Make sure the global reaper scheduler exists on the router (idempotent).
+async function ensureReaper(api: RouterOSAPI) {
+  const existing = await api.write('/system/scheduler/print', [`?name=${REAPER_NAME}`]) as any[];
+  if (Array.isArray(existing) && existing.length > 0) return;
+  await api.write('/system/scheduler/add', [
+    `=name=${REAPER_NAME}`,
+    `=interval=60s`,
+    `=policy=read,write,test`,
+    `=on-event=${reaperScript()}`,
+  ]);
+}
+
 export async function getProfiles(config: MikrotikConfig): Promise<MikrotikProfile[]> {
   const port = config.port ? parseInt(String(config.port)) : 8728;
   const api = new RouterOSAPI({
@@ -47,13 +118,19 @@ export async function getProfiles(config: MikrotikConfig): Promise<MikrotikProfi
     const profiles = Array.isArray(result) ? result : [];
     return profiles
       .filter((p: any) => p && p.name)
-      .map((p: any) => ({
-        id: p['.id'] || p.id || p.name,
-        name: p.name,
-        sessionTimeout: parseTimeout(p['session-timeout'] || p.sessionTimeout || ''),
-        sharedUsers: p['shared-users'] || p.sharedUsers || '1',
-        rateLimit: p['rate-limit'] || p.rateLimit || 'N/A',
-      }));
+      .map((p: any) => {
+        const rawSession = p['session-timeout'] || p.sessionTimeout || '';
+        const validityRaw = parseOnLoginValidity(p['on-login'] || p.onLogin || '');
+        return {
+          id: p['.id'] || p.id || p.name,
+          name: p.name,
+          sessionTimeout: parseTimeout(rawSession),
+          validityRaw,
+          validity: validityRaw ? humanizeValidity(validityRaw) : parseTimeout(rawSession),
+          sharedUsers: p['shared-users'] || p.sharedUsers || '1',
+          rateLimit: p['rate-limit'] || p.rateLimit || 'N/A',
+        };
+      });
   } catch (error: any) {
     console.error('[Mikrotik] getProfiles error:', error?.message || error);
     throw error;
@@ -67,6 +144,7 @@ export interface ProfileInput {
   rateLimit?: string;
   sharedUsers?: string;
   sessionTimeout?: string;
+  validity?: string;
 }
 
 export interface ActiveUser {
@@ -146,7 +224,14 @@ function profileParams(p: ProfileInput): string[] {
   const params: string[] = [`=name=${p.name}`];
   if (p.rateLimit) params.push(`=rate-limit=${p.rateLimit}`);
   if (p.sharedUsers) params.push(`=shared-users=${p.sharedUsers}`);
-  if (p.sessionTimeout) params.push(`=session-timeout=${p.sessionTimeout}`);
+  if (p.validity) {
+    // Fixed validity from first login: enforce via on-login scheduler, and clear
+    // the per-session timeout (0s = none) so usage isn't cut short within the window.
+    params.push(`=on-login=${buildExpiryScript(p.validity)}`);
+    params.push(`=session-timeout=0s`);
+  } else if (p.sessionTimeout) {
+    params.push(`=session-timeout=${p.sessionTimeout}`);
+  }
   return params;
 }
 
@@ -154,7 +239,9 @@ export async function createProfile(config: MikrotikConfig, p: ProfileInput) {
   const api = connect(config);
   try {
     await api.connect();
-    return await api.write('/ip/hotspot/user/profile/add', profileParams(p));
+    const result = await api.write('/ip/hotspot/user/profile/add', profileParams(p));
+    if (p.validity) await ensureReaper(api);
+    return result;
   } catch (error: any) {
     console.error('[Mikrotik] createProfile error:', error?.message || error);
     throw error;
@@ -167,7 +254,9 @@ export async function updateProfile(config: MikrotikConfig, id: string, p: Profi
   const api = connect(config);
   try {
     await api.connect();
-    return await api.write('/ip/hotspot/user/profile/set', [`=.id=${id}`, ...profileParams(p)]);
+    const result = await api.write('/ip/hotspot/user/profile/set', [`=.id=${id}`, ...profileParams(p)]);
+    if (p.validity) await ensureReaper(api);
+    return result;
   } catch (error: any) {
     console.error('[Mikrotik] updateProfile error:', error?.message || error);
     throw error;

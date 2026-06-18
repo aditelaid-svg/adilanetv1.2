@@ -10,6 +10,8 @@ interface MikrotikProfile {
   id: string;
   name: string;
   sessionTimeout: string;
+  validity: string;
+  validityRaw: string;
   sharedUsers: string;
   rateLimit: string;
 }
@@ -86,7 +88,7 @@ export default function AdminPackages() {
     setForm(f => ({
       ...f,
       mikrotik_profile: profileName,
-      duration: found?.sessionTimeout && found.sessionTimeout !== 'N/A' ? found.sessionTimeout : f.duration,
+      duration: found?.validity && found.validity !== 'N/A' ? found.validity : f.duration,
       speed: found?.rateLimit && found.rateLimit !== 'N/A' ? found.rateLimit : f.speed,
     }));
   };
@@ -350,14 +352,14 @@ export default function AdminPackages() {
                       </option>
                       {profiles.map(p => (
                         <option value={p.name} key={p.id}>
-                          {p.name} — {p.sessionTimeout} — {p.rateLimit}
+                          {p.name} — {p.validity} — {p.rateLimit}
                         </option>
                       ))}
                     </select>
                     {selectedProfile && (
                       <div className="flex flex-wrap gap-2 mt-2">
                         <span className="text-[11px] bg-sky-50 text-sky-600 px-2 py-1 rounded-[8px] border border-sky-100 font-semibold">
-                          ⏱ {selectedProfile.sessionTimeout}
+                          ⏱ {selectedProfile.validity}
                         </span>
                         <span className="text-[11px] bg-white text-slate-500 px-2 py-1 rounded-[8px] border border-slate-100 font-semibold">
                           ⚡ {selectedProfile.rateLimit}

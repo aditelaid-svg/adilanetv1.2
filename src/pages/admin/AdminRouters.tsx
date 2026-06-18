@@ -9,8 +9,8 @@ import EmptyState from '../../components/ui/EmptyState';
 type RouterForm = { name: string; ip_address: string; api_port: string; username: string; password: string };
 const emptyForm: RouterForm = { name: '', ip_address: '', api_port: '8728', username: 'admin', password: '' };
 
-type ProfileForm = { name: string; rateLimit: string; sharedUsers: string; sessionTimeout: string };
-const emptyProfileForm: ProfileForm = { name: '', rateLimit: '', sharedUsers: '1', sessionTimeout: '' };
+type ProfileForm = { name: string; rateLimit: string; sharedUsers: string; durationValue: string; durationUnit: 'm' | 'h' | 'd' };
+const emptyProfileForm: ProfileForm = { name: '', rateLimit: '', sharedUsers: '1', durationValue: '', durationUnit: 'h' };
 
 type TestResult = { connected: boolean; message: string; latency?: number } | null;
 
@@ -107,11 +107,13 @@ export default function AdminRouters() {
   };
 
   const openProfileEdit = (p: MikrotikProfile) => {
+    const mm = (p.validityRaw || '').match(/^(\d+)([mhd])$/);
     setProfileForm({
       name: p.name,
       rateLimit: p.rateLimit === 'N/A' ? '' : p.rateLimit,
       sharedUsers: p.sharedUsers || '1',
-      sessionTimeout: '',
+      durationValue: mm ? mm[1] : '',
+      durationUnit: (mm ? mm[2] : 'h') as 'm' | 'h' | 'd',
     });
     setProfileEditId(p.id);
     setShowProfileForm(true);
@@ -130,7 +132,7 @@ export default function AdminRouters() {
         name: profileForm.name,
         rateLimit: profileForm.rateLimit || undefined,
         sharedUsers: profileForm.sharedUsers || undefined,
-        sessionTimeout: profileForm.sessionTimeout || undefined,
+        validity: profileForm.durationValue ? `${profileForm.durationValue}${profileForm.durationUnit}` : undefined,
       };
       if (profileEditId) {
         await updateRouterProfile(profileRouterId, profileEditId, payload);
@@ -466,19 +468,28 @@ export default function AdminRouters() {
                       placeholder="e.g. 2M/2M"
                       className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 font-mono text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-600 mb-1.5">Shared Users</label>
-                      <input type="text" value={profileForm.sharedUsers} onChange={e => setProfileForm({ ...profileForm, sharedUsers: e.target.value })}
-                        placeholder="1"
-                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Masa Aktif Voucher</label>
+                    <div className="flex gap-2">
+                      <input type="number" min="1" value={profileForm.durationValue}
+                        onChange={e => setProfileForm({ ...profileForm, durationValue: e.target.value })}
+                        placeholder={profileEditId ? 'kosong = tetap' : 'e.g. 10'}
+                        className="flex-1 bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
+                      <select value={profileForm.durationUnit}
+                        onChange={e => setProfileForm({ ...profileForm, durationUnit: e.target.value as 'm' | 'h' | 'd' })}
+                        className="w-32 bg-white border border-slate-200 rounded-2xl px-3 py-3.5 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300">
+                        <option value="m">Menit</option>
+                        <option value="h">Jam</option>
+                        <option value="d">Hari</option>
+                      </select>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-600 mb-1.5">Session Timeout</label>
-                      <input type="text" value={profileForm.sessionTimeout} onChange={e => setProfileForm({ ...profileForm, sessionTimeout: e.target.value })}
-                        placeholder={profileEditId ? 'kosong = tetap' : 'e.g. 1h, 1d'}
-                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
-                    </div>
+                    <p className="text-[12px] text-slate-400 mt-1.5 leading-snug">Dihitung sejak voucher login pertama kali. Setelah masa ini habis, voucher otomatis hangus walau belum dipakai penuh.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Shared Users <span className="text-slate-400 font-normal">(perangkat bersamaan)</span></label>
+                    <input type="text" value={profileForm.sharedUsers} onChange={e => setProfileForm({ ...profileForm, sharedUsers: e.target.value })}
+                      placeholder="1"
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                   </div>
                   <div className="flex gap-2 pt-1 max-sm:pb-6">
                     <button type="button" onClick={() => setShowProfileForm(false)}
@@ -533,7 +544,7 @@ export default function AdminRouters() {
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
                             <span className="flex items-center gap-1"><Gauge className="w-3 h-3" strokeWidth={2} /> {p.rateLimit}</span>
                             <span className="flex items-center gap-1"><Users className="w-3 h-3" strokeWidth={2} /> {p.sharedUsers}</span>
-                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" strokeWidth={2} /> {p.sessionTimeout}</span>
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" strokeWidth={2} /> {p.validity}</span>
                           </div>
                         </div>
                       ))

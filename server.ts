@@ -1296,12 +1296,12 @@ async function startServer() {
       const router = rows[0];
 
       const fallbackProfiles = [
-        { id: "default", name: "default", sessionTimeout: "Unlimited", sharedUsers: "1", rateLimit: "N/A" },
-        { id: "1jam", name: "1jam", sessionTimeout: "1 Jam", sharedUsers: "1", rateLimit: "2M/2M" },
-        { id: "3jam", name: "3jam", sessionTimeout: "3 Jam", sharedUsers: "1", rateLimit: "5M/5M" },
-        { id: "1hari", name: "1hari", sessionTimeout: "1 Hari", sharedUsers: "1", rateLimit: "10M/10M" },
-        { id: "7hari", name: "7hari", sessionTimeout: "7 Hari", sharedUsers: "2", rateLimit: "20M/20M" },
-        { id: "30hari", name: "30hari", sessionTimeout: "30 Hari", sharedUsers: "3", rateLimit: "50M/50M" },
+        { id: "default", name: "default", sessionTimeout: "Unlimited", validity: "Unlimited", validityRaw: "", sharedUsers: "1", rateLimit: "N/A" },
+        { id: "1jam", name: "1jam", sessionTimeout: "1 Jam", validity: "1 Jam", validityRaw: "1h", sharedUsers: "1", rateLimit: "2M/2M" },
+        { id: "3jam", name: "3jam", sessionTimeout: "3 Jam", validity: "3 Jam", validityRaw: "3h", sharedUsers: "1", rateLimit: "5M/5M" },
+        { id: "1hari", name: "1hari", sessionTimeout: "1 Hari", validity: "1 Hari", validityRaw: "1d", sharedUsers: "1", rateLimit: "10M/10M" },
+        { id: "7hari", name: "7hari", sessionTimeout: "7 Hari", validity: "7 Hari", validityRaw: "7d", sharedUsers: "2", rateLimit: "20M/20M" },
+        { id: "30hari", name: "30hari", sessionTimeout: "30 Hari", validity: "30 Hari", validityRaw: "30d", sharedUsers: "3", rateLimit: "50M/50M" },
       ];
 
       try {
@@ -1361,7 +1361,7 @@ async function startServer() {
 
   // Validate hotspot profile fields before sending to RouterOS
   function validateProfileInput(body: any): string | null {
-    const { name, rateLimit, sharedUsers, sessionTimeout } = body;
+    const { name, rateLimit, sharedUsers, sessionTimeout, validity } = body;
     const hasCtrl = (s: string) => /[\x00-\x1f]/.test(s);
     if (typeof name !== "string" || !/^[\w .\-]{1,64}$/.test(name)) {
       return "Nama profil hanya boleh huruf, angka, spasi, titik, dash; maks 64 karakter.";
@@ -1378,18 +1378,22 @@ async function startServer() {
         (typeof sessionTimeout !== "string" || sessionTimeout.length > 32 || hasCtrl(sessionTimeout))) {
       return "Session timeout tidak valid.";
     }
+    if (validity !== undefined && validity !== "" &&
+        (typeof validity !== "string" || !/^\d{1,5}[mhd]$/.test(validity))) {
+      return "Masa aktif tidak valid (gunakan menit/jam/hari).";
+    }
     return null;
   }
 
   app.post("/api/routers/:id/profiles", requireAdmin, async (req, res) => {
     try {
-      const { name, rateLimit, sharedUsers, sessionTimeout } = req.body;
+      const { name, rateLimit, sharedUsers, sessionTimeout, validity } = req.body;
       if (!name) return res.status(400).json({ success: false, error: "Nama profil wajib diisi." });
       const vErr = validateProfileInput(req.body);
       if (vErr) return res.status(400).json({ success: false, error: vErr });
       const cfg = await getRouterConfig(req.params.id);
       if (!cfg) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
-      await createProfile(cfg, { name, rateLimit, sharedUsers, sessionTimeout });
+      await createProfile(cfg, { name, rateLimit, sharedUsers, sessionTimeout, validity });
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ success: false, error: `Gagal membuat profil di router: ${err.message}` });
@@ -1398,7 +1402,7 @@ async function startServer() {
 
   app.put("/api/routers/:id/profiles", requireAdmin, async (req, res) => {
     try {
-      const { profileId, name, rateLimit, sharedUsers, sessionTimeout } = req.body;
+      const { profileId, name, rateLimit, sharedUsers, sessionTimeout, validity } = req.body;
       if (!profileId || !name) return res.status(400).json({ success: false, error: "profileId dan name wajib diisi." });
       if (typeof profileId !== "string" || profileId.length > 64 || /[\x00-\x1f]/.test(profileId)) {
         return res.status(400).json({ success: false, error: "profileId tidak valid." });
@@ -1407,7 +1411,7 @@ async function startServer() {
       if (vErr) return res.status(400).json({ success: false, error: vErr });
       const cfg = await getRouterConfig(req.params.id);
       if (!cfg) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
-      await updateProfile(cfg, profileId, { name, rateLimit, sharedUsers, sessionTimeout });
+      await updateProfile(cfg, profileId, { name, rateLimit, sharedUsers, sessionTimeout, validity });
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ success: false, error: `Gagal memperbarui profil di router: ${err.message}` });

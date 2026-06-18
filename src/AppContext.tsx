@@ -119,6 +119,8 @@ export type MikrotikProfile = {
   id: string;
   name: string;
   sessionTimeout: string;
+  validity: string;
+  validityRaw: string;
   sharedUsers: string;
   rateLimit: string;
 };
@@ -128,6 +130,7 @@ export type ProfileInput = {
   rateLimit?: string;
   sharedUsers?: string;
   sessionTimeout?: string;
+  validity?: string;
 };
 
 export type ActiveUser = {
