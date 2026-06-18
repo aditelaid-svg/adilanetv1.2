@@ -52,7 +52,7 @@ export default function UserProfile() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className={`mb-4 px-4 py-3 rounded-[16px] text-[13px] font-medium border ${notification.type === 'success' ? 'bg-[#34C759]/10 text-[#34C759] border-[#34C759]/20' : 'bg-[#FF453A]/10 text-[#FF453A] border-[#FF453A]/20'}`}
+            className={`mb-4 px-4 py-3 rounded-[16px] text-[13px] font-medium border ${notification.type === 'success' ? 'bg-success/10 text-success border-success/20' : 'bg-danger/10 text-danger border-danger/20'}`}
           >
             {notification.message}
           </motion.div>
@@ -60,7 +60,7 @@ export default function UserProfile() {
       </AnimatePresence>
 
       <div className="space-y-5">
-        <div className="bg-[#1C1C1E] border border-white/5 rounded-[24px] overflow-hidden shadow-sm">
+        <div className="bg-surface border border-white/5 rounded-[24px] overflow-hidden shadow-sm">
           <div className="px-4 py-3.5 border-b border-white/5 bg-white/[0.02]">
             <h2 className="text-white font-semibold text-[13px] tracking-wide uppercase text-white/50">Informasi Akun</h2>
           </div>
@@ -98,14 +98,14 @@ export default function UserProfile() {
                 <ShieldAlert className="w-[18px] h-[18px] text-white/40" />
                 <span className="text-[15px] font-medium">PIN Transaksi</span>
               </div>
-              <span className={`text-[13px] font-semibold px-2 py-0.5 rounded ${currentUser?.pin ? 'bg-[#34C759]/10 text-[#34C759]' : 'bg-[#FF9F0A]/10 text-[#FF9F0A]'}`}>
+              <span className={`text-[13px] font-semibold px-2 py-0.5 rounded ${currentUser?.pin ? 'bg-success/10 text-success' : 'bg-gold/10 text-gold'}`}>
                 {currentUser?.pin ? 'Aktif' : 'Belum Diatur'}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="bg-[#1C1C1E] border border-white/5 rounded-[24px] overflow-hidden shadow-sm">
+        <div className="bg-surface border border-white/5 rounded-[24px] overflow-hidden shadow-sm">
           <div className="px-4 py-3.5 border-b border-white/5 bg-white/[0.02]">
             <h2 className="text-white font-semibold text-[13px] tracking-wide uppercase text-white/50">Keamanan</h2>
           </div>
@@ -135,7 +135,7 @@ export default function UserProfile() {
 
         <button
           onClick={logout}
-          className="w-full bg-[#FF453A]/10 hover:bg-[#FF453A]/20 active:bg-[#FF453A]/30 text-[#FF453A] font-medium py-3.5 rounded-[20px] transition-all flex justify-center items-center gap-2 mt-4 text-[15px]"
+          className="w-full bg-danger/10 hover:bg-danger/20 active:bg-danger/30 text-danger font-medium py-3.5 rounded-[20px] transition-all flex justify-center items-center gap-2 mt-4 text-[15px]"
         >
           <LogOut className="w-[18px] h-[18px]" />
           Keluar
@@ -153,7 +153,7 @@ export default function UserProfile() {
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="w-full max-w-md bg-[#1C1C1E] rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative border-t border-white/10 sm:border-white/10"
+              className="w-full max-w-md bg-surface rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative border-t border-white/10 sm:border-white/10"
             >
               <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 sm:hidden" />
               <button onClick={() => setShowPasswordModal(false)} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
@@ -168,11 +168,11 @@ export default function UserProfile() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Masukkan password baru"
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50"
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50"
                     required
                   />
                 </div>
-                <button type="submit" disabled={saving} className="w-full bg-[#0A84FF] disabled:opacity-50 hover:bg-[#0A84FF]/90 active:scale-[0.98] text-white font-semibold py-4 rounded-[16px] transition-transform text-[15px]">
+                <button type="submit" disabled={saving} className="w-full bg-brand disabled:opacity-50 hover:bg-brand/90 active:scale-[0.98] text-white font-semibold py-4 rounded-[16px] transition-transform text-[15px]">
                   {saving ? 'Menyimpan...' : 'Simpan Password'}
                 </button>
               </form>
@@ -185,7 +185,7 @@ export default function UserProfile() {
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="w-full max-w-md bg-[#1C1C1E] rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative border-t border-white/10 sm:border-white/10"
+              className="w-full max-w-md bg-surface rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative border-t border-white/10 sm:border-white/10"
             >
               <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 sm:hidden" />
               <button onClick={() => setShowPinModal(false)} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
@@ -203,11 +203,11 @@ export default function UserProfile() {
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, ''))}
                     placeholder="Masukkan 6 digit angka"
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-center font-mono tracking-[0.5em] text-[20px] focus:outline-none focus:border-[#0A84FF]/50"
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-center font-mono tracking-[0.5em] text-[20px] focus:outline-none focus:border-brand/50"
                     required
                   />
                 </div>
-                <button type="submit" disabled={newPin.length !== 6 || saving} className="w-full bg-[#0A84FF] disabled:bg-white/5 disabled:text-white/30 hover:bg-[#0A84FF]/90 active:scale-[0.98] text-white font-semibold py-4 rounded-[16px] transition-transform text-[15px]">
+                <button type="submit" disabled={newPin.length !== 6 || saving} className="w-full bg-brand disabled:bg-white/5 disabled:text-white/30 hover:bg-brand/90 active:scale-[0.98] text-white font-semibold py-4 rounded-[16px] transition-transform text-[15px]">
                   {saving ? 'Menyimpan...' : 'Simpan PIN'}
                 </button>
               </form>

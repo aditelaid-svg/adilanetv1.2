@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../AppContext';
 import { Ticket, Plus, Printer, Settings2, RefreshCw, Wifi, Clock, AlertCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatRupiah } from '../../lib/format';
 
 interface MikrotikProfile {
   id: string;
@@ -127,7 +128,7 @@ export default function AdminVouchers() {
         </div>
         <button
           onClick={() => setShowGenerate(true)}
-          className="bg-[#0A84FF] hover:bg-[#0070e0] active:scale-95 text-white px-4 py-2 rounded-[14px] text-sm font-bold flex items-center gap-2 shadow-lg shadow-[#0A84FF]/20 transition-all"
+          className="bg-brand hover:bg-brand-hover active:scale-95 text-white px-4 py-2 rounded-[14px] text-sm font-bold flex items-center gap-2 shadow-lg shadow-brand/20 transition-all"
         >
           <Plus className="w-4 h-4" /> Bikin
         </button>
@@ -146,7 +147,7 @@ export default function AdminVouchers() {
                 {generatedCodes.length} Voucher Dibuat
               </h3>
               <p className="text-[11px] text-white/40 mt-0.5">
-                Profil: {mikrotikProfile} • {duration} • Rp {parseInt(price || '0').toLocaleString('id-ID')}
+                Profil: {mikrotikProfile} • {duration} • {formatRupiah(parseInt(price || '0'))}
               </p>
             </div>
             <div className="flex gap-2">
@@ -167,7 +168,7 @@ export default function AdminVouchers() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {generatedCodes.map((code, idx) => (
               <div key={idx} className="bg-black/40 border border-white/10 rounded-[14px] px-3 py-2.5 flex flex-col items-center justify-center text-center">
-                <span className="font-mono text-sm text-[#0A84FF] font-bold tracking-wider">{code.user}</span>
+                <span className="font-mono text-sm text-brand font-bold tracking-wider">{code.user}</span>
                 {loginMode === 'separate' && (
                   <span className="font-mono text-[10px] text-white/40 tracking-wider mt-0.5">Pass: {code.pass}</span>
                 )}
@@ -180,18 +181,18 @@ export default function AdminVouchers() {
       <div className="bg-white/[0.02] border border-white/5 rounded-[24px] p-5 shadow-sm">
         <h3 className="font-bold text-white mb-4">Cara Kerja Profil Mikrotik</h3>
         <div className="space-y-3">
-          <div className="flex items-start gap-3 bg-[#0A84FF]/5 border border-[#0A84FF]/20 rounded-[16px] p-4">
-            <Wifi className="w-5 h-5 text-[#0A84FF] shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 bg-brand/5 border border-brand/20 rounded-[16px] p-4">
+            <Wifi className="w-5 h-5 text-brand shrink-0 mt-0.5" />
             <div>
               <p className="text-[13px] font-semibold text-white mb-1">Profil Otomatis dari Router</p>
               <p className="text-[12px] text-white/50 leading-relaxed">
-                Saat memilih router, sistem akan <span className="text-[#0A84FF]">otomatis mengambil profil</span> dari Mikrotik via API. 
+                Saat memilih router, sistem akan <span className="text-brand">otomatis mengambil profil</span> dari Mikrotik via API. 
                 Durasi voucher diambil dari field <code className="bg-white/10 px-1 rounded">session-timeout</code> profil.
               </p>
             </div>
           </div>
-          <div className="flex items-start gap-3 bg-[#FF9F0A]/5 border border-[#FF9F0A]/20 rounded-[16px] p-4">
-            <Clock className="w-5 h-5 text-[#FF9F0A] shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 bg-gold/5 border border-gold/20 rounded-[16px] p-4">
+            <Clock className="w-5 h-5 text-gold shrink-0 mt-0.5" />
             <div>
               <p className="text-[13px] font-semibold text-white mb-1">Demo Mode (Router Offline)</p>
               <p className="text-[12px] text-white/50 leading-relaxed">
@@ -214,7 +215,7 @@ export default function AdminVouchers() {
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="w-full max-w-md bg-[#1C1C1E] border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative my-auto"
+              className="w-full max-w-md bg-surface border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative my-auto"
             >
               <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 sm:hidden" />
               <button
@@ -224,7 +225,7 @@ export default function AdminVouchers() {
                 <X className="w-4 h-4" />
               </button>
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-[#0A84FF]/20 text-[#0A84FF] rounded-[12px] flex items-center justify-center">
+                <div className="w-10 h-10 bg-brand/20 text-brand rounded-[12px] flex items-center justify-center">
                   <Settings2 className="w-5 h-5" />
                 </div>
                 <h3 className="text-[22px] font-bold text-white tracking-tight">Generate Voucher</h3>
@@ -237,12 +238,12 @@ export default function AdminVouchers() {
                   <select
                     value={selectedRouter}
                     onChange={e => setSelectedRouter(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 appearance-none"
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 appearance-none"
                     required
                   >
-                    <option value="" disabled className="bg-[#1C1C1E] text-white/40">Pilih Router...</option>
+                    <option value="" disabled className="bg-surface text-white/40">Pilih Router...</option>
                     {routers.map(r => (
-                      <option value={r.id} key={r.id} className="bg-[#1C1C1E]">
+                      <option value={r.id} key={r.id} className="bg-surface">
                         {r.name} ({r.ip_address}) — {r.status}
                       </option>
                     ))}
@@ -258,36 +259,36 @@ export default function AdminVouchers() {
                       </label>
                       {loadingProfiles && <RefreshCw className="w-3.5 h-3.5 text-white/40 animate-spin" />}
                       {profileSource === 'mikrotik' && (
-                        <span className="text-[10px] bg-[#34C759]/10 text-[#34C759] px-2 py-0.5 rounded font-semibold border border-[#34C759]/20">LIVE Mikrotik</span>
+                        <span className="text-[10px] bg-success/10 text-success px-2 py-0.5 rounded font-semibold border border-success/20">LIVE Mikrotik</span>
                       )}
                       {profileSource === 'demo' && (
-                        <span className="text-[10px] bg-[#FF9F0A]/10 text-[#FF9F0A] px-2 py-0.5 rounded font-semibold border border-[#FF9F0A]/20">Demo Mode</span>
+                        <span className="text-[10px] bg-gold/10 text-gold px-2 py-0.5 rounded font-semibold border border-gold/20">Demo Mode</span>
                       )}
                     </div>
                     {profileError && (
-                      <div className="flex items-center gap-2 text-[12px] text-[#FF453A] bg-[#FF453A]/10 rounded-[12px] p-3 mb-2 border border-[#FF453A]/20">
+                      <div className="flex items-center gap-2 text-[12px] text-danger bg-danger/10 rounded-[12px] p-3 mb-2 border border-danger/20">
                         <AlertCircle className="w-4 h-4 shrink-0" /> {profileError}
                       </div>
                     )}
                     <select
                       value={mikrotikProfile}
                       onChange={e => handleProfileChange(e.target.value)}
-                      className={`w-full rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none appearance-none ${profileSource === 'mikrotik' ? 'bg-[#0A84FF]/5 border border-[#0A84FF]/30 focus:border-[#0A84FF]' : 'bg-white/[0.03] border border-white/5 focus:border-[#0A84FF]/50'}`}
+                      className={`w-full rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none appearance-none ${profileSource === 'mikrotik' ? 'bg-brand/5 border border-brand/30 focus:border-brand' : 'bg-white/[0.03] border border-white/5 focus:border-brand/50'}`}
                       required
                       disabled={loadingProfiles || profiles.length === 0}
                     >
-                      <option value="" disabled className="bg-[#1C1C1E] text-white/40">
+                      <option value="" disabled className="bg-surface text-white/40">
                         {loadingProfiles ? 'Memuat profil dari router...' : 'Pilih Profil...'}
                       </option>
                       {profiles.map(p => (
-                        <option value={p.name} key={p.id} className="bg-[#1C1C1E]">
+                        <option value={p.name} key={p.id} className="bg-surface">
                           {p.name} — {p.sessionTimeout} — {p.rateLimit}
                         </option>
                       ))}
                     </select>
                     {selectedProfileInfo && (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        <span className="text-[11px] bg-[#0A84FF]/10 text-[#0A84FF] px-2 py-1 rounded-[8px] border border-[#0A84FF]/20 font-semibold">
+                        <span className="text-[11px] bg-brand/10 text-brand px-2 py-1 rounded-[8px] border border-brand/20 font-semibold">
                           ⏱ {selectedProfileInfo.sessionTimeout}
                         </span>
                         <span className="text-[11px] bg-white/5 text-white/60 px-2 py-1 rounded-[8px] border border-white/10 font-semibold">
@@ -310,7 +311,7 @@ export default function AdminVouchers() {
                       placeholder="5000"
                       value={price}
                       onChange={e => setPrice(e.target.value)}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50"
+                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
                       required
                     />
                   </div>
@@ -321,7 +322,7 @@ export default function AdminVouchers() {
                       placeholder="Auto dari profil"
                       value={duration}
                       onChange={e => setDuration(e.target.value)}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50"
+                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
                     />
                   </div>
                 </div>
@@ -333,10 +334,10 @@ export default function AdminVouchers() {
                     <select
                       value={codeFormat}
                       onChange={e => setCodeFormat(e.target.value)}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50"
+                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
                     >
-                      <option value="alphanumeric" className="bg-[#1C1C1E]">A-Z + 0-9</option>
-                      <option value="numbers" className="bg-[#1C1C1E]">Angka Saja</option>
+                      <option value="alphanumeric" className="bg-surface">A-Z + 0-9</option>
+                      <option value="numbers" className="bg-surface">Angka Saja</option>
                     </select>
                   </div>
                   <div className="flex-1">
@@ -344,10 +345,10 @@ export default function AdminVouchers() {
                     <select
                       value={loginMode}
                       onChange={e => setLoginMode(e.target.value)}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50"
+                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
                     >
-                      <option value="user_is_pass" className="bg-[#1C1C1E]">User = Pass</option>
-                      <option value="separate" className="bg-[#1C1C1E]">User ≠ Pass</option>
+                      <option value="user_is_pass" className="bg-surface">User = Pass</option>
+                      <option value="separate" className="bg-surface">User ≠ Pass</option>
                     </select>
                   </div>
                 </div>
@@ -361,14 +362,14 @@ export default function AdminVouchers() {
                     max="200"
                     value={quantity}
                     onChange={e => setQuantity(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50"
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
                     required
                   />
                   <div className="flex gap-2 mt-2">
                     {[10, 25, 50, 100].map(n => (
                       <button
                         key={n} type="button" onClick={() => setQuantity(String(n))}
-                        className={`flex-1 py-1.5 rounded-[10px] text-[11px] font-semibold transition-colors ${quantity === String(n) ? 'bg-[#0A84FF] text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+                        className={`flex-1 py-1.5 rounded-[10px] text-[11px] font-semibold transition-colors ${quantity === String(n) ? 'bg-brand text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
                       >{n}</button>
                     ))}
                   </div>
@@ -377,7 +378,7 @@ export default function AdminVouchers() {
                 <button
                   type="submit"
                   disabled={isGenerating || !mikrotikProfile}
-                  className="w-full bg-[#0A84FF] disabled:opacity-50 hover:bg-[#0070e0] active:scale-[0.98] text-white font-bold py-4 rounded-[16px] mt-2 flex items-center justify-center gap-2 transition-transform text-[15px]"
+                  className="w-full bg-brand disabled:opacity-50 hover:bg-brand-hover active:scale-[0.98] text-white font-bold py-4 rounded-[16px] mt-2 flex items-center justify-center gap-2 transition-transform text-[15px]"
                 >
                   {isGenerating ? (
                     <>

@@ -82,17 +82,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   };
 
   const ICONS = {
-    success: <CheckCircle2 className="w-[18px] h-[18px] text-[#34C759]" />,
-    error: <XCircle className="w-[18px] h-[18px] text-[#FF453A]" />,
-    warning: <AlertTriangle className="w-[18px] h-[18px] text-[#FF9F0A]" />,
-    info: <Info className="w-[18px] h-[18px] text-[#0A84FF]" />,
+    success: <CheckCircle2 className="w-[18px] h-[18px] text-success" />,
+    error: <XCircle className="w-[18px] h-[18px] text-danger" />,
+    warning: <AlertTriangle className="w-[18px] h-[18px] text-gold" />,
+    info: <Info className="w-[18px] h-[18px] text-brand" />,
   };
 
   const BORDER = {
-    success: 'border-[#34C759]/25',
-    error: 'border-[#FF453A]/25',
-    warning: 'border-[#FF9F0A]/25',
-    info: 'border-[#0A84FF]/25',
+    success: 'border-success/25',
+    error: 'border-danger/25',
+    warning: 'border-gold/25',
+    info: 'border-brand/25',
   };
 
   return (
@@ -109,7 +109,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.18 } }}
               transition={{ type: 'spring', bounce: 0.28, duration: 0.38 }}
-              className={`flex items-start gap-3 px-4 py-3.5 rounded-[18px] border ${BORDER[t.type]} bg-[#1C1C1E]/95 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] pointer-events-auto`}
+              className={`flex items-start gap-3 px-4 py-3.5 rounded-[18px] border ${BORDER[t.type]} bg-surface/95 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] pointer-events-auto`}
             >
               <div className="shrink-0 mt-0.5">{ICONS[t.type]}</div>
               <div className="flex-1 min-w-0">
@@ -141,19 +141,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.92, opacity: 0 }}
               transition={{ type: 'spring', bounce: 0.22, duration: 0.32 }}
-              className="w-full max-w-[320px] bg-[#1C1C1E] border border-white/10 rounded-[28px] p-6 shadow-2xl"
+              className="w-full max-w-[320px] bg-surface border border-white/10 rounded-[28px] p-6 shadow-2xl"
             >
-              <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${dialog.danger ? 'bg-[#FF453A]/10 border border-[#FF453A]/20' : 'bg-[#0A84FF]/10 border border-[#0A84FF]/20'}`}>
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${dialog.danger ? 'bg-danger/10 border border-danger/20' : 'bg-brand/10 border border-brand/20'}`}>
                 {dialog.danger
-                  ? <AlertTriangle className="w-7 h-7 text-[#FF453A]" />
-                  : <Info className="w-7 h-7 text-[#0A84FF]" />}
+                  ? <AlertTriangle className="w-7 h-7 text-danger" />
+                  : <Info className="w-7 h-7 text-brand" />}
               </div>
               <h3 className="text-[17px] font-bold text-white text-center mb-2 tracking-tight">{dialog.title}</h3>
               <p className="text-white/50 text-[13px] text-center mb-6 leading-relaxed">{dialog.message}</p>
               <div className="flex flex-col gap-2.5">
                 <button
                   onClick={() => dialog.resolve(true)}
-                  className={`w-full py-3.5 rounded-[16px] font-semibold text-[15px] transition-all active:scale-[0.97] ${dialog.danger ? 'bg-[#FF453A] hover:bg-[#e03e35] text-white' : 'bg-[#0A84FF] hover:bg-[#0070e0] text-white'}`}
+                  className={`w-full py-3.5 rounded-[16px] font-semibold text-[15px] transition-all active:scale-[0.97] ${dialog.danger ? 'bg-danger hover:bg-danger-deep text-white' : 'bg-brand hover:bg-brand-hover text-white'}`}
                 >
                   {dialog.confirmText}
                 </button>

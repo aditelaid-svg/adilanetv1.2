@@ -176,9 +176,9 @@ export default function AdminRouters() {
   };
 
   const statusColor = (s: string) =>
-    s === 'online' ? 'text-[#34C759]' : s === 'warning' ? 'text-[#FF9F0A]' : 'text-[#FF453A]';
+    s === 'online' ? 'text-success' : s === 'warning' ? 'text-gold' : 'text-danger';
   const dotColor = (s: string) =>
-    s === 'online' ? 'bg-[#34C759]' : s === 'warning' ? 'bg-[#FF9F0A]' : 'bg-[#FF453A]';
+    s === 'online' ? 'bg-success' : s === 'warning' ? 'bg-gold' : 'bg-danger';
 
   return (
     <div className="space-y-6 pb-20">
@@ -187,7 +187,7 @@ export default function AdminRouters() {
           <h1 className="text-[28px] font-bold tracking-tight text-white mb-1">Router MikroTik</h1>
           <p className="text-white/50 text-[13px] font-medium">Konfigurasi perangkat router.</p>
         </div>
-        <button onClick={openAdd} className="w-10 h-10 bg-[#0A84FF]/10 hover:bg-[#0A84FF]/20 border border-[#0A84FF]/20 text-[#0A84FF] rounded-[14px] flex items-center justify-center transition-all active:scale-95">
+        <button onClick={openAdd} className="w-10 h-10 bg-brand/10 hover:bg-brand/20 border border-brand/20 text-brand rounded-[14px] flex items-center justify-center transition-all active:scale-95">
           <Plus className="w-5 h-5" />
         </button>
       </div>
@@ -214,19 +214,21 @@ export default function AdminRouters() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-[15px] text-white mb-0.5 leading-tight">{router.name}</h3>
-                    <p className="font-mono text-[11px] text-[#0A84FF]">{router.ip_address}:{router.api_port || 8728}</p>
+                    <p className="font-mono text-[11px] text-brand">{router.ip_address}:{router.api_port || 8728}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => openEdit(router)}
-                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/50 hover:text-[#0A84FF] hover:bg-[#0A84FF]/10 transition-colors"
+                    aria-label="Edit router"
+                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/50 hover:text-brand hover:bg-brand/10 transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => handleDelete(router.id, router.name)}
-                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/50 hover:text-[#FF453A] hover:bg-[#FF453A]/10 transition-colors"
+                    aria-label="Hapus router"
+                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/50 hover:text-danger hover:bg-danger/10 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -257,8 +259,8 @@ export default function AdminRouters() {
                   >
                     <div className={`flex items-center gap-2 rounded-[12px] px-3 py-2 text-[12px] font-medium ${
                       test.connected
-                        ? 'bg-[#34C759]/10 border border-[#34C759]/20 text-[#34C759]'
-                        : 'bg-[#FF453A]/10 border border-[#FF453A]/20 text-[#FF453A]'
+                        ? 'bg-success/10 border border-success/20 text-success'
+                        : 'bg-danger/10 border border-danger/20 text-danger'
                     }`}>
                       {test.connected
                         ? <CheckCircle className="w-3.5 h-3.5 shrink-0" />
@@ -286,7 +288,7 @@ export default function AdminRouters() {
                 </button>
                 <button
                   onClick={() => openProfiles(router.id)}
-                  className="flex-1 bg-[#0A84FF]/10 hover:bg-[#0A84FF]/20 active:bg-[#0A84FF]/30 text-[#0A84FF] text-[13px] font-semibold py-2.5 rounded-[14px] transition-all flex items-center justify-center gap-2"
+                  className="flex-1 bg-brand/10 hover:bg-brand/20 active:bg-brand/30 text-brand text-[13px] font-semibold py-2.5 rounded-[14px] transition-all flex items-center justify-center gap-2"
                 >
                   <Layers className="w-4 h-4" />
                   Kelola Profil
@@ -319,10 +321,10 @@ export default function AdminRouters() {
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-              className="w-full max-w-md bg-[#1C1C1E] border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative"
+              className="w-full max-w-md bg-surface border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative"
             >
               <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 sm:hidden" />
-              <button onClick={closeModal} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
+              <button onClick={closeModal} aria-label="Tutup" className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
               <h3 className="text-[22px] font-bold text-white mb-6">
@@ -333,36 +335,36 @@ export default function AdminRouters() {
                   <label className="block text-[13px] font-medium text-white/60 mb-1.5">Nama Router</label>
                   <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                     placeholder="e.g. Router Utama" required
-                    className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                    className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
                 </div>
                 <div>
                   <label className="block text-[13px] font-medium text-white/60 mb-1.5">IP Address</label>
                   <input type="text" value={form.ip_address} onChange={e => setForm({ ...form, ip_address: e.target.value })}
                     placeholder="e.g. 192.168.1.1" required
-                    className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white font-mono text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                    className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white font-mono text-[15px] focus:outline-none focus:border-brand/50" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[13px] font-medium text-white/60 mb-1.5">API Port</label>
                     <input type="text" value={form.api_port} onChange={e => setForm({ ...form, api_port: e.target.value })}
                       placeholder="8728"
-                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
                   </div>
                   <div>
                     <label className="block text-[13px] font-medium text-white/60 mb-1.5">Username</label>
                     <input type="text" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })}
                       placeholder="admin"
-                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[13px] font-medium text-white/60 mb-1.5">Password</label>
                   <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                     placeholder="••••••"
-                    className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                    className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
                 </div>
                 <button type="submit" disabled={saving}
-                  className="w-full bg-[#0A84FF] hover:bg-[#0A84FF]/90 active:scale-[0.98] disabled:opacity-60 transition-all text-white font-semibold py-4 rounded-[16px] mt-2 max-sm:pb-8 text-[15px]">
+                  className="w-full bg-brand hover:bg-brand/90 active:scale-[0.98] disabled:opacity-60 transition-all text-white font-semibold py-4 rounded-[16px] mt-2 max-sm:pb-8 text-[15px]">
                   {saving ? 'Menyimpan...' : (editId !== null ? 'Simpan Perubahan' : 'Tambah Router')}
                 </button>
               </form>
@@ -385,15 +387,15 @@ export default function AdminRouters() {
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-              className="w-full max-w-md bg-[#1C1C1E] border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative max-h-[88vh] flex flex-col"
+              className="w-full max-w-md bg-surface border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative max-h-[88vh] flex flex-col"
             >
               <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-5 sm:hidden" />
-              <button onClick={closeProfiles} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
+              <button onClick={closeProfiles} aria-label="Tutup" className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
 
               <div className="flex items-center gap-2 mb-1">
-                <Layers className="w-5 h-5 text-[#0A84FF]" />
+                <Layers className="w-5 h-5 text-brand" />
                 <h3 className="text-[22px] font-bold text-white">Profil Hotspot</h3>
               </div>
               <p className="text-white/40 text-[12px] mb-4">
@@ -401,7 +403,7 @@ export default function AdminRouters() {
               </p>
 
               {profilesSource === 'demo' && (
-                <div className="flex items-center gap-2 rounded-[12px] px-3 py-2 mb-3 text-[12px] font-medium bg-[#FF9F0A]/10 border border-[#FF9F0A]/20 text-[#FF9F0A]">
+                <div className="flex items-center gap-2 rounded-[12px] px-3 py-2 mb-3 text-[12px] font-medium bg-gold/10 border border-gold/20 text-gold">
                   <XCircle className="w-3.5 h-3.5 shrink-0" />
                   <span className="flex-1">{profilesWarning || 'Router tidak terjangkau — perubahan dinonaktifkan.'}</span>
                 </div>
@@ -413,26 +415,26 @@ export default function AdminRouters() {
                     <label className="block text-[13px] font-medium text-white/60 mb-1.5">Nama Profil</label>
                     <input type="text" value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })}
                       placeholder="e.g. 1jam" required disabled={profileEditId !== null}
-                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 disabled:opacity-50" />
+                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50 disabled:opacity-50" />
                   </div>
                   <div>
                     <label className="block text-[13px] font-medium text-white/60 mb-1.5">Rate Limit (up/down)</label>
                     <input type="text" value={profileForm.rateLimit} onChange={e => setProfileForm({ ...profileForm, rateLimit: e.target.value })}
                       placeholder="e.g. 2M/2M"
-                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white font-mono text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white font-mono text-[15px] focus:outline-none focus:border-brand/50" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[13px] font-medium text-white/60 mb-1.5">Shared Users</label>
                       <input type="text" value={profileForm.sharedUsers} onChange={e => setProfileForm({ ...profileForm, sharedUsers: e.target.value })}
                         placeholder="1"
-                        className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                        className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
                     </div>
                     <div>
                       <label className="block text-[13px] font-medium text-white/60 mb-1.5">Session Timeout</label>
                       <input type="text" value={profileForm.sessionTimeout} onChange={e => setProfileForm({ ...profileForm, sessionTimeout: e.target.value })}
                         placeholder={profileEditId ? 'kosong = tetap' : 'e.g. 1h, 1d'}
-                        className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                        className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
                     </div>
                   </div>
                   <div className="flex gap-2 pt-1 max-sm:pb-6">
@@ -441,7 +443,7 @@ export default function AdminRouters() {
                       Batal
                     </button>
                     <button type="submit" disabled={profileSaving}
-                      className="flex-1 bg-[#0A84FF] hover:bg-[#0A84FF]/90 active:scale-[0.98] disabled:opacity-60 transition-all text-white font-semibold py-3.5 rounded-[16px] text-[15px]">
+                      className="flex-1 bg-brand hover:bg-brand/90 active:scale-[0.98] disabled:opacity-60 transition-all text-white font-semibold py-3.5 rounded-[16px] text-[15px]">
                       {profileSaving ? 'Menyimpan...' : (profileEditId ? 'Simpan' : 'Tambah')}
                     </button>
                   </div>
@@ -451,7 +453,7 @@ export default function AdminRouters() {
                   <button
                     onClick={openProfileAdd}
                     disabled={profilesSource !== 'mikrotik'}
-                    className="w-full flex items-center justify-center gap-2 bg-[#0A84FF]/10 hover:bg-[#0A84FF]/20 disabled:opacity-40 disabled:cursor-not-allowed text-[#0A84FF] font-semibold py-3 rounded-[16px] text-[14px] transition-colors mb-3"
+                    className="w-full flex items-center justify-center gap-2 bg-brand/10 hover:bg-brand/20 disabled:opacity-40 disabled:cursor-not-allowed text-brand font-semibold py-3 rounded-[16px] text-[14px] transition-colors mb-3"
                   >
                     <Plus className="w-4 h-4" /> Tambah Profil
                   </button>
@@ -472,14 +474,14 @@ export default function AdminRouters() {
                               <button
                                 onClick={() => openProfileEdit(p)}
                                 disabled={profilesSource !== 'mikrotik'}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-[#0A84FF] hover:bg-[#0A84FF]/10 disabled:opacity-30 transition-colors"
+                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-brand hover:bg-brand/10 disabled:opacity-30 transition-colors"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleProfileDelete(p)}
                                 disabled={profilesSource !== 'mikrotik'}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-[#FF453A] hover:bg-[#FF453A]/10 disabled:opacity-30 transition-colors"
+                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-danger hover:bg-danger/10 disabled:opacity-30 transition-colors"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>

@@ -6,5 +6,6 @@
 - [Mikrotik API](mikrotik-api.md) — createVoucher uses array param format `=key=value`, port passed from router.api_port; getProfiles with port support.
 - [Mikrotik profiles](mikrotik-profiles.md) — admin hotspot profile CRUD from UI; GET has demo fallback, writes never fall back; server-side field validation.
 - [PWA SW](pwa-sw.md) — SW registered in ALL environments (not just PROD); cache name adilanet-v3; proper SPA navigation fallback.
+- [UI conventions](ui-conventions.md) — color tokens in @theme, format.ts helpers, EmptyState/Skeleton primitives, AppContext.loading top-bar; prefer these over inline duplicates.
 - [Superadmin role](superadmin-role.md) — protected role; only self can edit/delete it; use isAdminRole() for ALL admin checks; always ≥1 superadmin.
 - [Auth & session](auth-session.md) — cookie sessions (pg store), bcrypt password+pin w/ idempotent boot migration, requireAuth/requireAdmin, session-scoped data, atomic balance deduction.

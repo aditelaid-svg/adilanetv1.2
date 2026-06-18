@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../AppContext';
 import { ShieldCheck, ArrowRight, Phone, Wallet, Copy, Check, Info, Wifi, Clock, Zap, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatRupiah } from '../lib/format';
 
 export default function PublicBuy() {
   const { packageId } = useParams<{ packageId: string }>();
@@ -35,7 +36,7 @@ export default function PublicBuy() {
 
   if (!pkg) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-[#0A84FF] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
@@ -98,7 +99,7 @@ export default function PublicBuy() {
 
   return (
     <div className="min-h-screen bg-[#000000] flex flex-col items-center justify-center p-4 overflow-hidden relative">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[500px] bg-[#0A84FF]/15 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[500px] bg-brand/15 blur-[120px] rounded-full pointer-events-none" />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -107,14 +108,14 @@ export default function PublicBuy() {
         className="w-full max-w-sm relative z-10"
       >
         <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 rounded-[18px] bg-gradient-to-br from-[#0A84FF] to-[#005bb5] flex items-center justify-center shadow-lg shadow-[#0A84FF]/30 mb-4">
+          <div className="w-14 h-14 rounded-[18px] bg-gradient-to-br from-brand to-brand-deep flex items-center justify-center shadow-lg shadow-brand/30 mb-4">
             <ShieldCheck className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-[20px] font-bold text-white tracking-tight">AdilaNet</h1>
           <p className="text-white/40 text-[12px] font-medium mt-0.5">Portal Voucher WiFi</p>
         </div>
 
-        <div className="bg-[#1C1C1E]/90 backdrop-blur-2xl border border-white/8 rounded-[28px] p-5 shadow-2xl mb-4">
+        <div className="bg-surface/90 backdrop-blur-2xl border border-white/8 rounded-[28px] p-5 shadow-2xl mb-4">
           <p className="text-[10px] font-bold text-white/40 tracking-widest uppercase mb-3">Paket Dipilih</p>
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -133,13 +134,13 @@ export default function PublicBuy() {
             </div>
             <div className="text-right shrink-0">
               <div className="text-[22px] font-bold text-white tracking-tight">
-                Rp {pkg.price.toLocaleString('id-ID')}
+                {formatRupiah(pkg.price)}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-[#1C1C1E]/90 backdrop-blur-2xl border border-white/8 rounded-[28px] p-5 shadow-2xl">
+        <div className="bg-surface/90 backdrop-blur-2xl border border-white/8 rounded-[28px] p-5 shadow-2xl">
           <AnimatePresence mode="wait">
             {step === 'input_phone' && (
               <motion.form
@@ -159,7 +160,7 @@ export default function PublicBuy() {
                       value={phone}
                       onChange={e => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
                       placeholder="08xxxxxxxxxx"
-                      className="w-full bg-white/[0.04] border border-white/8 rounded-[16px] pl-10 pr-4 py-3.5 text-white placeholder:text-white/20 focus:outline-none focus:border-[#0A84FF]/50 transition-all text-[15px]"
+                      className="w-full bg-white/[0.04] border border-white/8 rounded-[16px] pl-10 pr-4 py-3.5 text-white placeholder:text-white/20 focus:outline-none focus:border-brand/50 transition-all text-[15px]"
                       required
                     />
                     <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
@@ -168,7 +169,7 @@ export default function PublicBuy() {
                     <motion.div
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-2 mt-2 text-[12px] text-[#FF453A] bg-[#FF453A]/10 rounded-[10px] px-3 py-2 border border-[#FF453A]/15"
+                      className="flex items-center gap-2 mt-2 text-[12px] text-danger bg-danger/10 rounded-[10px] px-3 py-2 border border-danger/15"
                     >
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                       {error}
@@ -184,7 +185,7 @@ export default function PublicBuy() {
                   <button
                     type="submit"
                     disabled={isProcessing}
-                    className="w-full bg-[#0A84FF] disabled:opacity-50 hover:bg-[#0070e0] active:scale-[0.98] text-white font-semibold rounded-[16px] px-4 py-4 flex items-center justify-center gap-2 transition-transform text-[15px]"
+                    className="w-full bg-brand disabled:opacity-50 hover:bg-brand-hover active:scale-[0.98] text-white font-semibold rounded-[16px] px-4 py-4 flex items-center justify-center gap-2 transition-transform text-[15px]"
                   >
                     {isProcessing ? (
                       <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Memproses...</>
@@ -193,8 +194,8 @@ export default function PublicBuy() {
                     )}
                   </button>
                 ) : (
-                  <div className="p-4 bg-[#FF453A]/10 border border-[#FF453A]/20 rounded-[16px] text-center">
-                    <p className="font-semibold text-[13px] text-[#FF453A]">Pembayaran Sedang Maintenance</p>
+                  <div className="p-4 bg-danger/10 border border-danger/20 rounded-[16px] text-center">
+                    <p className="font-semibold text-[13px] text-danger">Pembayaran Sedang Maintenance</p>
                     <p className="text-[11px] text-white/40 mt-1">Hubungi admin untuk pembelian.</p>
                   </div>
                 )}
@@ -235,13 +236,13 @@ export default function PublicBuy() {
                 <p className="text-[12px] text-white/50 mb-5">DANA · OVO · GoPay · ShopeePay · M-Banking</p>
 
                 {error && (
-                  <div className="flex items-center gap-2 text-[12px] text-[#FF453A] bg-[#FF453A]/10 rounded-[12px] px-3 py-2.5 mb-4 border border-[#FF453A]/15">
+                  <div className="flex items-center gap-2 text-[12px] text-danger bg-danger/10 rounded-[12px] px-3 py-2.5 mb-4 border border-danger/15">
                     <AlertCircle className="w-4 h-4 shrink-0" /> {error}
                   </div>
                 )}
 
-                <div className="w-full flex items-center justify-center gap-2 bg-[#0A84FF]/10 border border-[#0A84FF]/20 text-[#0A84FF] font-semibold py-4 rounded-[16px] text-[14px] mb-2.5">
-                  <div className="w-4 h-4 border-2 border-[#0A84FF]/30 border-t-[#0A84FF] rounded-full animate-spin" />
+                <div className="w-full flex items-center justify-center gap-2 bg-brand/10 border border-brand/20 text-brand font-semibold py-4 rounded-[16px] text-[14px] mb-2.5">
+                  <div className="w-4 h-4 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
                   Menunggu pembayaran...
                 </div>
                 <p className="text-[11px] text-white/35 mb-2.5">
@@ -264,23 +265,24 @@ export default function PublicBuy() {
                 transition={{ type: 'spring', bounce: 0.3, duration: 0.4 }}
                 className="text-center py-2"
               >
-                <div className="w-16 h-16 bg-[#34C759]/15 rounded-full flex items-center justify-center mx-auto mb-5 relative">
-                  <div className="absolute inset-0 bg-[#34C759]/20 rounded-full animate-ping" />
-                  <Check className="w-8 h-8 text-[#34C759] relative z-10" />
+                <div className="w-16 h-16 bg-success/15 rounded-full flex items-center justify-center mx-auto mb-5 relative">
+                  <div className="absolute inset-0 bg-success/20 rounded-full animate-ping" />
+                  <Check className="w-8 h-8 text-success relative z-10" />
                 </div>
                 <h3 className="text-[20px] font-bold text-white mb-1 tracking-tight">Pembayaran Berhasil!</h3>
                 <p className="text-white/40 text-[13px] mb-6">Ini kode voucher WiFi Anda</p>
 
-                <div className="bg-[#0A84FF]/8 border border-[#0A84FF]/20 rounded-[20px] p-5 mb-5 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-28 h-28 bg-[#0A84FF]/10 blur-[40px] rounded-full -mr-10 -mt-10" />
+                <div className="bg-brand/8 border border-brand/20 rounded-[20px] p-5 mb-5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-brand/10 blur-[40px] rounded-full -mr-10 -mt-10" />
                   <p className="text-white/40 text-[10px] font-bold tracking-widest uppercase mb-2">KODE VOUCHER</p>
                   <div className="flex items-center gap-3">
-                    <code className="text-[22px] font-mono font-bold tracking-[0.15em] text-[#0A84FF] flex-1">
+                    <code className="text-[22px] font-mono font-bold tracking-[0.15em] text-brand flex-1">
                       {successCode}
                     </code>
                     <button
                       onClick={copyCode}
-                      className="w-10 h-10 bg-[#0A84FF]/15 hover:bg-[#0A84FF]/25 active:scale-95 rounded-[12px] flex items-center justify-center text-[#0A84FF] transition-all"
+                      aria-label="Salin kode voucher"
+                      className="w-10 h-10 bg-brand/15 hover:bg-brand/25 active:scale-95 rounded-[12px] flex items-center justify-center text-brand transition-all"
                     >
                       {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                     </button>
@@ -290,9 +292,9 @@ export default function PublicBuy() {
                 <div className="bg-white/[0.03] border border-white/5 rounded-[16px] p-4 text-left mb-5">
                   <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">Cara Pakai:</p>
                   <ol className="space-y-1.5 text-[12px] text-white/60">
-                    <li className="flex items-start gap-2"><span className="text-[#0A84FF] font-bold shrink-0">1.</span>Buka halaman login WiFi di browser</li>
-                    <li className="flex items-start gap-2"><span className="text-[#0A84FF] font-bold shrink-0">2.</span>Masukkan kode di atas sebagai Username &amp; Password</li>
-                    <li className="flex items-start gap-2"><span className="text-[#0A84FF] font-bold shrink-0">3.</span>Klik Login — Internet siap digunakan! 🎉</li>
+                    <li className="flex items-start gap-2"><span className="text-brand font-bold shrink-0">1.</span>Buka halaman login WiFi di browser</li>
+                    <li className="flex items-start gap-2"><span className="text-brand font-bold shrink-0">2.</span>Masukkan kode di atas sebagai Username &amp; Password</li>
+                    <li className="flex items-start gap-2"><span className="text-brand font-bold shrink-0">3.</span>Klik Login — Internet siap digunakan! 🎉</li>
                   </ol>
                 </div>
 

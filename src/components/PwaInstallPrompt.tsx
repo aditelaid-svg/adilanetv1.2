@@ -79,15 +79,15 @@ export default function PwaInstallPrompt() {
         transition={{ type: 'spring', bounce: 0.25, duration: 0.5 }}
         className="fixed bottom-20 left-3 right-3 z-[200] max-w-sm mx-auto"
       >
-        <div className="bg-[#1C1C1E]/95 border border-[#0A84FF]/30 rounded-[20px] p-4 shadow-2xl shadow-black/60 backdrop-blur-xl">
+        <div className="bg-surface/95 border border-brand/30 rounded-[20px] p-4 shadow-2xl shadow-black/60 backdrop-blur-xl">
           {installed ? (
             <div className="flex items-center justify-center gap-2 py-1">
-              <div className="w-2 h-2 rounded-full bg-[#34C759]" />
+              <div className="w-2 h-2 rounded-full bg-success" />
               <p className="text-[14px] font-semibold text-white">Berhasil diinstall!</p>
             </div>
           ) : (
             <div className="flex items-start gap-3">
-              <div className="w-11 h-11 rounded-[13px] bg-gradient-to-br from-[#0A84FF] to-[#005BB5] flex items-center justify-center shrink-0 shadow-lg mt-0.5">
+              <div className="w-11 h-11 rounded-[13px] bg-gradient-to-br from-brand to-brand-deep flex items-center justify-center shrink-0 shadow-lg mt-0.5">
                 <Smartphone className="w-5 h-5 text-white" />
               </div>
 
@@ -97,7 +97,7 @@ export default function PwaInstallPrompt() {
                 </p>
                 {isIos ? (
                   <p className="text-[11px] text-white/60 leading-relaxed">
-                    Ketuk ikon <Share className="inline w-3 h-3 mx-0.5 text-[#0A84FF]" /> di bawah, lalu pilih{' '}
+                    Ketuk ikon <Share className="inline w-3 h-3 mx-0.5 text-brand" /> di bawah, lalu pilih{' '}
                     <span className="text-white font-semibold">"Tambahkan ke Layar Utama"</span>
                   </p>
                 ) : deferredPrompt ? (
@@ -114,7 +114,7 @@ export default function PwaInstallPrompt() {
                 {!isIos && deferredPrompt && (
                   <button
                     onClick={handleInstall}
-                    className="bg-[#0A84FF] hover:bg-[#0070e0] active:scale-95 text-white text-[11px] font-bold px-3 py-1.5 rounded-[10px] flex items-center gap-1 transition-all"
+                    className="bg-brand hover:bg-brand-hover active:scale-95 text-white text-[11px] font-bold px-3 py-1.5 rounded-[10px] flex items-center gap-1 transition-all"
                   >
                     <Download className="w-3 h-3" /> Install
                   </button>

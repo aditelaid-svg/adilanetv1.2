@@ -108,7 +108,7 @@ export default function AdminSettings() {
         className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
       >
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-[12px] bg-[#FF9500]/20 text-[#FF9500] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-[12px] bg-warning/20 text-warning flex items-center justify-center">
             <UserCog className="w-5 h-5" />
           </div>
           <h2 className="font-semibold text-[15px] text-white">Keamanan Admin</h2>
@@ -123,7 +123,7 @@ export default function AdminSettings() {
                 value={adminPassword}
                 onChange={e => setAdminPassword(e.target.value)}
                 placeholder="Masukkan password baru"
-                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#FF9500]/50 transition-colors"
+                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-warning/50 transition-colors"
                 required
               />
               <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
@@ -131,7 +131,7 @@ export default function AdminSettings() {
           </div>
           <button 
             type="submit"
-            className="w-full bg-[#FF9500]/10 text-[#FF9500] border border-[#FF9500]/20 hover:bg-[#FF9500]/20 active:scale-[0.98] font-semibold flex items-center justify-center gap-2 transition-transform text-[15px] py-3.5 rounded-[16px]"
+            className="w-full bg-warning/10 text-warning border border-warning/20 hover:bg-warning/20 active:scale-[0.98] font-semibold flex items-center justify-center gap-2 transition-transform text-[15px] py-3.5 rounded-[16px]"
           >
             {passwordSaved ? 'Berhasil Disimpan' : 'Simpan Password'}
           </button>
@@ -144,7 +144,7 @@ export default function AdminSettings() {
           className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
         >
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-[12px] bg-[#5E5CE6]/20 text-[#5E5CE6] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-[12px] bg-iris/20 text-iris flex items-center justify-center">
               <Shield className="w-5 h-5" />
             </div>
             <div className="flex-1">
@@ -153,7 +153,7 @@ export default function AdminSettings() {
             <div className="flex items-center">
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" checked={qrisEnabled} onChange={(e) => setQrisEnabled(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#34C759]"></div>
+                  <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
                 </label>
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function AdminSettings() {
                 value={merchantId}
                 onChange={e => setMerchantId(e.target.value)}
                 placeholder="MC-xxxxxxxx"
-                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors"
               />
             </div>
             <div>
@@ -177,14 +177,14 @@ export default function AdminSettings() {
                   value={qrisKey}
                   onChange={e => setQrisKey(e.target.value)}
                   placeholder="API Key dari dashboard SanPay"
-                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors"
                 />
                 <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
               </div>
             </div>
 
-            <div className="bg-[#0A84FF]/8 border border-[#0A84FF]/20 rounded-[16px] p-4 space-y-2.5">
-              <p className="text-[12px] font-semibold text-[#0A84FF]">Cara mengaktifkan QRIS produksi</p>
+            <div className="bg-brand/8 border border-brand/20 rounded-[16px] p-4 space-y-2.5">
+              <p className="text-[12px] font-semibold text-brand">Cara mengaktifkan QRIS produksi</p>
               <ol className="text-[12px] text-white/55 space-y-1.5 list-decimal list-inside">
                 <li>Login ke dashboard SanPay, buka menu <b>Setting API</b>.</li>
                 <li>Salin <b>Merchant Code</b> &amp; <b>API Key</b> ke kolom di atas, lalu simpan.</li>
@@ -201,7 +201,7 @@ export default function AdminSettings() {
                   <button
                     type="button"
                     onClick={() => { navigator.clipboard.writeText(callbackUrl); setCallbackCopied(true); setTimeout(() => setCallbackCopied(false), 2000); }}
-                    className="shrink-0 w-9 h-9 bg-[#0A84FF]/15 hover:bg-[#0A84FF]/25 rounded-[10px] flex items-center justify-center text-[#0A84FF] transition-colors"
+                    className="shrink-0 w-9 h-9 bg-brand/15 hover:bg-brand/25 rounded-[10px] flex items-center justify-center text-brand transition-colors"
                   >
                     {callbackCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </button>
@@ -216,7 +216,7 @@ export default function AdminSettings() {
           className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
         >
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-[12px] bg-[#34C759]/20 text-[#34C759] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-[12px] bg-success/20 text-success flex items-center justify-center">
               <Ticket className="w-5 h-5" />
             </div>
             <h2 className="font-semibold text-[15px] text-white">Format Kode Voucher</h2>
@@ -237,7 +237,7 @@ export default function AdminSettings() {
                     onClick={() => setVoucherCharset(opt.v)}
                     className={`py-3 rounded-[14px] text-[13px] font-semibold border transition-colors ${
                       voucherCharset === opt.v
-                        ? 'bg-[#34C759]/15 border-[#34C759]/40 text-[#34C759]'
+                        ? 'bg-success/15 border-success/40 text-success'
                         : 'bg-white/[0.02] border-white/5 text-white/60 hover:text-white/80'
                     }`}
                   >
@@ -256,7 +256,7 @@ export default function AdminSettings() {
                   max={20}
                   value={voucherLength}
                   onChange={e => setVoucherLength(Number(e.target.value))}
-                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#34C759]/50 transition-colors"
+                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-success/50 transition-colors"
                 />
                 <p className="text-[11px] text-white/35 mt-1.5">4–20 karakter (di luar prefix)</p>
               </div>
@@ -267,15 +267,15 @@ export default function AdminSettings() {
                   value={voucherPrefix}
                   onChange={e => setVoucherPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 10))}
                   placeholder="(kosongkan jika tanpa awalan)"
-                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] font-mono focus:outline-none focus:border-[#34C759]/50 transition-colors"
+                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] font-mono focus:outline-none focus:border-success/50 transition-colors"
                 />
                 <p className="text-[11px] text-white/35 mt-1.5">Mis. WFI- atau kosong</p>
               </div>
             </div>
 
-            <div className="bg-[#34C759]/8 border border-[#34C759]/20 rounded-[16px] p-4">
+            <div className="bg-success/8 border border-success/20 rounded-[16px] p-4">
               <p className="text-[11px] font-semibold tracking-wide uppercase text-white/40 mb-1.5">Contoh Hasil</p>
-              <code className="text-[16px] text-[#34C759] font-mono font-bold break-all">
+              <code className="text-[16px] text-success font-mono font-bold break-all">
                 {(() => {
                   const NUM = '0123456789';
                   const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -295,7 +295,7 @@ export default function AdminSettings() {
           className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
         >
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-[12px] bg-[#0A84FF]/20 text-[#0A84FF] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-[12px] bg-brand/20 text-brand flex items-center justify-center">
               <Bell className="w-5 h-5" />
             </div>
             <h2 className="font-semibold text-[15px] text-white">Notifikasi Telegram</h2>
@@ -308,7 +308,7 @@ export default function AdminSettings() {
                 type="text"
                 value={telegramToken}
                 onChange={e => setTelegramToken(e.target.value)}
-                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-[#0A84FF] text-[15px] font-mono focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-brand text-[15px] font-mono focus:outline-none focus:border-brand/50 transition-colors"
               />
             </div>
             <div>
@@ -317,7 +317,7 @@ export default function AdminSettings() {
                 type="text"
                 value={telegramChatId}
                 onChange={e => setTelegramChatId(e.target.value)}
-                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-[#0A84FF] text-[15px] font-mono focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-brand text-[15px] font-mono focus:outline-none focus:border-brand/50 transition-colors"
               />
             </div>
           </div>
@@ -326,7 +326,7 @@ export default function AdminSettings() {
         <button 
           type="submit"
           disabled={isSaving}
-          className={`w-full ${isSaved ? 'bg-[#34C759] hover:bg-[#34C759]' : 'bg-[#0A84FF] hover:bg-[#0A84FF]/90'} active:scale-[0.98] text-white font-semibold flex items-center justify-center gap-2 transition-all text-[15px] py-4 rounded-[16px] disabled:opacity-50`}
+          className={`w-full ${isSaved ? 'bg-success hover:bg-success' : 'bg-brand hover:bg-brand/90'} active:scale-[0.98] text-white font-semibold flex items-center justify-center gap-2 transition-all text-[15px] py-4 rounded-[16px] disabled:opacity-50`}
         >
           {isSaved ? (
             <>

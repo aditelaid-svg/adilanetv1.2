@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import { LayoutDashboard, Router as RouterIcon, Ticket, Receipt, Users, Settings, Menu, X, LogOut, ChevronLeft } from 'lucide-react';
 import { cn } from './UserLayout';
 import { useAppContext } from '../AppContext';
@@ -15,24 +15,11 @@ const adminNav = [
 ];
 
 export default function AdminLayout() {
-  const { currentUser, setCurrentUser } = useAppContext();
+  const { currentUser, setCurrentUser, loading } = useAppContext();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const location = useLocation();
-
-  const getPageTitle = () => {
-    switch (location.pathname) {
-      case '/admin': case '/admin/': return 'Dashboard';
-      case '/admin/routers': return 'Implement dashboards';
-      case '/admin/packages': return 'Implement dashboards';
-      case '/admin/transactions': return 'Implement dashboards';
-      case '/admin/users': return 'Implement dashboards';
-      case '/admin/settings': return 'Implement dashboards';
-      default: return 'Admin Panel';
-    }
-  };
 
   return (
-    <div className="min-h-screen bg-[#000000] text-slate-50 font-sans selection:bg-[#0A84FF]/30 overflow-hidden flex justify-center">
+    <div className="min-h-screen bg-[#000000] text-slate-50 font-sans selection:bg-brand/30 overflow-hidden flex justify-center">
       <div className="relative z-10 w-full max-w-md bg-[#000000] min-h-screen flex flex-col relative overflow-x-hidden border-x border-white/5">
         
         {/* Header */}
@@ -40,6 +27,7 @@ export default function AdminLayout() {
           <div className="flex items-center gap-3">
              <button 
               onClick={() => setIsSidebarOpen(true)}
+              aria-label="Buka menu"
               className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-slate-300 hover:text-white transition-all active:scale-95"
             >
               <Menu className="w-5 h-5" />
@@ -48,6 +36,11 @@ export default function AdminLayout() {
                Admin Panel <ChevronLeft className="w-4 h-4 rotate-180 text-white/50" />
             </span>
           </div>
+          {loading && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden">
+              <div className="h-full w-1/5 bg-brand loading-bar rounded-full" />
+            </div>
+          )}
         </header>
 
         {/* Main Content Area */}
@@ -74,11 +67,11 @@ export default function AdminLayout() {
                 animate={{ x: 0 }}
                 exit={{ x: '-100%' }}
                 transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-                className="fixed top-0 left-0 bottom-0 w-[280px] bg-[#1C1C1E]/90 backdrop-blur-2xl z-[60] flex flex-col max-w-md mx-auto shadow-2xl border-r border-white/10"
+                className="fixed top-0 left-0 bottom-0 w-[280px] bg-surface/90 backdrop-blur-2xl z-[60] flex flex-col max-w-md mx-auto shadow-2xl border-r border-white/10"
               >
                 <div className="p-5 flex items-center justify-between border-b border-white/10 mt-safe">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-[10px] bg-[#0A84FF] flex items-center justify-center shadow-sm">
+                    <div className="w-10 h-10 rounded-[10px] bg-brand flex items-center justify-center shadow-sm">
                       <RouterIcon className="w-5 h-5 text-white" />
                     </div>
                     <div>
@@ -86,7 +79,7 @@ export default function AdminLayout() {
                         <p className="text-[13px] text-white/60 font-medium">Admin Panel</p>
                     </div>
                   </div>
-                  <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white/70 hover:text-white transition-colors active:scale-95">
+                  <button onClick={() => setIsSidebarOpen(false)} aria-label="Tutup menu" className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white/70 hover:text-white transition-colors active:scale-95">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -104,7 +97,7 @@ export default function AdminLayout() {
                           cn(
                             "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 relative group font-medium text-[15px]",
                             isActive 
-                              ? "text-white bg-[#0A84FF]" 
+                              ? "text-white bg-brand" 
                               : "text-white/70 hover:text-white hover:bg-white/10 border-transparent"
                           )
                         }
@@ -129,7 +122,7 @@ export default function AdminLayout() {
                   
                   <button 
                     onClick={() => setCurrentUser(null)}
-                    className="flex items-center gap-3 px-3 py-3 text-[#FF453A] hover:bg-[#FF453A]/10 rounded-xl transition-colors text-[15px] font-semibold w-full"
+                    className="flex items-center gap-3 px-3 py-3 text-danger hover:bg-danger/10 rounded-xl transition-colors text-[15px] font-semibold w-full"
                   >
                     <LogOut className="w-[18px] h-[18px]" />
                     <span>Keluar</span>

@@ -3,6 +3,7 @@ import { useAppContext, Package } from '../../AppContext';
 import { Wifi, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
+import { formatRupiah } from '../../lib/format';
 
 export default function UserPackages() {
   const { packages, currentUser, buyPackage } = useAppContext();
@@ -21,7 +22,7 @@ export default function UserPackages() {
           <input 
             type="text" 
             placeholder="Cari paket..." 
-            className="w-full bg-[#1C1C1E] border border-white/5 text-white rounded-2xl pl-11 pr-4 py-3 text-[15px] focus:outline-none focus:border-[#0A84FF]/50 shadow-sm transition-colors"
+            className="w-full bg-surface border border-white/5 text-white rounded-2xl pl-11 pr-4 py-3 text-[15px] focus:outline-none focus:border-brand/50 shadow-sm transition-colors"
           />
       </div>
 
@@ -30,7 +31,7 @@ export default function UserPackages() {
               <button 
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`snap-start shrink-0 px-4 py-2 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all border ${filter === f ? 'bg-[#0A84FF] text-white border-transparent' : 'bg-[#1C1C1E] text-slate-300 hover:bg-white/10 border-white/5'}`}
+                className={`snap-start shrink-0 px-4 py-2 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all border ${filter === f ? 'bg-brand text-white border-transparent' : 'bg-surface text-slate-300 hover:bg-white/10 border-white/5'}`}
               >
                   {f}
               </button>
@@ -44,19 +45,19 @@ export default function UserPackages() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: idx * 0.05 }}
-            className="bg-[#1C1C1E] border border-white/5 rounded-3xl relative overflow-hidden shadow-sm flex flex-col"
+            className="bg-surface border border-white/5 rounded-3xl relative overflow-hidden shadow-sm flex flex-col"
           >
             {/* Top Solid Bar */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-[#0A84FF]" />
+            <div className="absolute top-0 left-0 w-full h-1 bg-brand" />
             
             <div className="p-4 flex-1 flex flex-col">
-                <div className="bg-[#0A84FF]/10 text-[#0A84FF] text-[10px] font-bold px-2 py-0.5 rounded-md w-fit mb-3">
+                <div className="bg-brand/10 text-brand text-[10px] font-bold px-2 py-0.5 rounded-md w-fit mb-3">
                     {idx === 0 ? 'Murah' : idx === 1 ? 'Populer' : 'Hemat'}
                 </div>
                 
                 <h3 className="text-white font-semibold text-[15px] leading-tight mb-1">{pkg.name}</h3>
                 <div className="text-[20px] font-bold text-white mb-4 tracking-tight">
-                    Rp {pkg.price.toLocaleString('id-ID')}
+                    {formatRupiah(pkg.price)}
                 </div>
                 
                 <div className="space-y-2 mb-5 flex-1">
@@ -73,7 +74,7 @@ export default function UserPackages() {
 
                 <button 
                   onClick={() => navigate('/user/buy', { state: { packageId: pkg.id } })}
-                  className="w-full bg-[#0A84FF] hover:bg-[#0070e0] text-white font-semibold py-2.5 rounded-xl text-[13px] transition-transform hover:scale-[1.02] active:scale-[0.98] mt-auto"
+                  className="w-full bg-brand hover:bg-brand-hover text-white font-semibold py-2.5 rounded-xl text-[13px] transition-transform hover:scale-[1.02] active:scale-[0.98] mt-auto"
                 >
                   Beli
                 </button>

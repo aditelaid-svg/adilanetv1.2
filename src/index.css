@@ -4,6 +4,19 @@
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Brand & semantic color tokens (single source of truth) */
+  --color-brand: #0A84FF;
+  --color-brand-hover: #0070e0;
+  --color-brand-deep: #005bb5;
+  --color-success: #34C759;
+  --color-danger: #FF453A;
+  --color-danger-deep: #e03e35;
+  --color-warning: #FF9500;
+  --color-gold: #FF9F0A;
+  --color-iris: #5E5CE6;
+  --color-grape: #BF5AF2;
+  --color-surface: #1C1C1E;
 }
 
 html, body {
@@ -19,4 +32,12 @@ html, body {
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(500%); }
+}
+.loading-bar {
+  animation: loading-bar 1.1s ease-in-out infinite;
 }

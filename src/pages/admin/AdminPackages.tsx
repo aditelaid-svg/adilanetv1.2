@@ -3,6 +3,7 @@ import { useAppContext, Package } from '../../AppContext';
 import { useToast } from '../../components/Toast';
 import { Plus, Edit, Trash2, Clock, Zap, Wifi, Link as LinkIcon, Check, X, RefreshCw, AlertCircle, Router } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatRupiah } from '../../lib/format';
 
 interface MikrotikProfile {
   id: string;
@@ -180,7 +181,7 @@ export default function AdminPackages() {
         </div>
         <button
           onClick={openAdd}
-          className="bg-[#0A84FF] hover:bg-[#0070e0] active:scale-95 text-white px-4 py-2.5 rounded-[14px] text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-lg shadow-[#0A84FF]/20"
+          className="bg-brand hover:bg-brand-hover active:scale-95 text-white px-4 py-2.5 rounded-[14px] text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-lg shadow-brand/20"
         >
           <Plus className="w-4 h-4" /> Tambah
         </button>
@@ -203,17 +204,17 @@ export default function AdminPackages() {
             transition={{ delay: idx * 0.04 }}
             className="bg-white/[0.025] border border-white/[0.07] rounded-[24px] p-5 relative overflow-hidden shadow-sm"
           >
-            <div className={`absolute top-0 left-0 w-full h-[3px] ${COLORS.find(c => c.value === pkg.badge_color)?.cls || 'bg-[#0A84FF]'}`} />
+            <div className={`absolute top-0 left-0 w-full h-[3px] ${COLORS.find(c => c.value === pkg.badge_color)?.cls || 'bg-brand'}`} />
 
             <div className="flex justify-between items-start mb-3 mt-1">
-              <div className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${COLORS.find(c => c.value === pkg.badge_color)?.cls || 'bg-[#0A84FF]'} bg-opacity-15`} style={{ color: 'white', opacity: 0.9 }}>
+              <div className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${COLORS.find(c => c.value === pkg.badge_color)?.cls || 'bg-brand'} bg-opacity-15`} style={{ color: 'white', opacity: 0.9 }}>
                 <span className="opacity-80">{BADGE_LABEL[pkg.badge_color] || 'Standar'}</span>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleCopyLink(pkg.id)}
                   title="Salin link publik untuk hotspot"
-                  className="w-7 h-7 flex items-center justify-center rounded-[10px] bg-[#0A84FF]/10 text-[#0A84FF] hover:bg-[#0A84FF]/20 transition-colors"
+                  className="w-7 h-7 flex items-center justify-center rounded-[10px] bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
                 >
                   {copiedLink === pkg.id ? <Check className="w-3.5 h-3.5" /> : <LinkIcon className="w-3.5 h-3.5" />}
                 </button>
@@ -225,7 +226,7 @@ export default function AdminPackages() {
                 </button>
                 <button
                   onClick={() => handleDelete(pkg)}
-                  className="w-7 h-7 flex items-center justify-center rounded-[10px] bg-white/5 text-white/40 hover:text-[#FF453A] hover:bg-[#FF453A]/10 transition-colors"
+                  className="w-7 h-7 flex items-center justify-center rounded-[10px] bg-white/5 text-white/40 hover:text-danger hover:bg-danger/10 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -234,12 +235,12 @@ export default function AdminPackages() {
 
             <h3 className="text-[17px] font-bold text-white mb-0.5">{pkg.name}</h3>
             {pkg.mikrotik_profile && (
-              <p className="text-[11px] text-[#0A84FF]/70 font-medium mb-2 flex items-center gap-1">
+              <p className="text-[11px] text-brand/70 font-medium mb-2 flex items-center gap-1">
                 <Router className="w-3 h-3" /> Profil: {pkg.mikrotik_profile}
               </p>
             )}
             <div className="text-[28px] font-bold text-white mb-4 tracking-tight">
-              Rp {pkg.price.toLocaleString('id-ID')}
+              {formatRupiah(pkg.price)}
             </div>
 
             <div className="flex flex-wrap gap-2 mb-4">
@@ -275,7 +276,7 @@ export default function AdminPackages() {
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.38 }}
-              className="w-full max-w-md bg-[#1C1C1E] border-t border-white/[0.08] rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+              className="w-full max-w-md bg-surface border-t border-white/[0.08] rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
             >
               <div className="w-10 h-1 bg-white/15 rounded-full mx-auto mb-5 sm:hidden" />
               <button onClick={closeModal} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center bg-white/[0.06] rounded-full text-white/40 hover:text-white transition-colors">
@@ -291,7 +292,7 @@ export default function AdminPackages() {
                     value={form.name}
                     onChange={e => setForm({ ...form, name: e.target.value })}
                     placeholder="e.g. Harian Hemat"
-                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors"
                     required
                   />
                 </div>
@@ -303,11 +304,11 @@ export default function AdminPackages() {
                   <select
                     value={form.router_id}
                     onChange={e => setForm({ ...form, router_id: e.target.value })}
-                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 appearance-none"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 appearance-none"
                   >
-                    <option value="" className="bg-[#1C1C1E] text-white/50">— Tanpa Router —</option>
+                    <option value="" className="bg-surface text-white/50">— Tanpa Router —</option>
                     {routers.map(r => (
-                      <option value={r.id} key={r.id} className="bg-[#1C1C1E]">
+                      <option value={r.id} key={r.id} className="bg-surface">
                         {r.name} ({r.ip_address})
                       </option>
                     ))}
@@ -326,14 +327,14 @@ export default function AdminPackages() {
                       </label>
                       {loadingProfiles && <RefreshCw className="w-3.5 h-3.5 text-white/40 animate-spin" />}
                       {profileSource === 'mikrotik' && (
-                        <span className="text-[10px] bg-[#34C759]/10 text-[#34C759] px-2 py-0.5 rounded font-bold border border-[#34C759]/20">LIVE</span>
+                        <span className="text-[10px] bg-success/10 text-success px-2 py-0.5 rounded font-bold border border-success/20">LIVE</span>
                       )}
                       {profileSource === 'demo' && (
-                        <span className="text-[10px] bg-[#FF9F0A]/10 text-[#FF9F0A] px-2 py-0.5 rounded font-bold border border-[#FF9F0A]/20">DEMO</span>
+                        <span className="text-[10px] bg-gold/10 text-gold px-2 py-0.5 rounded font-bold border border-gold/20">DEMO</span>
                       )}
                     </div>
                     {profileError && (
-                      <div className="flex items-center gap-2 text-[12px] text-[#FF453A] bg-[#FF453A]/10 rounded-[10px] p-2.5 mb-2 border border-[#FF453A]/15">
+                      <div className="flex items-center gap-2 text-[12px] text-danger bg-danger/10 rounded-[10px] p-2.5 mb-2 border border-danger/15">
                         <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {profileError}
                       </div>
                     )}
@@ -341,20 +342,20 @@ export default function AdminPackages() {
                       value={form.mikrotik_profile}
                       onChange={e => handleProfileChange(e.target.value)}
                       disabled={loadingProfiles || profiles.length === 0}
-                      className={`w-full rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none appearance-none transition-colors ${profileSource === 'mikrotik' ? 'bg-[#0A84FF]/5 border border-[#0A84FF]/25 focus:border-[#0A84FF]' : 'bg-white/[0.03] border border-white/[0.07] focus:border-[#0A84FF]/50'}`}
+                      className={`w-full rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none appearance-none transition-colors ${profileSource === 'mikrotik' ? 'bg-brand/5 border border-brand/25 focus:border-brand' : 'bg-white/[0.03] border border-white/[0.07] focus:border-brand/50'}`}
                     >
-                      <option value="" className="bg-[#1C1C1E] text-white/40">
+                      <option value="" className="bg-surface text-white/40">
                         {loadingProfiles ? 'Mengambil profil dari router...' : 'Pilih Profil...'}
                       </option>
                       {profiles.map(p => (
-                        <option value={p.name} key={p.id} className="bg-[#1C1C1E]">
+                        <option value={p.name} key={p.id} className="bg-surface">
                           {p.name} — {p.sessionTimeout} — {p.rateLimit}
                         </option>
                       ))}
                     </select>
                     {selectedProfile && (
                       <div className="flex flex-wrap gap-2 mt-2">
-                        <span className="text-[11px] bg-[#0A84FF]/10 text-[#0A84FF] px-2 py-1 rounded-[8px] border border-[#0A84FF]/20 font-semibold">
+                        <span className="text-[11px] bg-brand/10 text-brand px-2 py-1 rounded-[8px] border border-brand/20 font-semibold">
                           ⏱ {selectedProfile.sessionTimeout}
                         </span>
                         <span className="text-[11px] bg-white/5 text-white/55 px-2 py-1 rounded-[8px] border border-white/10 font-semibold">
@@ -377,7 +378,7 @@ export default function AdminPackages() {
                       value={form.speed}
                       onChange={e => setForm({ ...form, speed: e.target.value })}
                       placeholder="e.g. 10 Mbps"
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors"
                       required
                     />
                   </div>
@@ -388,7 +389,7 @@ export default function AdminPackages() {
                       value={form.duration}
                       onChange={e => setForm({ ...form, duration: e.target.value })}
                       placeholder="e.g. 1 Hari"
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors"
                       required
                     />
                   </div>
@@ -402,7 +403,7 @@ export default function AdminPackages() {
                       value={form.quota}
                       onChange={e => setForm({ ...form, quota: e.target.value })}
                       placeholder="e.g. Unlimited"
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors"
                       required
                     />
                   </div>
@@ -414,7 +415,7 @@ export default function AdminPackages() {
                       onChange={e => setForm({ ...form, price: e.target.value })}
                       placeholder="5000"
                       min="0"
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors"
                       required
                     />
                   </div>
@@ -428,7 +429,7 @@ export default function AdminPackages() {
                         key={c.value}
                         type="button"
                         onClick={() => setForm({ ...form, badge_color: c.value })}
-                        className={`w-8 h-8 rounded-full ${c.cls} transition-all ${form.badge_color === c.value ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1C1C1E] scale-110' : 'opacity-50 hover:opacity-75'}`}
+                        className={`w-8 h-8 rounded-full ${c.cls} transition-all ${form.badge_color === c.value ? 'ring-2 ring-white ring-offset-2 ring-offset-surface scale-110' : 'opacity-50 hover:opacity-75'}`}
                       />
                     ))}
                   </div>
@@ -437,7 +438,7 @@ export default function AdminPackages() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full bg-[#0A84FF] hover:bg-[#0070e0] disabled:opacity-50 active:scale-[0.98] transition-all text-white font-semibold py-4 rounded-[16px] mt-2 text-[15px]"
+                  className="w-full bg-brand hover:bg-brand-hover disabled:opacity-50 active:scale-[0.98] transition-all text-white font-semibold py-4 rounded-[16px] mt-2 text-[15px]"
                 >
                   {saving ? (
                     <span className="flex items-center justify-center gap-2">

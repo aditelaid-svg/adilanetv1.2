@@ -3,9 +3,12 @@ import { useAppContext } from '../../AppContext';
 import { useToast } from '../../components/Toast';
 import { Users, Search, UserCheck, UserX, Wallet, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import EmptyState from '../../components/ui/EmptyState';
+import { SkeletonList } from '../../components/ui/Skeleton';
+import { formatRupiah } from '../../lib/format';
 
 export default function AdminUsers() {
-  const { users, updateUser, deleteUser, topupBalance, currentUser } = useAppContext();
+  const { users, updateUser, deleteUser, topupBalance, currentUser, loading } = useAppContext();
   const toast = useToast();
 
   const [topupModalUser, setTopupModalUser] = useState<number | null>(null);
@@ -64,7 +67,7 @@ export default function AdminUsers() {
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-white/[0.03] backdrop-blur-md border border-white/5 rounded-[16px] p-3 flex flex-col justify-center">
           <div className="flex items-center gap-1.5 mb-1">
-            <div className="w-6 h-6 rounded-lg bg-[#0A84FF]/10 flex items-center justify-center text-[#0A84FF]">
+            <div className="w-6 h-6 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
               <Users className="w-3.5 h-3.5" />
             </div>
             <span className="text-[17px] font-bold text-white leading-none">{users.length}</span>
@@ -73,7 +76,7 @@ export default function AdminUsers() {
         </div>
         <div className="bg-white/[0.03] backdrop-blur-md border border-white/5 rounded-[16px] p-3 flex flex-col justify-center">
           <div className="flex items-center gap-1.5 mb-1">
-            <div className="w-6 h-6 rounded-lg bg-[#34C759]/10 flex items-center justify-center text-[#34C759]">
+            <div className="w-6 h-6 rounded-lg bg-success/10 flex items-center justify-center text-success">
               <UserCheck className="w-3.5 h-3.5" />
             </div>
             <span className="text-[17px] font-bold text-white leading-none">{activeCount}</span>
@@ -82,7 +85,7 @@ export default function AdminUsers() {
         </div>
         <div className="bg-white/[0.03] backdrop-blur-md border border-white/5 rounded-[16px] p-3 flex flex-col justify-center">
           <div className="flex items-center gap-1.5 mb-1">
-            <div className="w-6 h-6 rounded-lg bg-[#FF453A]/10 flex items-center justify-center text-[#FF453A]">
+            <div className="w-6 h-6 rounded-lg bg-danger/10 flex items-center justify-center text-danger">
               <UserX className="w-3.5 h-3.5" />
             </div>
             <span className="text-[17px] font-bold text-white leading-none">{blockedCount}</span>
@@ -98,7 +101,7 @@ export default function AdminUsers() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Cari nama, email, atau nomor HP..."
-          className="w-full bg-white/[0.03] border border-white/10 text-white rounded-[16px] pl-9 pr-4 py-3 text-[13px] focus:outline-none focus:border-[#0A84FF]/50 focus:bg-white/[0.05] transition-colors shadow-sm"
+          className="w-full bg-white/[0.03] border border-white/10 text-white rounded-[16px] pl-9 pr-4 py-3 text-[13px] focus:outline-none focus:border-brand/50 focus:bg-white/[0.05] transition-colors shadow-sm"
         />
       </div>
 
@@ -107,7 +110,7 @@ export default function AdminUsers() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-[14px] text-[13px] font-semibold whitespace-nowrap active:scale-95 transition-all ${filter === f ? 'bg-[#0A84FF] text-white' : 'bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] text-white/80'}`}
+            className={`px-4 py-2 rounded-[14px] text-[13px] font-semibold whitespace-nowrap active:scale-95 transition-all ${filter === f ? 'bg-brand text-white' : 'bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] text-white/80'}`}
           >
             {f}
           </button>
@@ -115,6 +118,9 @@ export default function AdminUsers() {
       </div>
 
       <div className="space-y-3">
+        {loading && users.length === 0 ? (
+          <SkeletonList count={4} />
+        ) : (<>
         {filteredUsers.map((user, idx) => (
           <motion.div
             key={user.id}
@@ -130,14 +136,14 @@ export default function AdminUsers() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-0.5">
                   <h3 className="font-semibold text-white text-[15px]">{user.name}</h3>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${user.status === 'active' ? 'bg-[#34C759]/10 text-[#34C759] border-[#34C759]/20' : 'bg-[#FF453A]/10 text-[#FF453A] border-[#FF453A]/20'}`}>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${user.status === 'active' ? 'bg-success/10 text-success border-success/20' : 'bg-danger/10 text-danger border-danger/20'}`}>
                     {user.status === 'active' ? 'Aktif' : 'Diblokir'}
                   </span>
                   {user.role === 'superadmin' && (
-                    <span className="bg-[#BF5AF2]/10 text-[#BF5AF2] text-[9px] font-bold px-1.5 py-0.5 rounded border border-[#BF5AF2]/20 uppercase">Super Admin</span>
+                    <span className="bg-grape/10 text-grape text-[9px] font-bold px-1.5 py-0.5 rounded border border-grape/20 uppercase">Super Admin</span>
                   )}
                   {user.role === 'admin' && (
-                    <span className="bg-[#FF9500]/10 text-[#FF9500] text-[9px] font-bold px-1.5 py-0.5 rounded border border-[#FF9500]/20 uppercase">Admin</span>
+                    <span className="bg-warning/10 text-warning text-[9px] font-bold px-1.5 py-0.5 rounded border border-warning/20 uppercase">Admin</span>
                   )}
                 </div>
                 <p className="text-white/50 text-[12px] mb-0.5">{user.phone_number || '-'}</p>
@@ -147,7 +153,7 @@ export default function AdminUsers() {
 
             <div className="grid grid-cols-2 mb-4 gap-2">
               <div className="bg-white/[0.02] border border-white/5 rounded-[12px] p-2 flex flex-col justify-center items-center text-center">
-                <span className="text-[13px] font-bold text-white mb-0.5 leading-none">Rp {(user.balance).toLocaleString('id-ID')}</span>
+                <span className="text-[13px] font-bold text-white mb-0.5 leading-none">{formatRupiah(user.balance)}</span>
                 <span className="text-[9px] uppercase tracking-widest text-white/40 font-semibold mt-1">Saldo</span>
               </div>
               <div className="bg-white/[0.02] border border-white/5 rounded-[12px] p-2 flex flex-col justify-center items-center text-center">
@@ -173,14 +179,14 @@ export default function AdminUsers() {
                   {!isProtected && (user.status === 'active' ? (
                     <button
                       onClick={() => toggleBlockStatus(user.id, user.status)}
-                      className="flex items-center justify-center gap-1.5 bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
+                      className="flex items-center justify-center gap-1.5 bg-danger/10 hover:bg-danger/20 text-danger font-medium py-2 rounded-[12px] text-[12px] transition-colors"
                     >
                       <UserX className="w-3.5 h-3.5" /> Blokir
                     </button>
                   ) : (
                     <button
                       onClick={() => toggleBlockStatus(user.id, user.status)}
-                      className="flex items-center justify-center gap-1.5 bg-[#34C759]/10 hover:bg-[#34C759]/20 text-[#34C759] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
+                      className="flex items-center justify-center gap-1.5 bg-success/10 hover:bg-success/20 text-success font-medium py-2 rounded-[12px] text-[12px] transition-colors"
                     >
                       <UserCheck className="w-3.5 h-3.5" /> Buka
                     </button>
@@ -188,7 +194,7 @@ export default function AdminUsers() {
                   {!isProtected && (
                     <button
                       onClick={() => handleDelete(user.id, user.name)}
-                      className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-[#FF453A]/20 text-white/50 hover:text-[#FF453A] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
+                      className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-danger/20 text-white/50 hover:text-danger font-medium py-2 rounded-[12px] text-[12px] transition-colors"
                     >
                       <X className="w-3.5 h-3.5" /> Hapus
                     </button>
@@ -200,8 +206,13 @@ export default function AdminUsers() {
         ))}
 
         {filteredUsers.length === 0 && (
-          <div className="text-center py-12 text-white/30 text-[14px]">Tidak ada pengguna ditemukan.</div>
+          <EmptyState
+            icon={Users}
+            title={search || filter !== 'Semua' ? 'Tidak ada hasil' : 'Belum ada pengguna'}
+            description={search || filter !== 'Semua' ? 'Coba ubah pencarian atau filter.' : 'Pengguna terdaftar akan muncul di sini.'}
+          />
         )}
+        </>)}
       </div>
 
       {/* Topup Modal */}
@@ -213,10 +224,10 @@ export default function AdminUsers() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="w-full max-w-md bg-[#1C1C1E] rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative border-t border-white/10 sm:border-white/10"
+              className="w-full max-w-md bg-surface rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative border-t border-white/10 sm:border-white/10"
             >
               <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 sm:hidden" />
-              <button onClick={() => setTopupModalUser(null)} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
+              <button onClick={() => setTopupModalUser(null)} aria-label="Tutup" className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
               <h3 className="text-[22px] font-bold text-white mb-2">Top Up Saldo</h3>
@@ -232,7 +243,7 @@ export default function AdminUsers() {
                     onChange={(e) => setTopupAmount(e.target.value)}
                     placeholder="Contoh: 50000"
                     min="1000"
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-[16px] px-4 py-3.5 text-white focus:outline-none focus:border-[#0A84FF]/50 text-[15px]"
+                    className="w-full bg-white/[0.03] border border-white/5 rounded-[16px] px-4 py-3.5 text-white focus:outline-none focus:border-brand/50 text-[15px]"
                     required
                   />
                 </div>
@@ -242,7 +253,7 @@ export default function AdminUsers() {
                       key={a}
                       type="button"
                       onClick={() => setTopupAmount(String(a))}
-                      className={`flex-1 py-2 rounded-[12px] text-[11px] font-semibold transition-colors ${topupAmount === String(a) ? 'bg-[#0A84FF] text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+                      className={`flex-1 py-2 rounded-[12px] text-[11px] font-semibold transition-colors ${topupAmount === String(a) ? 'bg-brand text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
                     >
                       {(a/1000).toFixed(0)}rb
                     </button>
@@ -251,7 +262,7 @@ export default function AdminUsers() {
                 <button
                   type="submit"
                   disabled={!topupAmount}
-                  className="w-full bg-[#0A84FF] disabled:bg-white/5 disabled:text-white/30 hover:bg-[#0A84FF]/90 active:scale-[0.98] text-white font-semibold py-4 rounded-[16px] mt-2 transition-transform text-[15px]"
+                  className="w-full bg-brand disabled:bg-white/5 disabled:text-white/30 hover:bg-brand/90 active:scale-[0.98] text-white font-semibold py-4 rounded-[16px] mt-2 transition-transform text-[15px]"
                 >
                   Konfirmasi Top Up
                 </button>
