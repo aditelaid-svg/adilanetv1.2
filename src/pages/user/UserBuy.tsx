@@ -73,36 +73,26 @@ export default function UserBuy() {
     }
   };
 
-  const handleSimulatePaymentWebhook = async () => {
-    if (!selectedPkg) return;
-    setIsProcessing(true);
-    try {
-      // Confirm QRIS payment — the webhook provisions the voucher on Mikrotik
-      // and returns the real voucher code for this payment.
-      const response = await fetch('/api/webhook/sanpay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reference_id: refId,
-          status: 'Success',
-          user_id: currentUser?.id,
-          package_id: selectedPkg.id,
-        }),
-      });
-      const data = await response.json();
-      if (data.voucher_code) {
-        setSuccessCode(data.voucher_code);
-        setShowQrisCode(false);
-        await refreshData();
-      } else {
-        setError('Pembayaran belum terverifikasi atau voucher gagal dibuat di Mikrotik. Coba lagi.');
-      }
-    } catch {
-      setError('Terjadi kesalahan.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  // Poll payment status while the QRIS is shown. The voucher is only issued
+  // server-side after SanPay confirms the payment via its signed webhook.
+  useEffect(() => {
+    if (!showQrisCode || !refId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const r = await fetch(`/api/payment/status/${refId}`);
+        const d = await r.json();
+        if (active && d.success && d.data.status === 'success' && d.data.voucher_code) {
+          setSuccessCode(d.data.voucher_code);
+          setShowQrisCode(false);
+          await refreshData();
+        }
+      } catch { /* ignore transient network errors while polling */ }
+    };
+    const id = setInterval(poll, 4000);
+    poll();
+    return () => { active = false; clearInterval(id); };
+  }, [showQrisCode, refId]);
 
   const buyPackageWithPin = async (currentPin: string) => {
     if (!selectedPkg) return;
@@ -324,13 +314,13 @@ export default function UserBuy() {
                     <div className="mb-4 text-center text-[#FF453A] text-[13px] font-medium bg-[#FF453A]/10 py-2 rounded-[12px]">{error}</div>
                   )}
 
-                  <button
-                    onClick={handleSimulatePaymentWebhook}
-                    disabled={isProcessing}
-                    className="w-full bg-[#34C759] disabled:opacity-50 hover:bg-[#34C759]/90 active:scale-[0.98] text-white font-semibold py-4 rounded-[16px] transition-transform text-[15px]"
-                  >
-                    {isProcessing ? 'Menunggu Verifikasi...' : 'Simulasi Pembayaran Berhasil'}
-                  </button>
+                  <div className="w-full flex items-center justify-center gap-2 bg-[#0A84FF]/10 border border-[#0A84FF]/20 text-[#0A84FF] font-semibold py-4 rounded-[16px] text-[14px]">
+                    <div className="w-4 h-4 border-2 border-[#0A84FF]/30 border-t-[#0A84FF] rounded-full animate-spin" />
+                    Menunggu pembayaran...
+                  </div>
+                  <p className="text-white/35 text-[11px] mt-3">
+                    Voucher muncul otomatis setelah pembayaran terverifikasi. Jangan tutup halaman ini.
+                  </p>
                 </div>
               ) : (
                 <div className="text-center py-6">

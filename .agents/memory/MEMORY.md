@@ -1,6 +1,6 @@
 - [Toast system](toast-system.md) — Global toast+confirm in src/components/Toast.tsx (ToastProvider in App.tsx); replaces all window.confirm/alert across admin pages.
 - [Package schema](package-schema.md) — packages table has router_id and mikrotik_profile (nullable); AppContext has updatePackage via PATCH /api/packages/:id.
-- [Public checkout](public-checkout.md) — POST /api/transactions/public creates real voucher without login; PublicBuy.tsx calls this after "Saya Sudah Bayar" button.
+- [SanPay QRIS](sanpay-qris.md) — real QRIS via create-qris + signed webhook fulfillment; vouchers only minted after verified+amount-matched payment. Replaces old insecure /api/transactions/public.
 - [Mikrotik API](mikrotik-api.md) — createVoucher uses array param format `=key=value`, port passed from router.api_port; getProfiles with port support.
 - [Mikrotik profiles](mikrotik-profiles.md) — admin hotspot profile CRUD from UI; GET has demo fallback, writes never fall back; server-side field validation.
 - [PWA SW](pwa-sw.md) — SW registered in ALL environments (not just PROD); cache name adilanet-v3; proper SPA navigation fallback.

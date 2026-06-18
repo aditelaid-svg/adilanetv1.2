@@ -68,28 +68,25 @@ export default function PublicBuy() {
     }
   };
 
-  const handleConfirmPayment = async () => {
-    setIsProcessing(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/transactions/public', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ package_id: pkg.id, phone }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setSuccessCode(data.data.voucher_code);
-        setStep('success');
-      } else {
-        setError(data.error || 'Gagal memproses. Coba lagi.');
-      }
-    } catch {
-      setError('Terjadi kesalahan jaringan.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  // Poll payment status while the QRIS is shown. The voucher is only issued
+  // server-side after SanPay confirms the payment via its signed webhook.
+  useEffect(() => {
+    if (step !== 'qris' || !refId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const r = await fetch(`/api/payment/status/${refId}`);
+        const d = await r.json();
+        if (active && d.success && d.data.status === 'success' && d.data.voucher_code) {
+          setSuccessCode(d.data.voucher_code);
+          setStep('success');
+        }
+      } catch { /* ignore transient network errors while polling */ }
+    };
+    const id = setInterval(poll, 4000);
+    poll();
+    return () => { active = false; clearInterval(id); };
+  }, [step, refId]);
 
   const copyCode = () => {
     if (successCode) {
@@ -243,21 +240,15 @@ export default function PublicBuy() {
                   </div>
                 )}
 
+                <div className="w-full flex items-center justify-center gap-2 bg-[#0A84FF]/10 border border-[#0A84FF]/20 text-[#0A84FF] font-semibold py-4 rounded-[16px] text-[14px] mb-2.5">
+                  <div className="w-4 h-4 border-2 border-[#0A84FF]/30 border-t-[#0A84FF] rounded-full animate-spin" />
+                  Menunggu pembayaran...
+                </div>
+                <p className="text-[11px] text-white/35 mb-2.5">
+                  Voucher muncul otomatis setelah pembayaran terverifikasi. Jangan tutup halaman ini.
+                </p>
                 <button
-                  onClick={handleConfirmPayment}
-                  disabled={isProcessing}
-                  className="w-full bg-[#34C759] disabled:opacity-50 hover:bg-[#2db34e] active:scale-[0.98] text-white font-semibold py-4 rounded-[16px] transition-transform text-[15px] mb-2.5"
-                >
-                  {isProcessing ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Memverifikasi...
-                    </span>
-                  ) : 'Saya Sudah Bayar ✓'}
-                </button>
-                <button
-                  onClick={() => { setStep('input_phone'); setError(null); }}
-                  disabled={isProcessing}
+                  onClick={() => { setStep('input_phone'); setError(null); setRefId(null); setQrisUrl(null); }}
                   className="w-full text-white/40 font-medium py-2.5 rounded-[14px] transition-all text-[13px] hover:text-white/60"
                 >
                   Batal

@@ -115,6 +115,8 @@ async function initDb() {
       created_at TIMESTAMP DEFAULT NOW()
     );
     ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reference_id VARCHAR(100);
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS phone VARCHAR(30);
+    ALTER TABLE transactions ALTER COLUMN status TYPE VARCHAR(20);
     DROP INDEX IF EXISTS transactions_reference_id_uniq;
     CREATE UNIQUE INDEX IF NOT EXISTS transactions_reference_id_key ON transactions(reference_id);
 
@@ -223,6 +225,12 @@ async function getSettings() {
   return s;
 }
 
+// SanPay signs/verifies payloads with HMAC-SHA256 over the raw JSON body,
+// using the merchant's API Key as the secret. Same algorithm both directions.
+function sanpaySignature(rawBody: string, apiKey: string): string {
+  return crypto.createHmac("sha256", apiKey).update(rawBody, "utf8").digest("hex");
+}
+
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 5000;
@@ -235,7 +243,10 @@ async function startServer() {
   const isProd = process.env.NODE_ENV === "production";
   app.set("trust proxy", 1);
   app.use(cors({ origin: true, credentials: true }));
-  app.use(express.json());
+  // Capture the raw request body so we can verify the SanPay webhook HMAC signature.
+  app.use(express.json({
+    verify: (req: any, _res, buf) => { req.rawBody = buf; },
+  }));
 
   const PgSession = connectPgSimple(session);
   app.use(
@@ -677,6 +688,12 @@ async function startServer() {
       if (!package_id || !payment_method) {
         return res.status(400).json({ success: false, error: "Data transaksi tidak lengkap." });
       }
+      // This endpoint only handles instant balance (saldo) purchases. QRIS goes
+      // through /api/payment/create-qris and is only fulfilled after a verified
+      // payment callback — no voucher may be minted here for non-saldo methods.
+      if (payment_method !== 'saldo') {
+        return res.status(400).json({ success: false, error: "Metode pembayaran tidak didukung di sini. Gunakan QRIS." });
+      }
 
       // Get user and package
       const { rows: userRows } = await pool.query(`SELECT * FROM users WHERE id = $1`, [user_id]);
@@ -808,41 +825,85 @@ async function startServer() {
     }
   });
 
-  // ─── PAYMENT (QRIS) ───────────────────────────────────────────────────────
+  // ─── PAYMENT (QRIS via SanPay) ────────────────────────────────────────────
+  // Generates a real dynamic QRIS through SanPay (sanpay.site). The voucher is
+  // NEVER issued here — it is only issued after SanPay confirms payment via the
+  // signed webhook below. The client polls /api/payment/status/:refId.
   app.post("/api/payment/create-qris", async (req, res) => {
     try {
       const s = await getSettings();
       if (s.qrisEnabled === 'false') {
-        return res.status(403).json({ success: false, error: "Pembayaran via QRIS sedang Maintenance/Dinonaktifkan." });
+        return res.status(403).json({ success: false, error: "Pembayaran via QRIS sedang dinonaktifkan." });
       }
 
-      const { amount, packageId, phone } = req.body;
-      const SANPAY_API_KEY = s.sanpayApiKey || process.env.SANPAY_API_KEY;
-      const refId = `WFI-TX-${Date.now()}`;
-
-      if (!SANPAY_API_KEY) {
-        return res.json({
-          success: true,
-          data: {
-            reference_id: refId,
-            qr_string: "QRIS_MOCK_DATA_1234567890",
-            qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=QRIS-DEMO-${refId}`,
-            amount: amount,
-            status: "pending"
-          },
-          message: "Mode demo: QRIS mock (tidak ada API Key)"
+      const apiKey = (s.sanpayApiKey || '').trim();
+      const merchantCode = (s.merchantId || '').trim();
+      if (!apiKey || !merchantCode) {
+        return res.status(503).json({
+          success: false,
+          error: "QRIS belum dikonfigurasi. Admin perlu mengisi Merchant Code & API Key SanPay di Setelan.",
         });
       }
 
-      // Real Sanpay integration placeholder
+      const { packageId } = req.body;
+      if (!packageId) return res.status(400).json({ success: false, error: "packageId wajib diisi." });
+      const { rows: pkgRows } = await pool.query(`SELECT * FROM packages WHERE id = $1`, [packageId]);
+      if (pkgRows.length === 0) return res.status(404).json({ success: false, error: "Paket tidak ditemukan." });
+      const pkg = pkgRows[0];
+
+      // Authoritative amount from the package — never trust the client.
+      const amount = Math.round(parseFloat(pkg.price));
+      const phone = typeof req.body.phone === 'string' ? req.body.phone.slice(0, 30) : null;
+      const userId = req.session?.userId || null;
+
+      // Unique partner reference (SanPay limit: 64 chars).
+      const refId = `WFI-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+
+      // Record a pending transaction up-front keyed by reference_id. SanPay's
+      // callback only echoes this reference, so we must persist who/what it is for.
+      await pool.query(
+        `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status, reference_id, phone)
+         VALUES ($1, $2, NULL, $3, 'qris', 'pending', $4, $5)
+         ON CONFLICT (reference_id) DO NOTHING`,
+        [userId, packageId, amount, refId, phone]
+      );
+
+      // Ask SanPay to generate the dynamic QRIS.
+      const payload = JSON.stringify({ amount, partnerReferenceNo: refId, expirySeconds: 600 });
+      const signature = sanpaySignature(payload, apiKey);
+      let sanpayJson: any;
+      try {
+        const resp = await fetch("https://sanpay.site/api/v1/topup_qris", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Merchant-Code": merchantCode,
+            "X-Signature": signature,
+          },
+          body: payload,
+        });
+        sanpayJson = await resp.json().catch(() => ({}));
+        if (!resp.ok || sanpayJson.status !== "success" || !sanpayJson.qrContent) {
+          throw new Error(sanpayJson?.message || `SanPay HTTP ${resp.status}`);
+        }
+      } catch (apiErr: any) {
+        await pool.query(`DELETE FROM transactions WHERE reference_id = $1 AND status = 'pending'`, [refId]);
+        console.error(`[QRIS] Gagal membuat QRIS SanPay: ${apiErr.message}`);
+        return res.status(502).json({ success: false, error: `Gagal membuat QRIS: ${apiErr.message}` });
+      }
+
+      const qrContent = sanpayJson.qrContent;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrContent)}`;
       res.json({
         success: true,
         data: {
           reference_id: refId,
-          qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=QRIS-${refId}`,
+          qr_string: qrContent,
+          qr_url: qrUrl,
           amount,
-          status: "pending"
-        }
+          expires_at: sanpayJson.expiresAt || null,
+          status: "pending",
+        },
       });
     } catch (err: any) {
       console.error(err);
@@ -850,100 +911,130 @@ async function startServer() {
     }
   });
 
-  app.post("/api/webhook/sanpay", async (req, res) => {
+  // Client polls this to learn when SanPay has confirmed the payment and the
+  // voucher has been provisioned. The reference is unguessable (timestamp+random).
+  app.get("/api/payment/status/:refId", async (req, res) => {
     try {
-      // Verify webhook authenticity via shared secret
-      const expectedSecret = process.env.SANPAY_WEBHOOK_SECRET;
-      if (expectedSecret) {
-        const provided = req.get("x-webhook-secret") || req.body?.secret;
-        if (provided !== expectedSecret) {
-          return res.status(401).json({ received: false, error: "Webhook signature tidak valid." });
-        }
+      const { rows } = await pool.query(
+        `SELECT status, voucher_code FROM transactions WHERE reference_id = $1`,
+        [req.params.refId]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ success: false, error: "Transaksi tidak ditemukan." });
       }
-      const { reference_id, status, user_id, package_id } = req.body;
-      console.log(`[Webhook] Pembayaran ${reference_id}: ${status}`);
-      let voucherCode = null;
-      if (status === "Success" || status === "PAID") {
-        // reference_id is mandatory so the callback is idempotent (no bypass).
-        if (!reference_id) {
-          return res.status(400).json({ received: false, error: "reference_id wajib untuk konfirmasi pembayaran." });
-        }
-        if (user_id && package_id) {
-          const { rows: pkgRows } = await pool.query(`SELECT * FROM packages WHERE id = $1`, [package_id]);
-          if (pkgRows.length > 0) {
-            // Atomically claim this payment reference BEFORE provisioning. The row
-            // is 'pending' with voucher_code = NULL until the hotspot user is
-            // actually created on Mikrotik — so a concurrent/duplicate callback
-            // never receives a code that isn't valid yet.
-            const { rows: claim } = await pool.query(
-              `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status, reference_id)
-               VALUES ($1, $2, NULL, $3, 'qris', 'pending', $4)
-               ON CONFLICT (reference_id) DO NOTHING RETURNING id`,
-              [user_id, package_id, parseFloat(pkgRows[0].price), reference_id]
-            );
-            if (claim.length === 0) {
-              // Already claimed/processed — only expose the code once it succeeded
-              const { rows: existing } = await pool.query(
-                `SELECT voucher_code, status FROM transactions WHERE reference_id = $1`,
-                [reference_id]
-              );
-              const row = existing[0];
-              return res.status(200).json({
-                received: true,
-                voucher_code: row && row.status === "success" ? row.voucher_code : null,
-              });
-            }
-            const claimedId = claim[0].id;
-            try {
-              const code = await generateUniqueVoucher();
-              await provisionVoucher(pkgRows[0], code);
-              await pool.query(
-                `UPDATE transactions SET voucher_code = $1, status = 'success' WHERE id = $2`,
-                [code, claimedId]
-              );
-              voucherCode = code;
-            } catch (provErr: any) {
-              // Provisioning failed — release the claim so the payment can be retried
-              await pool.query(`DELETE FROM transactions WHERE id = $1`, [claimedId]);
-              console.error(`[Webhook] Gagal provision voucher untuk ${reference_id}: ${provErr.message}`);
-            }
-          }
-        }
-      }
-      res.status(200).json({ received: true, voucher_code: voucherCode });
-    } catch (err) {
-      console.error("Webhook error:", err);
-      res.status(500).send("Webhook Error");
+      const row = rows[0];
+      res.json({
+        success: true,
+        data: {
+          status: row.status,
+          voucher_code: row.status === "success" ? row.voucher_code : null,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  // ─── PUBLIC PURCHASE (no login needed - for hotspot portal) ───────────────
-  app.post("/api/transactions/public", async (req, res) => {
+  // SanPay calls this when a payment succeeds. Authenticated via X-Merchant-Code
+  // + X-Signature (HMAC-SHA256 of the raw body with our API Key).
+  app.post("/api/webhook/sanpay", async (req: any, res) => {
     try {
-      const { package_id, phone } = req.body;
-      if (!package_id) return res.status(400).json({ success: false, error: "package_id wajib diisi." });
-      const { rows: pkgRows } = await pool.query(`SELECT * FROM packages WHERE id = $1`, [package_id]);
-      if (pkgRows.length === 0) return res.status(404).json({ success: false, error: "Paket tidak ditemukan." });
-      const pkg = pkgRows[0];
-      const voucherCode = await generateUniqueVoucher();
-      // Create the voucher on the Mikrotik router first — if this fails the buyer
-      // gets no usable voucher, so we abort instead of saving a dead transaction.
-      try {
-        await provisionVoucher(pkg, voucherCode);
-      } catch (provErr: any) {
-        console.error(`[PublicBuy] Gagal provision voucher: ${provErr.message}`);
-        return res.status(502).json({ success: false, error: `Gagal membuat voucher di Mikrotik: ${provErr.message}` });
+      const s = await getSettings();
+      const apiKey = (s.sanpayApiKey || '').trim();
+      const merchantCode = (s.merchantId || '').trim();
+
+      // Verify authenticity. Only enforced once credentials are configured so the
+      // SanPay dashboard "Validasi URL" test can still reach us during setup.
+      if (apiKey && merchantCode) {
+        const sigHeader = req.get("x-signature") || "";
+        const mcHeader = req.get("x-merchant-code") || "";
+        const raw = req.rawBody ? req.rawBody.toString("utf8") : JSON.stringify(req.body || {});
+        const expected = sanpaySignature(raw, apiKey);
+        const sigOk =
+          sigHeader.length === expected.length &&
+          crypto.timingSafeEqual(Buffer.from(sigHeader), Buffer.from(expected));
+        if (mcHeader !== merchantCode || !sigOk) {
+          return res.status(401).json({ status: "error", message: "Invalid signature" });
+        }
       }
-      const { rows: txRows } = await pool.query(
-        `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status) VALUES (NULL, $1, $2, $3, 'qris', 'success') RETURNING *`,
-        [package_id, voucherCode, parseFloat(pkg.price)]
+
+      const body = req.body || {};
+
+      // Validation ping from the SanPay dashboard — just acknowledge.
+      if (body.isValidationTest) {
+        return res.status(200).json({ status: "success" });
+      }
+
+      // Only act on a successful payment. QRIS success callbacks carry no status
+      // field (SanPay only calls on success), but VA/Retail send status='success'
+      // and payment_status='PAID'. Reject anything that explicitly says otherwise.
+      if (body.status && body.status !== "success") {
+        return res.status(200).json({ status: "success" });
+      }
+      if (body.payment_status && body.payment_status !== "PAID") {
+        return res.status(200).json({ status: "success" });
+      }
+
+      // QRIS callback echoes our partnerReferenceNo as `referenceNo`.
+      // VA/Retail callback uses `partnerReferenceNo`.
+      const ref = body.referenceNo || body.partnerReferenceNo;
+      if (!ref) {
+        return res.status(200).json({ status: "success" });
+      }
+
+      // Atomically claim the pending transaction so concurrent/duplicate
+      // callbacks can never double-provision.
+      const { rows: claim } = await pool.query(
+        `UPDATE transactions SET status = 'provisioning'
+         WHERE reference_id = $1 AND status = 'pending'
+         RETURNING id, package_id, amount`,
+        [ref]
       );
-      const tx = txRows[0];
-      console.log(`[PublicBuy] Voucher dibuat: ${voucherCode} untuk paket ${pkg.name}, HP: ${phone || 'N/A'}`);
-      res.json({ success: true, data: { transaction: tx, voucher_code: voucherCode, package: pkg } });
-    } catch (err: any) {
-      console.error(err);
-      res.status(500).json({ success: false, error: err.message });
+      if (claim.length === 0) {
+        // Unknown reference, or already handled/in-flight — acknowledge idempotently.
+        return res.status(200).json({ status: "success" });
+      }
+
+      const txId = claim[0].id;
+
+      // Verify the paid amount matches what we charged for this reference.
+      if (body.amount !== undefined) {
+        const expected = Math.round(parseFloat(claim[0].amount));
+        const paid = Math.round(Number(body.amount));
+        if (!Number.isFinite(paid) || paid !== expected) {
+          await pool.query(`UPDATE transactions SET status = 'pending' WHERE id = $1`, [txId]);
+          console.error(`[Webhook] Nominal tidak cocok untuk ${ref}: diharapkan ${expected}, diterima ${body.amount}`);
+          return res.status(400).json({ status: "error", message: "amount mismatch" });
+        }
+      }
+
+      const { rows: pkgRows } = await pool.query(`SELECT * FROM packages WHERE id = $1`, [claim[0].package_id]);
+      if (pkgRows.length === 0) {
+        await pool.query(`UPDATE transactions SET status = 'pending' WHERE id = $1`, [txId]);
+        return res.status(200).json({ status: "success" });
+      }
+
+      try {
+        const code = await generateUniqueVoucher();
+        await provisionVoucher(pkgRows[0], code);
+        await pool.query(
+          `UPDATE transactions SET voucher_code = $1, status = 'success' WHERE id = $2`,
+          [code, txId]
+        );
+        console.log(`[Webhook] Pembayaran ${ref} sukses — voucher ${code} dibuat.`);
+      } catch (provErr: any) {
+        // Roll back to 'pending' and return a non-2xx so SanPay retries the
+        // callback later (e.g. once a transiently-offline router is back). The
+        // buyer has paid, so the transaction stays recoverable for reconciliation.
+        await pool.query(`UPDATE transactions SET status = 'pending' WHERE id = $1`, [txId]);
+        console.error(`[Webhook] Gagal provision voucher untuk ${ref}: ${provErr.message}`);
+        return res.status(500).json({ status: "error", message: "provisioning failed, will retry" });
+      }
+
+      res.status(200).json({ status: "success" });
+    } catch (err) {
+      console.error("Webhook error:", err);
+      res.status(500).json({ status: "error" });
     }
   });
 

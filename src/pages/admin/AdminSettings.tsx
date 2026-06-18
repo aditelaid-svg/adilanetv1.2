@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Save, Settings2, Shield, Bell, Key, UserCog, Check } from 'lucide-react';
+import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
 
 export default function AdminSettings() {
@@ -16,6 +16,11 @@ export default function AdminSettings() {
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [callbackCopied, setCallbackCopied] = useState(false);
+
+  const callbackUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/webhook/sanpay`
+    : '/api/webhook/sanpay';
 
   useEffect(() => {
     // Fetch settings from Database via Backend API
@@ -28,6 +33,7 @@ export default function AdminSettings() {
           setQrisKey(json.data.sanpayApiKey || '');
           setMerchantId(json.data.merchantId || '');
           setTelegramToken(json.data.telegramToken || '');
+          setTelegramChatId(json.data.telegramChatId || '');
           setQrisEnabled(json.data.qrisEnabled ?? true);
         }
       } catch (err) {
@@ -144,24 +150,52 @@ export default function AdminSettings() {
           
           <div className={`space-y-4 transition-opacity ${!qrisEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div>
-              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Merchant ID</label>
+              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Merchant Code (SanPay)</label>
               <input
                 type="text"
                 value={merchantId}
                 onChange={e => setMerchantId(e.target.value)}
+                placeholder="MC-xxxxxxxx"
                 className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
               />
             </div>
             <div>
-              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Secret Key / Server Key</label>
+              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">API Key (SanPay)</label>
               <div className="relative">
                 <input
                   type="password"
                   value={qrisKey}
                   onChange={e => setQrisKey(e.target.value)}
+                  placeholder="API Key dari dashboard SanPay"
                   className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 transition-colors"
                 />
                 <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+              </div>
+            </div>
+
+            <div className="bg-[#0A84FF]/8 border border-[#0A84FF]/20 rounded-[16px] p-4 space-y-2.5">
+              <p className="text-[12px] font-semibold text-[#0A84FF]">Cara mengaktifkan QRIS produksi</p>
+              <ol className="text-[12px] text-white/55 space-y-1.5 list-decimal list-inside">
+                <li>Login ke dashboard SanPay, buka menu <b>Setting API</b>.</li>
+                <li>Salin <b>Merchant Code</b> &amp; <b>API Key</b> ke kolom di atas, lalu simpan.</li>
+                <li>Isi <b>URL Callback</b> di SanPay dengan alamat di bawah ini, lalu klik <b>Validasi URL</b>.</li>
+                <li>Whitelist IP server SanPay: <span className="font-mono text-white/70">103.127.137.140</span>.</li>
+                <li>Aktifkan toggle QRIS di atas. Setelah ini pembayaran QRIS langsung berjalan nyata.</li>
+              </ol>
+              <div className="pt-1">
+                <label className="block text-[11px] font-semibold tracking-wide uppercase text-white/40 mb-1.5">URL Callback</label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-black/30 border border-white/10 rounded-[10px] px-3 py-2 text-[11px] text-white/70 font-mono break-all">
+                    {callbackUrl}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => { navigator.clipboard.writeText(callbackUrl); setCallbackCopied(true); setTimeout(() => setCallbackCopied(false), 2000); }}
+                    className="shrink-0 w-9 h-9 bg-[#0A84FF]/15 hover:bg-[#0A84FF]/25 rounded-[10px] flex items-center justify-center text-[#0A84FF] transition-colors"
+                  >
+                    {callbackCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
