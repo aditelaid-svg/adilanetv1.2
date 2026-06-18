@@ -702,16 +702,52 @@ async function startServer() {
     }
   });
 
+  // Sync: read the REAL live hotspot sessions from the router and store the
+  // current connected-user count. Never falls back to fake/random data.
   app.post("/api/routers/:id/sync", requireAdmin, async (req, res) => {
     try {
-      const newCount = Math.floor(Math.random() * 20) + 5;
-      const { rows } = await pool.query(
-        `UPDATE routers SET connected_users = connected_users + $1 WHERE id = $2 RETURNING id, name, ip_address, api_port, username, status, connected_users, created_at`,
-        [newCount, req.params.id]
+      const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      const router = rows[0];
+      const { getActiveUsers } = await import("./src/server/mikrotik");
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Mikrotik connection timeout")), 4000)
       );
-      res.json({ success: true, data: rows[0] });
+      const active = await Promise.race([
+        getActiveUsers({ host: router.ip_address, user: router.username, pass: router.password, port: router.api_port }),
+        timeoutPromise,
+      ]);
+      const { rows: updated } = await pool.query(
+        `UPDATE routers SET connected_users = $1, status = 'online' WHERE id = $2 RETURNING id, name, ip_address, api_port, username, status, connected_users, created_at`,
+        [active.length, router.id]
+      );
+      res.json({ success: true, data: updated[0], count: active.length });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      await pool.query(`UPDATE routers SET status='offline' WHERE id=$1`, [req.params.id]).catch(() => {});
+      res.status(502).json({ success: false, error: `Gagal membaca router: ${err.message}` });
+    }
+  });
+
+  // Live list of users currently connected to the router's hotspot.
+  app.get("/api/routers/:id/active-users", requireAdmin, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      const router = rows[0];
+      const { getActiveUsers } = await import("./src/server/mikrotik");
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Mikrotik connection timeout")), 4000)
+      );
+      const active = await Promise.race([
+        getActiveUsers({ host: router.ip_address, user: router.username, pass: router.password, port: router.api_port }),
+        timeoutPromise,
+      ]);
+      // Keep the stored count in sync with the live reading.
+      await pool.query(`UPDATE routers SET connected_users = $1, status = 'online' WHERE id = $2`, [active.length, router.id]).catch(() => {});
+      res.json({ success: true, data: active });
+    } catch (err: any) {
+      await pool.query(`UPDATE routers SET status='offline' WHERE id=$1`, [req.params.id]).catch(() => {});
+      res.status(502).json({ success: false, error: `Gagal membaca user aktif: ${err.message}` });
     }
   });
 

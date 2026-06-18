@@ -29,3 +29,16 @@ export function formatTime(dateStr: string): string {
     minute: '2-digit',
   });
 }
+
+export function formatBytes(bytes: number | null | undefined): string {
+  const n = typeof bytes === 'number' && Number.isFinite(bytes) ? bytes : 0;
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let val = n / 1024;
+  let i = 0;
+  while (val >= 1024 && i < units.length - 1) {
+    val /= 1024;
+    i++;
+  }
+  return `${val.toFixed(val >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}

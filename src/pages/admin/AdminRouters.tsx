@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { useAppContext, MikrotikProfile } from '../../AppContext';
+import { useAppContext, MikrotikProfile, ActiveUser } from '../../AppContext';
 import { useToast } from '../../components/Toast';
-import { Router, Plus, X, Pencil, CheckCircle, XCircle, Loader2, Activity, Layers, Trash2, Gauge, Users, Clock } from 'lucide-react';
+import { Router, Plus, X, Pencil, CheckCircle, XCircle, Loader2, Activity, Layers, Trash2, Gauge, Users, Clock, Wifi, RefreshCw, Smartphone, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatBytes } from '../../lib/format';
 
 type RouterForm = { name: string; ip_address: string; api_port: string; username: string; password: string };
 const emptyForm: RouterForm = { name: '', ip_address: '', api_port: '8728', username: 'admin', password: '' };
@@ -15,7 +16,7 @@ type TestResult = { connected: boolean; message: string; latency?: number } | nu
 export default function AdminRouters() {
   const {
     routers, addRouter, updateRouter, deleteRouter, testRouterConnection,
-    getRouterProfiles, createRouterProfile, updateRouterProfile, deleteRouterProfile,
+    getRouterActiveUsers, getRouterProfiles, createRouterProfile, updateRouterProfile, deleteRouterProfile,
   } = useAppContext();
   const toast = useToast();
   const [showAdd, setShowAdd] = useState(false);
@@ -35,6 +36,39 @@ export default function AdminRouters() {
   const [profileEditId, setProfileEditId] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfileForm);
   const [profileSaving, setProfileSaving] = useState(false);
+
+  // ─── Active (online) users state ───
+  const [activeRouterId, setActiveRouterId] = useState<number | null>(null);
+  const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
+  const [activeLoading, setActiveLoading] = useState(false);
+
+  const openActiveUsers = async (routerId: number) => {
+    setActiveRouterId(routerId);
+    setActiveUsers([]);
+    setActiveLoading(true);
+    try {
+      const list = await getRouterActiveUsers(routerId);
+      setActiveUsers(list);
+    } catch (e: any) {
+      toast.error(e.message || 'Gagal memuat user aktif');
+      setActiveRouterId(null);
+    } finally {
+      setActiveLoading(false);
+    }
+  };
+
+  const refreshActiveUsers = async () => {
+    if (activeRouterId == null) return;
+    setActiveLoading(true);
+    try {
+      const list = await getRouterActiveUsers(activeRouterId);
+      setActiveUsers(list);
+    } catch (e: any) {
+      toast.error(e.message || 'Gagal memuat user aktif');
+    } finally {
+      setActiveLoading(false);
+    }
+  };
 
   const loadProfiles = async (routerId: number) => {
     setProfilesLoading(true);
@@ -236,10 +270,18 @@ export default function AdminRouters() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-white/[0.02] border border-white/5 rounded-[16px] p-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold mb-1">User Aktif</p>
-                  <p className="text-[20px] font-bold text-white leading-none mt-1">{router.connected_users}</p>
-                </div>
+                <button
+                  onClick={() => openActiveUsers(router.id)}
+                  className="text-left bg-white/[0.02] hover:bg-white/[0.05] active:bg-white/[0.08] border border-white/5 rounded-[16px] p-3 transition-colors group"
+                >
+                  <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
+                    <Wifi className="w-3 h-3" /> User Online
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <p className="text-[20px] font-bold text-white leading-none">{router.connected_users}</p>
+                    <span className="text-[10px] text-brand font-semibold opacity-0 group-hover:opacity-100 transition-opacity">Lihat →</span>
+                  </div>
+                </button>
                 <div className="bg-white/[0.02] border border-white/5 rounded-[16px] p-3">
                   <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold mb-1">Status</p>
                   <p className={`text-[15px] font-bold capitalize mt-1 leading-none ${statusColor(router.status)}`}>
@@ -498,6 +540,105 @@ export default function AdminRouters() {
                   </div>
                 </>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Active (online) Users Modal */}
+      <AnimatePresence>
+        {activeRouterId !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActiveRouterId(null)}
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 40, opacity: 0, scale: 0.98 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-surface border border-white/8 rounded-t-[28px] sm:rounded-[28px] w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-white/5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-[12px] bg-success/10 flex items-center justify-center">
+                    <Wifi className="w-[18px] h-[18px] text-success" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold text-[16px] leading-tight">User Online</h3>
+                    <p className="text-[12px] text-white/40">
+                      {routers.find(r => r.id === activeRouterId)?.name} · {activeUsers.length} terhubung
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={refreshActiveUsers}
+                    disabled={activeLoading}
+                    aria-label="Muat ulang"
+                    className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-white/60 hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${activeLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => setActiveRouterId(null)}
+                    aria-label="Tutup"
+                    className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto p-4 space-y-2.5">
+                {activeLoading && activeUsers.length === 0 ? (
+                  <div className="py-14 flex flex-col items-center text-white/40">
+                    <Loader2 className="w-7 h-7 animate-spin mb-3" />
+                    <p className="text-[13px]">Membaca sesi dari router...</p>
+                  </div>
+                ) : activeUsers.length === 0 ? (
+                  <div className="py-14 flex flex-col items-center text-white/30 text-center">
+                    <Wifi className="w-9 h-9 mb-3 opacity-30" />
+                    <p className="text-[15px] font-medium text-white/50">Tidak ada user online</p>
+                    <p className="text-[13px] mt-1">Belum ada perangkat yang terhubung saat ini.</p>
+                  </div>
+                ) : (
+                  activeUsers.map((u) => (
+                    <div key={u.id || u.macAddress || u.user} className="bg-white/[0.03] border border-white/5 rounded-[16px] p-3.5">
+                      <div className="flex items-center justify-between gap-2 mb-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-success/10 flex items-center justify-center shrink-0">
+                            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                          </div>
+                          <span className="text-white font-semibold text-[14px] truncate">{u.user}</span>
+                        </div>
+                        <span className="flex items-center gap-1 text-[11px] text-white/40 shrink-0">
+                          <Clock className="w-3 h-3" /> {u.uptime}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        {u.address && (
+                          <span className="flex items-center gap-1.5 text-white/50 truncate">
+                            <Smartphone className="w-3 h-3 shrink-0 text-white/30" /> {u.address}
+                          </span>
+                        )}
+                        {u.macAddress && (
+                          <span className="text-white/40 font-mono truncate">{u.macAddress}</span>
+                        )}
+                        <span className="flex items-center gap-1.5 text-iris">
+                          <ArrowDownToLine className="w-3 h-3 shrink-0" /> {formatBytes(u.bytesIn)}
+                        </span>
+                        <span className="flex items-center gap-1.5 text-gold">
+                          <ArrowUpFromLine className="w-3 h-3 shrink-0" /> {formatBytes(u.bytesOut)}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </motion.div>
           </motion.div>
         )}

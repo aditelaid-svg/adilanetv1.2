@@ -69,6 +69,68 @@ export interface ProfileInput {
   sessionTimeout?: string;
 }
 
+export interface ActiveUser {
+  id: string;
+  user: string;
+  address: string;
+  macAddress: string;
+  uptime: string;
+  bytesIn: number;
+  bytesOut: number;
+  loginBy: string;
+}
+
+function toNum(v: any): number {
+  const n = parseInt(String(v ?? '0'), 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Read the live hotspot sessions currently connected to the router
+// (RouterOS `/ip/hotspot/active`). Each row is one connected user.
+export async function getActiveUsers(config: MikrotikConfig): Promise<ActiveUser[]> {
+  const api = connect(config);
+  try {
+    await api.connect();
+    const result = await api.write('/ip/hotspot/active/print') as any[];
+    const rows = Array.isArray(result) ? result : [];
+    return rows
+      .filter((r: any) => r && (r.user || r['.id']))
+      .map((r: any) => ({
+        id: r['.id'] || r.id || '',
+        user: r.user || '-',
+        address: r.address || '',
+        macAddress: r['mac-address'] || r.macAddress || '',
+        uptime: parseUptime(r.uptime || ''),
+        bytesIn: toNum(r['bytes-in'] ?? r.bytesIn),
+        bytesOut: toNum(r['bytes-out'] ?? r.bytesOut),
+        loginBy: r['login-by'] || r.loginBy || '',
+      }));
+  } catch (error: any) {
+    console.error('[Mikrotik] getActiveUsers error:', error?.message || error);
+    throw error;
+  } finally {
+    try { api.close(); } catch {}
+  }
+}
+
+// RouterOS uptime is like "1d2h3m4s" / "2h15m" / "45s". Normalise to a short label.
+function parseUptime(up: string): string {
+  if (!up) return '-';
+  const d = up.match(/(\d+)d/);
+  const h = up.match(/(\d+)h/);
+  const m = up.match(/(\d+)m(?!s)/);
+  const s = up.match(/(\d+)s/);
+  const days = d ? parseInt(d[1]) : 0;
+  const hours = h ? parseInt(h[1]) : 0;
+  const mins = m ? parseInt(m[1]) : 0;
+  const secs = s ? parseInt(s[1]) : 0;
+  if (days > 0) return hours > 0 ? `${days}h ${hours}j` : `${days} Hari`;
+  if (hours > 0) return mins > 0 ? `${hours}j ${mins}m` : `${hours} Jam`;
+  if (mins > 0) return `${mins} Menit`;
+  if (secs > 0) return `${secs} Detik`;
+  return up;
+}
+
 function connect(config: MikrotikConfig): RouterOSAPI {
   const port = config.port ? parseInt(String(config.port)) : 8728;
   return new RouterOSAPI({
