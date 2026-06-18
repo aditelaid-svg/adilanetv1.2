@@ -4,6 +4,7 @@ import { useToast } from '../../components/Toast';
 import { Router, Plus, X, Pencil, CheckCircle, XCircle, Loader2, Activity, Layers, Trash2, Gauge, Users, Clock, Wifi, RefreshCw, Smartphone, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatBytes } from '../../lib/format';
+import EmptyState from '../../components/ui/EmptyState';
 
 type RouterForm = { name: string; ip_address: string; api_port: string; username: string; password: string };
 const emptyForm: RouterForm = { name: '', ip_address: '', api_port: '8728', username: 'admin', password: '' };
@@ -210,19 +211,19 @@ export default function AdminRouters() {
   };
 
   const statusColor = (s: string) =>
-    s === 'online' ? 'text-success' : s === 'warning' ? 'text-gold' : 'text-danger';
+    s === 'online' ? 'text-teal-600' : s === 'warning' ? 'text-amber-600' : 'text-rose-600';
   const dotColor = (s: string) =>
-    s === 'online' ? 'bg-success' : s === 'warning' ? 'bg-gold' : 'bg-danger';
+    s === 'online' ? 'bg-teal-500' : s === 'warning' ? 'bg-amber-500' : 'bg-rose-500';
 
   return (
     <div className="space-y-6 pb-20">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-[28px] font-bold tracking-tight text-white mb-1">Router MikroTik</h1>
-          <p className="text-white/50 text-[13px] font-medium">Konfigurasi perangkat router.</p>
+          <h1 className="text-[28px] font-bold tracking-tight text-slate-800 mb-1">Router MikroTik</h1>
+          <p className="text-slate-500 text-[13px] font-medium">Konfigurasi perangkat router.</p>
         </div>
-        <button onClick={openAdd} className="w-10 h-10 bg-brand/10 hover:bg-brand/20 border border-brand/20 text-brand rounded-[14px] flex items-center justify-center transition-all active:scale-95">
-          <Plus className="w-5 h-5" />
+        <button onClick={openAdd} className="w-10 h-10 bg-sky-500 hover:bg-sky-600 text-white rounded-[16px] flex items-center justify-center transition-all active:scale-95 shadow-[0_8px_20px_rgba(14,165,233,0.3)]">
+          <Plus className="w-5 h-5" strokeWidth={2} />
         </button>
       </div>
 
@@ -236,35 +237,35 @@ export default function AdminRouters() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.08 }}
-              className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm relative overflow-hidden"
+              className="glass-strong rounded-[24px] p-5 relative overflow-hidden"
             >
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <div className="w-12 h-12 rounded-[14px] bg-white/[0.04] border border-white/5 flex items-center justify-center">
-                      <Router className={`w-6 h-6 ${statusColor(router.status)}`} />
+                    <div className="w-12 h-12 rounded-[14px] bg-white border border-slate-100 flex items-center justify-center">
+                      <Router className={`w-6 h-6 ${statusColor(router.status)}`} strokeWidth={1.8} />
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-black ${dotColor(router.status)}`} />
+                    <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${dotColor(router.status)}`} />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-[15px] text-white mb-0.5 leading-tight">{router.name}</h3>
-                    <p className="font-mono text-[11px] text-brand">{router.ip_address}:{router.api_port || 8728}</p>
+                    <h3 className="font-semibold text-[15px] text-slate-800 mb-0.5 leading-tight">{router.name}</h3>
+                    <p className="font-mono text-[11px] text-sky-600">{router.ip_address}:{router.api_port || 8728}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => openEdit(router)}
                     aria-label="Edit router"
-                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/50 hover:text-brand hover:bg-brand/10 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white border border-slate-100 text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
                   >
-                    <Pencil className="w-3.5 h-3.5" />
+                    <Pencil className="w-3.5 h-3.5" strokeWidth={2} />
                   </button>
                   <button
                     onClick={() => handleDelete(router.id, router.name)}
                     aria-label="Hapus router"
-                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/50 hover:text-danger hover:bg-danger/10 transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-white border border-slate-100 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-4 h-4" strokeWidth={2} />
                   </button>
                 </div>
               </div>
@@ -272,18 +273,18 @@ export default function AdminRouters() {
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <button
                   onClick={() => openActiveUsers(router.id)}
-                  className="text-left bg-white/[0.02] hover:bg-white/[0.05] active:bg-white/[0.08] border border-white/5 rounded-[16px] p-3 transition-colors group"
+                  className="text-left bg-white hover:bg-slate-50 border border-slate-100 rounded-[16px] p-3 transition-colors group"
                 >
-                  <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
-                    <Wifi className="w-3 h-3" /> User Online
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
+                    <Wifi className="w-3 h-3" strokeWidth={2} /> User Online
                   </p>
                   <div className="flex items-center gap-1.5 mt-1">
-                    <p className="text-[20px] font-bold text-white leading-none">{router.connected_users}</p>
-                    <span className="text-[10px] text-brand font-semibold opacity-0 group-hover:opacity-100 transition-opacity">Lihat →</span>
+                    <p className="text-[20px] font-bold text-slate-800 leading-none">{router.connected_users}</p>
+                    <span className="text-[10px] text-sky-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">Lihat →</span>
                   </div>
                 </button>
-                <div className="bg-white/[0.02] border border-white/5 rounded-[16px] p-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-widest font-semibold mb-1">Status</p>
+                <div className="bg-white border border-slate-100 rounded-[16px] p-3">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold mb-1">Status</p>
                   <p className={`text-[15px] font-bold capitalize mt-1 leading-none ${statusColor(router.status)}`}>
                     {router.status}
                   </p>
@@ -301,12 +302,12 @@ export default function AdminRouters() {
                   >
                     <div className={`flex items-center gap-2 rounded-[12px] px-3 py-2 text-[12px] font-medium ${
                       test.connected
-                        ? 'bg-success/10 border border-success/20 text-success'
-                        : 'bg-danger/10 border border-danger/20 text-danger'
+                        ? 'bg-teal-100 text-teal-700'
+                        : 'bg-rose-100 text-rose-700'
                     }`}>
                       {test.connected
-                        ? <CheckCircle className="w-3.5 h-3.5 shrink-0" />
-                        : <XCircle className="w-3.5 h-3.5 shrink-0" />
+                        ? <CheckCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+                        : <XCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
                       }
                       <span className="flex-1 truncate">{test.message}</span>
                       {test.latency && (
@@ -321,18 +322,18 @@ export default function AdminRouters() {
                 <button
                   onClick={() => handleTest(router.id)}
                   disabled={isTesting}
-                  className="flex-1 bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] text-white/80 text-[13px] font-semibold py-2.5 rounded-[14px] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 bg-white border border-slate-100 hover:bg-slate-50 text-slate-700 text-[13px] font-semibold py-2.5 rounded-[14px] transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
                 >
                   {isTesting
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Testing...</>
-                    : <><Activity className="w-4 h-4" /> Test Koneksi</>
+                    : <><Activity className="w-4 h-4" strokeWidth={2} /> Test Koneksi</>
                   }
                 </button>
                 <button
                   onClick={() => openProfiles(router.id)}
-                  className="flex-1 bg-brand/10 hover:bg-brand/20 active:bg-brand/30 text-brand text-[13px] font-semibold py-2.5 rounded-[14px] transition-all flex items-center justify-center gap-2"
+                  className="flex-1 bg-sky-50 hover:bg-sky-100 text-sky-600 text-[13px] font-semibold py-2.5 rounded-[14px] transition-all flex items-center justify-center gap-2"
                 >
-                  <Layers className="w-4 h-4" />
+                  <Layers className="w-4 h-4" strokeWidth={2} />
                   Kelola Profil
                 </button>
               </div>
@@ -341,11 +342,11 @@ export default function AdminRouters() {
         })}
 
         {routers.length === 0 && (
-          <div className="text-center py-16 text-white/30">
-            <Router className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="text-[15px] font-medium">Belum ada router</p>
-            <p className="text-[13px] mt-1">Tap + untuk menambah router MikroTik</p>
-          </div>
+          <EmptyState
+            icon={Router}
+            title="Belum ada router"
+            description="Tap + untuk menambah router MikroTik."
+          />
         )}
       </div>
 
@@ -356,57 +357,57 @@ export default function AdminRouters() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/40 backdrop-blur-md"
+            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md"
           >
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-              className="w-full max-w-md bg-surface border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative"
+              className="w-full max-w-md glass-strong rounded-t-[28px] sm:rounded-[28px] p-6 shadow-2xl relative"
             >
-              <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 sm:hidden" />
-              <button onClick={closeModal} aria-label="Tutup" className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
-                <X className="w-4 h-4" />
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sm:hidden" />
+              <button onClick={closeModal} aria-label="Tutup" className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-400 hover:text-slate-700 transition-colors">
+                <X className="w-4 h-4" strokeWidth={2} />
               </button>
-              <h3 className="text-[22px] font-bold text-white mb-6">
+              <h3 className="text-[22px] font-bold text-slate-800 mb-6">
                 {editId !== null ? 'Edit Router' : 'Tambah Router'}
               </h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-[13px] font-medium text-white/60 mb-1.5">Nama Router</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Nama Router</label>
                   <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                     placeholder="e.g. Router Utama" required
-                    className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-medium text-white/60 mb-1.5">IP Address</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">IP Address</label>
                   <input type="text" value={form.ip_address} onChange={e => setForm({ ...form, ip_address: e.target.value })}
                     placeholder="e.g. 192.168.1.1" required
-                    className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white font-mono text-[15px] focus:outline-none focus:border-brand/50" />
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 font-mono text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[13px] font-medium text-white/60 mb-1.5">API Port</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">API Port</label>
                     <input type="text" value={form.api_port} onChange={e => setForm({ ...form, api_port: e.target.value })}
                       placeholder="8728"
-                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                   </div>
                   <div>
-                    <label className="block text-[13px] font-medium text-white/60 mb-1.5">Username</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Username</label>
                     <input type="text" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })}
                       placeholder="admin"
-                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[13px] font-medium text-white/60 mb-1.5">Password</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Password</label>
                   <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                     placeholder="••••••"
-                    className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                 </div>
                 <button type="submit" disabled={saving}
-                  className="w-full bg-brand hover:bg-brand/90 active:scale-[0.98] disabled:opacity-60 transition-all text-white font-semibold py-4 rounded-[16px] mt-2 max-sm:pb-8 text-[15px]">
+                  className="w-full bg-sky-500 hover:bg-sky-600 active:scale-95 disabled:opacity-60 transition-all text-white font-semibold py-4 rounded-[16px] mt-2 max-sm:pb-8 text-[15px] shadow-[0_8px_20px_rgba(14,165,233,0.3)]">
                   {saving ? 'Menyimpan...' : (editId !== null ? 'Simpan Perubahan' : 'Tambah Router')}
                 </button>
               </form>
@@ -422,31 +423,31 @@ export default function AdminRouters() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/40 backdrop-blur-md"
+            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md"
           >
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-              className="w-full max-w-md bg-surface border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative max-h-[88vh] flex flex-col"
+              className="w-full max-w-md glass-strong rounded-t-[28px] sm:rounded-[28px] p-6 shadow-2xl relative max-h-[88vh] flex flex-col"
             >
-              <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-5 sm:hidden" />
-              <button onClick={closeProfiles} aria-label="Tutup" className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
-                <X className="w-4 h-4" />
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-5 sm:hidden" />
+              <button onClick={closeProfiles} aria-label="Tutup" className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-400 hover:text-slate-700 transition-colors">
+                <X className="w-4 h-4" strokeWidth={2} />
               </button>
 
               <div className="flex items-center gap-2 mb-1">
-                <Layers className="w-5 h-5 text-brand" />
-                <h3 className="text-[22px] font-bold text-white">Profil Hotspot</h3>
+                <Layers className="w-5 h-5 text-sky-600" strokeWidth={2} />
+                <h3 className="text-[22px] font-bold text-slate-800">Profil Hotspot</h3>
               </div>
-              <p className="text-white/40 text-[12px] mb-4">
+              <p className="text-slate-400 text-[12px] mb-4">
                 {routers.find(r => r.id === profileRouterId)?.name}
               </p>
 
               {profilesSource === 'demo' && (
-                <div className="flex items-center gap-2 rounded-[12px] px-3 py-2 mb-3 text-[12px] font-medium bg-gold/10 border border-gold/20 text-gold">
-                  <XCircle className="w-3.5 h-3.5 shrink-0" />
+                <div className="flex items-center gap-2 rounded-[12px] px-3 py-2 mb-3 text-[12px] font-medium bg-amber-100 text-amber-700">
+                  <XCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
                   <span className="flex-1">{profilesWarning || 'Router tidak terjangkau — perubahan dinonaktifkan.'}</span>
                 </div>
               )}
@@ -454,38 +455,38 @@ export default function AdminRouters() {
               {showProfileForm ? (
                 <form onSubmit={handleProfileSubmit} className="space-y-4 overflow-y-auto">
                   <div>
-                    <label className="block text-[13px] font-medium text-white/60 mb-1.5">Nama Profil</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Nama Profil</label>
                     <input type="text" value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })}
                       placeholder="e.g. 1jam" required disabled={profileEditId !== null}
-                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50 disabled:opacity-50" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 disabled:opacity-50" />
                   </div>
                   <div>
-                    <label className="block text-[13px] font-medium text-white/60 mb-1.5">Rate Limit (up/down)</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Rate Limit (up/down)</label>
                     <input type="text" value={profileForm.rateLimit} onChange={e => setProfileForm({ ...profileForm, rateLimit: e.target.value })}
                       placeholder="e.g. 2M/2M"
-                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white font-mono text-[15px] focus:outline-none focus:border-brand/50" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 font-mono text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[13px] font-medium text-white/60 mb-1.5">Shared Users</label>
+                      <label className="block text-sm font-medium text-slate-600 mb-1.5">Shared Users</label>
                       <input type="text" value={profileForm.sharedUsers} onChange={e => setProfileForm({ ...profileForm, sharedUsers: e.target.value })}
                         placeholder="1"
-                        className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                     </div>
                     <div>
-                      <label className="block text-[13px] font-medium text-white/60 mb-1.5">Session Timeout</label>
+                      <label className="block text-sm font-medium text-slate-600 mb-1.5">Session Timeout</label>
                       <input type="text" value={profileForm.sessionTimeout} onChange={e => setProfileForm({ ...profileForm, sessionTimeout: e.target.value })}
                         placeholder={profileEditId ? 'kosong = tetap' : 'e.g. 1h, 1d'}
-                        className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50" />
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300" />
                     </div>
                   </div>
                   <div className="flex gap-2 pt-1 max-sm:pb-6">
                     <button type="button" onClick={() => setShowProfileForm(false)}
-                      className="flex-1 bg-white/5 hover:bg-white/10 text-white/70 font-semibold py-3.5 rounded-[16px] text-[15px] transition-colors">
+                      className="flex-1 bg-white border border-slate-100 hover:bg-slate-50 text-slate-700 font-semibold py-3.5 rounded-[16px] text-[15px] transition-colors shadow-sm">
                       Batal
                     </button>
                     <button type="submit" disabled={profileSaving}
-                      className="flex-1 bg-brand hover:bg-brand/90 active:scale-[0.98] disabled:opacity-60 transition-all text-white font-semibold py-3.5 rounded-[16px] text-[15px]">
+                      className="flex-1 bg-sky-500 hover:bg-sky-600 active:scale-95 disabled:opacity-60 transition-all text-white font-semibold py-3.5 rounded-[16px] text-[15px] shadow-[0_8px_20px_rgba(14,165,233,0.3)]">
                       {profileSaving ? 'Menyimpan...' : (profileEditId ? 'Simpan' : 'Tambah')}
                     </button>
                   </div>
@@ -495,44 +496,44 @@ export default function AdminRouters() {
                   <button
                     onClick={openProfileAdd}
                     disabled={profilesSource !== 'mikrotik'}
-                    className="w-full flex items-center justify-center gap-2 bg-brand/10 hover:bg-brand/20 disabled:opacity-40 disabled:cursor-not-allowed text-brand font-semibold py-3 rounded-[16px] text-[14px] transition-colors mb-3"
+                    className="w-full flex items-center justify-center gap-2 bg-sky-50 hover:bg-sky-100 disabled:opacity-40 disabled:cursor-not-allowed text-sky-600 font-semibold py-3 rounded-[16px] text-[14px] transition-colors mb-3"
                   >
-                    <Plus className="w-4 h-4" /> Tambah Profil
+                    <Plus className="w-4 h-4" strokeWidth={2} /> Tambah Profil
                   </button>
 
                   <div className="space-y-2 overflow-y-auto -mx-1 px-1">
                     {profilesLoading ? (
-                      <div className="flex items-center justify-center py-10 text-white/40">
+                      <div className="flex items-center justify-center py-10 text-slate-400">
                         <Loader2 className="w-5 h-5 animate-spin" />
                       </div>
                     ) : profiles.length === 0 ? (
-                      <div className="text-center py-10 text-white/30 text-[14px]">Belum ada profil.</div>
+                      <div className="text-center py-10 text-slate-400 text-[14px]">Belum ada profil.</div>
                     ) : (
                       profiles.map(p => (
-                        <div key={p.id} className="bg-white/[0.02] border border-white/5 rounded-[16px] p-3.5">
+                        <div key={p.id} className="bg-white border border-slate-100 rounded-[16px] p-3.5">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="font-semibold text-white text-[15px]">{p.name}</span>
+                            <span className="font-semibold text-slate-800 text-[15px]">{p.name}</span>
                             <div className="flex gap-1.5">
                               <button
                                 onClick={() => openProfileEdit(p)}
                                 disabled={profilesSource !== 'mikrotik'}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-brand hover:bg-brand/10 disabled:opacity-30 transition-colors"
+                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-sky-600 hover:bg-sky-50 disabled:opacity-30 transition-colors"
                               >
-                                <Pencil className="w-3.5 h-3.5" />
+                                <Pencil className="w-3.5 h-3.5" strokeWidth={2} />
                               </button>
                               <button
                                 onClick={() => handleProfileDelete(p)}
                                 disabled={profilesSource !== 'mikrotik'}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-danger hover:bg-danger/10 disabled:opacity-30 transition-colors"
+                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-30 transition-colors"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
                               </button>
                             </div>
                           </div>
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/50">
-                            <span className="flex items-center gap-1"><Gauge className="w-3 h-3" /> {p.rateLimit}</span>
-                            <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {p.sharedUsers}</span>
-                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.sessionTimeout}</span>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                            <span className="flex items-center gap-1"><Gauge className="w-3 h-3" strokeWidth={2} /> {p.rateLimit}</span>
+                            <span className="flex items-center gap-1"><Users className="w-3 h-3" strokeWidth={2} /> {p.sharedUsers}</span>
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" strokeWidth={2} /> {p.sessionTimeout}</span>
                           </div>
                         </div>
                       ))
@@ -553,23 +554,23 @@ export default function AdminRouters() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setActiveRouterId(null)}
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4"
           >
             <motion.div
               initial={{ y: 40, opacity: 0, scale: 0.98 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: 40, opacity: 0, scale: 0.98 }}
               onClick={e => e.stopPropagation()}
-              className="bg-surface border border-white/8 rounded-t-[28px] sm:rounded-[28px] w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl"
+              className="glass-strong rounded-t-[28px] sm:rounded-[28px] w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl"
             >
-              <div className="flex items-center justify-between p-5 border-b border-white/5">
+              <div className="flex items-center justify-between p-5 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-[12px] bg-success/10 flex items-center justify-center">
-                    <Wifi className="w-[18px] h-[18px] text-success" />
+                  <div className="w-9 h-9 rounded-[12px] bg-teal-100 flex items-center justify-center">
+                    <Wifi className="w-[18px] h-[18px] text-teal-600" strokeWidth={2} />
                   </div>
                   <div>
-                    <h3 className="text-white font-bold text-[16px] leading-tight">User Online</h3>
-                    <p className="text-[12px] text-white/40">
+                    <h3 className="text-slate-800 font-bold text-[16px] leading-tight">User Online</h3>
+                    <p className="text-[12px] text-slate-400">
                       {routers.find(r => r.id === activeRouterId)?.name} · {activeUsers.length} terhubung
                     </p>
                   </div>
@@ -579,60 +580,60 @@ export default function AdminRouters() {
                     onClick={refreshActiveUsers}
                     disabled={activeLoading}
                     aria-label="Muat ulang"
-                    className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-white/60 hover:text-white transition-colors disabled:opacity-50"
+                    className="w-8 h-8 flex items-center justify-center bg-white border border-slate-100 hover:bg-slate-50 rounded-full text-slate-400 hover:text-slate-700 transition-colors disabled:opacity-50"
                   >
                     <RefreshCw className={`w-4 h-4 ${activeLoading ? 'animate-spin' : ''}`} />
                   </button>
                   <button
                     onClick={() => setActiveRouterId(null)}
                     aria-label="Tutup"
-                    className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
+                    className="w-8 h-8 flex items-center justify-center bg-white border border-slate-100 hover:bg-slate-50 rounded-full text-slate-400 hover:text-slate-700 transition-colors"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-4 h-4" strokeWidth={2} />
                   </button>
                 </div>
               </div>
 
               <div className="overflow-y-auto p-4 space-y-2.5">
                 {activeLoading && activeUsers.length === 0 ? (
-                  <div className="py-14 flex flex-col items-center text-white/40">
+                  <div className="py-14 flex flex-col items-center text-slate-400">
                     <Loader2 className="w-7 h-7 animate-spin mb-3" />
                     <p className="text-[13px]">Membaca sesi dari router...</p>
                   </div>
                 ) : activeUsers.length === 0 ? (
-                  <div className="py-14 flex flex-col items-center text-white/30 text-center">
-                    <Wifi className="w-9 h-9 mb-3 opacity-30" />
-                    <p className="text-[15px] font-medium text-white/50">Tidak ada user online</p>
+                  <div className="py-14 flex flex-col items-center text-slate-400 text-center">
+                    <Wifi className="w-9 h-9 mb-3 text-slate-300" strokeWidth={1.5} />
+                    <p className="text-[15px] font-medium text-slate-500">Tidak ada user online</p>
                     <p className="text-[13px] mt-1">Belum ada perangkat yang terhubung saat ini.</p>
                   </div>
                 ) : (
                   activeUsers.map((u) => (
-                    <div key={u.id || u.macAddress || u.user} className="bg-white/[0.03] border border-white/5 rounded-[16px] p-3.5">
+                    <div key={u.id || u.macAddress || u.user} className="bg-white border border-slate-100 rounded-[16px] p-3.5">
                       <div className="flex items-center justify-between gap-2 mb-2.5">
                         <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-7 h-7 rounded-full bg-success/10 flex items-center justify-center shrink-0">
-                            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                          <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
+                            <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
                           </div>
-                          <span className="text-white font-semibold text-[14px] truncate">{u.user}</span>
+                          <span className="text-slate-800 font-semibold text-[14px] truncate">{u.user}</span>
                         </div>
-                        <span className="flex items-center gap-1 text-[11px] text-white/40 shrink-0">
-                          <Clock className="w-3 h-3" /> {u.uptime}
+                        <span className="flex items-center gap-1 text-[11px] text-slate-400 shrink-0">
+                          <Clock className="w-3 h-3" strokeWidth={2} /> {u.uptime}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-[11px]">
                         {u.address && (
-                          <span className="flex items-center gap-1.5 text-white/50 truncate">
-                            <Smartphone className="w-3 h-3 shrink-0 text-white/30" /> {u.address}
+                          <span className="flex items-center gap-1.5 text-slate-500 truncate">
+                            <Smartphone className="w-3 h-3 shrink-0 text-slate-400" strokeWidth={2} /> {u.address}
                           </span>
                         )}
                         {u.macAddress && (
-                          <span className="text-white/40 font-mono truncate">{u.macAddress}</span>
+                          <span className="text-slate-400 font-mono truncate">{u.macAddress}</span>
                         )}
-                        <span className="flex items-center gap-1.5 text-iris">
-                          <ArrowDownToLine className="w-3 h-3 shrink-0" /> {formatBytes(u.bytesIn)}
+                        <span className="flex items-center gap-1.5 text-sky-600">
+                          <ArrowDownToLine className="w-3 h-3 shrink-0" strokeWidth={2} /> {formatBytes(u.bytesIn)}
                         </span>
-                        <span className="flex items-center gap-1.5 text-gold">
-                          <ArrowUpFromLine className="w-3 h-3 shrink-0" /> {formatBytes(u.bytesOut)}
+                        <span className="flex items-center gap-1.5 text-amber-600">
+                          <ArrowUpFromLine className="w-3 h-3 shrink-0" strokeWidth={2} /> {formatBytes(u.bytesOut)}
                         </span>
                       </div>
                     </div>

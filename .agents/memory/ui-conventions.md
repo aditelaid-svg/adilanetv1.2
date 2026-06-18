@@ -5,6 +5,11 @@ description: Shared design tokens, format helpers, and UI primitives — prefer 
 
 # UI conventions (AdilaNet)
 
+- **Design language = "Coastal Glass" (LIGHT theme).** The app was converted from its old dark theme to a light one across EVERY surface (auth, customer, admin, overlays). Light sky→aqua→teal gradient background + frosted white glassmorphism cards, slate-800/600/500 text, sky-500 + teal accents, 28/32px radii, iOS typography. Do NOT reintroduce dark surfaces (`bg-surface`, `bg-black`, `bg-slate-900` as a card bg, `text-white`/`border-white/x` on non-colored backgrounds). **Exception:** `p.image_url ? 'bg-slate-900'` placeholders and `bg-black/30 text-white` badges sit UNDER promo images for legibility — those are intentional and must stay.
+- **Glass + background utilities** live in `src/index.css`: `.coastal-bg` + 3 `.coastal-glow .coastal-glow-1/2/3` children (animated gradient bg), and `.glass` / `.glass-strong` / `.glass-pill` / `.glass-nav`. Standalone pages with NO layout (Login, Register, PublicBuy) must render their own `<div className="coastal-bg fixed inset-0">` with the 3 glow children + content at `relative z-10`. Layout-wrapped pages get the bg from `UserLayout` / `AdminLayout`.
+- **Solid sky/teal/rose buttons correctly use `text-white`** — that is white-on-color, not a leftover dark class; don't "fix" those.
+- `src/pages/user/UserHome.tsx` is the gold-standard reference for the light treatment.
+
 - **Color tokens** live in `@theme` in `src/index.css` (brand, brand-hover, brand-deep, success, danger, danger-deep, warning, gold, iris, grape, surface). Use token utilities (`bg-brand`, `text-success`, etc.) — do NOT introduce new `bg-[#hex]` arbitrary color utilities for the main palette. For inline `style={{ color }}`, use `var(--color-...)`.
 - **Money + dates**: use `src/lib/format.ts` (`formatRupiah`, `formatDate`, `formatDateShort`, `formatTime`) instead of inline `toLocaleString('id-ID')` / `new Date().toLocaleDateString`. `formatRupiah` already prepends `Rp`.
 - **Shared primitives**: `src/components/ui/EmptyState.tsx` (icon+title+description) and `src/components/ui/Skeleton.tsx` (`Skeleton`, `SkeletonCard`, `SkeletonList`).

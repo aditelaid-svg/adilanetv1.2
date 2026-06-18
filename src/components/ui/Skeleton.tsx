@@ -1,12 +1,12 @@
 import React from 'react';
 
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/[0.06] rounded-[12px] ${className}`} />;
+  return <div className={`animate-pulse bg-slate-200/60 rounded-[12px] ${className}`} />;
 }
 
 export function SkeletonCard() {
   return (
-    <div className="bg-white/[0.03] border border-white/5 rounded-[20px] p-4 space-y-3">
+    <div className="glass rounded-[24px] p-4 space-y-3">
       <div className="flex items-center gap-3">
         <Skeleton className="w-10 h-10 rounded-[12px]" />
         <div className="flex-1 space-y-2">

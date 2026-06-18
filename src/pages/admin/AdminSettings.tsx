@@ -99,43 +99,43 @@ export default function AdminSettings() {
     <div className="space-y-6 pb-20">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-[28px] font-bold tracking-tight text-white mb-1">Setelan</h1>
-          <p className="text-[13px] font-medium text-white/50">Konfigurasi sistem & keamanan</p>
+          <h1 className="text-[28px] font-bold tracking-tight text-slate-800 mb-1">Setelan</h1>
+          <p className="text-[13px] font-medium text-slate-500">Konfigurasi sistem & keamanan</p>
         </div>
-        <div className="w-12 h-12 bg-white/5 border border-white/10 text-white/80 rounded-[16px] flex items-center justify-center">
-          <Settings2 className="w-6 h-6" />
+        <div className="w-12 h-12 glass-pill text-sky-600 rounded-[16px] flex items-center justify-center">
+          <Settings2 className="w-6 h-6" strokeWidth={1.8} />
         </div>
       </div>
 
       <motion.div 
         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
+        className="glass-strong rounded-[24px] p-5"
       >
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-[12px] bg-warning/20 text-warning flex items-center justify-center">
-            <UserCog className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-[12px] bg-amber-100 text-amber-600 flex items-center justify-center">
+            <UserCog className="w-5 h-5" strokeWidth={1.8} />
           </div>
-          <h2 className="font-semibold text-[15px] text-white">Keamanan Admin</h2>
+          <h2 className="font-semibold text-[15px] text-slate-800">Keamanan Admin</h2>
         </div>
         
         <form onSubmit={handleSavePassword} className="space-y-4">
           <div>
-            <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Ubah Password Admin</label>
+            <label className="block text-[13px] font-medium text-slate-600 mb-2">Ubah Password Admin</label>
             <div className="relative">
               <input
                 type="password"
                 value={adminPassword}
                 onChange={e => setAdminPassword(e.target.value)}
                 placeholder="Masukkan password baru"
-                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-warning/50 transition-colors"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition-colors"
                 required
               />
-              <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+              <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={1.8} />
             </div>
           </div>
           <button 
             type="submit"
-            className="w-full bg-warning/10 text-warning border border-warning/20 hover:bg-warning/20 active:scale-[0.98] font-semibold flex items-center justify-center gap-2 transition-transform text-[15px] py-3.5 rounded-[16px]"
+            className="w-full bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 active:scale-95 font-semibold flex items-center justify-center gap-2 transition-all text-[15px] py-3.5 rounded-[16px]"
           >
             {passwordSaved ? 'Berhasil Disimpan' : 'Simpan Password'}
           </button>
@@ -145,69 +145,69 @@ export default function AdminSettings() {
       <form onSubmit={handleSave} className="space-y-5">
         <motion.div 
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
+          className="glass-strong rounded-[24px] p-5"
         >
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-[12px] bg-iris/20 text-iris flex items-center justify-center">
-              <Shield className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-[12px] bg-indigo-100 text-indigo-600 flex items-center justify-center">
+              <Shield className="w-5 h-5" strokeWidth={1.8} />
             </div>
             <div className="flex-1">
-                <h2 className="font-semibold text-[15px] text-white">Payment Gateway (QRIS)</h2>
+                <h2 className="font-semibold text-[15px] text-slate-800">Payment Gateway (QRIS)</h2>
             </div>
             <div className="flex items-center">
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" checked={qrisEnabled} onChange={(e) => setQrisEnabled(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div>
                 </label>
             </div>
           </div>
           
           <div className={`space-y-4 transition-opacity ${!qrisEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div>
-              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Merchant Code (SanPay)</label>
+              <label className="block text-[13px] font-medium text-slate-600 mb-2">Merchant Code (SanPay)</label>
               <input
                 type="text"
                 value={merchantId}
                 onChange={e => setMerchantId(e.target.value)}
                 placeholder="MC-xxxxxxxx"
-                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors"
               />
             </div>
             <div>
-              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">API Key (SanPay)</label>
+              <label className="block text-[13px] font-medium text-slate-600 mb-2">API Key (SanPay)</label>
               <div className="relative">
                 <input
                   type="password"
                   value={qrisKey}
                   onChange={e => setQrisKey(e.target.value)}
                   placeholder="API Key dari dashboard SanPay"
-                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors"
                 />
-                <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={1.8} />
               </div>
             </div>
 
-            <div className="bg-brand/8 border border-brand/20 rounded-[16px] p-4 space-y-2.5">
-              <p className="text-[12px] font-semibold text-brand">Cara mengaktifkan QRIS produksi</p>
-              <ol className="text-[12px] text-white/55 space-y-1.5 list-decimal list-inside">
+            <div className="bg-sky-50 border border-sky-100 rounded-[16px] p-4 space-y-2.5">
+              <p className="text-[12px] font-semibold text-sky-600">Cara mengaktifkan QRIS produksi</p>
+              <ol className="text-[12px] text-slate-500 space-y-1.5 list-decimal list-inside">
                 <li>Login ke dashboard SanPay, buka menu <b>Setting API</b>.</li>
                 <li>Salin <b>Merchant Code</b> &amp; <b>API Key</b> ke kolom di atas, lalu simpan.</li>
                 <li>Isi <b>URL Callback</b> di SanPay dengan alamat di bawah ini, lalu klik <b>Validasi URL</b>.</li>
-                <li>Whitelist IP server SanPay: <span className="font-mono text-white/70">103.127.137.140</span>.</li>
+                <li>Whitelist IP server SanPay: <span className="font-mono text-slate-700">103.127.137.140</span>.</li>
                 <li>Aktifkan toggle QRIS di atas. Setelah ini pembayaran QRIS langsung berjalan nyata.</li>
               </ol>
               <div className="pt-1">
-                <label className="block text-[11px] font-semibold tracking-wide uppercase text-white/40 mb-1.5">URL Callback</label>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1.5">URL Callback</label>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 bg-black/30 border border-white/10 rounded-[10px] px-3 py-2 text-[11px] text-white/70 font-mono break-all">
+                  <code className="flex-1 bg-white border border-slate-200 rounded-[10px] px-3 py-2 text-[11px] text-slate-600 font-mono break-all">
                     {callbackUrl}
                   </code>
                   <button
                     type="button"
                     onClick={() => { navigator.clipboard.writeText(callbackUrl); setCallbackCopied(true); setTimeout(() => setCallbackCopied(false), 2000); }}
-                    className="shrink-0 w-9 h-9 bg-brand/15 hover:bg-brand/25 rounded-[10px] flex items-center justify-center text-brand transition-colors"
+                    className="shrink-0 w-9 h-9 bg-sky-100 hover:bg-sky-200 rounded-[10px] flex items-center justify-center text-sky-600 transition-colors"
                   >
-                    {callbackCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {callbackCopied ? <Check className="w-4 h-4" strokeWidth={1.8} /> : <Copy className="w-4 h-4" strokeWidth={1.8} />}
                   </button>
                 </div>
               </div>
@@ -217,18 +217,18 @@ export default function AdminSettings() {
 
         <motion.div
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-          className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
+          className="glass-strong rounded-[24px] p-5"
         >
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-[12px] bg-success/20 text-success flex items-center justify-center">
-              <Ticket className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-[12px] bg-teal-100 text-teal-600 flex items-center justify-center">
+              <Ticket className="w-5 h-5" strokeWidth={1.8} />
             </div>
-            <h2 className="font-semibold text-[15px] text-white">Format Kode Voucher</h2>
+            <h2 className="font-semibold text-[15px] text-slate-800">Format Kode Voucher</h2>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Tipe Karakter</label>
+              <label className="block text-[13px] font-medium text-slate-600 mb-2">Tipe Karakter</label>
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { v: 'alphanumeric', l: 'Huruf + Angka' },
@@ -241,8 +241,8 @@ export default function AdminSettings() {
                     onClick={() => setVoucherCharset(opt.v)}
                     className={`py-3 rounded-[14px] text-[13px] font-semibold border transition-colors ${
                       voucherCharset === opt.v
-                        ? 'bg-success/15 border-success/40 text-success'
-                        : 'bg-white/[0.02] border-white/5 text-white/60 hover:text-white/80'
+                        ? 'bg-teal-50 border-teal-200 text-teal-700'
+                        : 'bg-white border-slate-200 text-slate-600 hover:text-slate-800'
                     }`}
                   >
                     {opt.l}
@@ -253,33 +253,33 @@ export default function AdminSettings() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Panjang Kode</label>
+                <label className="block text-[13px] font-medium text-slate-600 mb-2">Panjang Kode</label>
                 <input
                   type="number"
                   min={4}
                   max={20}
                   value={voucherLength}
                   onChange={e => setVoucherLength(Number(e.target.value))}
-                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-success/50 transition-colors"
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-300 transition-colors"
                 />
-                <p className="text-[11px] text-white/35 mt-1.5">4–20 karakter (di luar prefix)</p>
+                <p className="text-[11px] text-slate-400 mt-1.5">4–20 karakter (di luar prefix)</p>
               </div>
               <div>
-                <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Prefix / Awalan</label>
+                <label className="block text-[13px] font-medium text-slate-600 mb-2">Prefix / Awalan</label>
                 <input
                   type="text"
                   value={voucherPrefix}
                   onChange={e => setVoucherPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 10))}
                   placeholder="(kosongkan jika tanpa awalan)"
-                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] font-mono focus:outline-none focus:border-success/50 transition-colors"
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] font-mono focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-300 transition-colors"
                 />
-                <p className="text-[11px] text-white/35 mt-1.5">Mis. WFI- atau kosong</p>
+                <p className="text-[11px] text-slate-400 mt-1.5">Mis. WFI- atau kosong</p>
               </div>
             </div>
 
-            <div className="bg-success/8 border border-success/20 rounded-[16px] p-4">
-              <p className="text-[11px] font-semibold tracking-wide uppercase text-white/40 mb-1.5">Contoh Hasil</p>
-              <code className="text-[16px] text-success font-mono font-bold break-all">
+            <div className="bg-teal-50 border border-teal-100 rounded-[16px] p-4">
+              <p className="text-[11px] font-medium text-slate-500 mb-1.5">Contoh Hasil</p>
+              <code className="text-[16px] text-teal-700 font-mono font-bold break-all">
                 {(() => {
                   const NUM = '0123456789';
                   const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -289,38 +289,38 @@ export default function AdminSettings() {
                   return `${voucherPrefix}${body}`;
                 })()}
               </code>
-              <p className="text-[11px] text-white/35 mt-2">Username & password Mikrotik memakai kode yang sama.</p>
+              <p className="text-[11px] text-slate-400 mt-2">Username & password Mikrotik memakai kode yang sama.</p>
             </div>
           </div>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
-          className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
+          className="glass-strong rounded-[24px] p-5"
         >
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-[12px] bg-success/20 text-success flex items-center justify-center">
-              <Wifi className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-[12px] bg-teal-100 text-teal-600 flex items-center justify-center">
+              <Wifi className="w-5 h-5" strokeWidth={1.8} />
             </div>
-            <h2 className="font-semibold text-[15px] text-white">Login WiFi Otomatis</h2>
+            <h2 className="font-semibold text-[15px] text-slate-800">Login WiFi Otomatis</h2>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">URL Login Hotspot</label>
+              <label className="block text-[13px] font-medium text-slate-600 mb-2">URL Login Hotspot</label>
               <input
                 type="text"
                 value={hotspotLoginUrl}
                 onChange={e => setHotspotLoginUrl(e.target.value)}
                 placeholder="http://10.5.50.1/login"
-                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] font-mono focus:outline-none focus:border-success/50 transition-colors"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] font-mono focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-300 transition-colors"
               />
-              <p className="text-[11px] text-white/35 mt-1.5">Alamat halaman login hotspot Mikrotik (gateway), bukan IP API.</p>
+              <p className="text-[11px] text-slate-400 mt-1.5">Alamat halaman login hotspot Mikrotik (gateway), bukan IP API.</p>
             </div>
 
-            <div className="bg-success/8 border border-success/20 rounded-[16px] p-4 space-y-1.5">
-              <p className="text-[12px] font-semibold text-success">Cara kerja</p>
-              <p className="text-[12px] text-white/55 leading-relaxed">
+            <div className="bg-teal-50 border border-teal-100 rounded-[16px] p-4 space-y-1.5">
+              <p className="text-[12px] font-semibold text-teal-700">Cara kerja</p>
+              <p className="text-[12px] text-slate-500 leading-relaxed">
                 Jika diisi, pelanggan yang membeli voucher dari aplikasi (sambil terhubung ke WiFi) akan melihat tombol <b>“Login WiFi Sekarang”</b> yang langsung menghubungkan mereka ke internet — tanpa ketik kode manual. Kosongkan untuk menyembunyikan tombol.
               </p>
             </div>
@@ -329,32 +329,32 @@ export default function AdminSettings() {
 
         <motion.div 
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
+          className="glass-strong rounded-[24px] p-5"
         >
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-[12px] bg-brand/20 text-brand flex items-center justify-center">
-              <Bell className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-[12px] bg-sky-100 text-sky-600 flex items-center justify-center">
+              <Bell className="w-5 h-5" strokeWidth={1.8} />
             </div>
-            <h2 className="font-semibold text-[15px] text-white">Notifikasi Telegram</h2>
+            <h2 className="font-semibold text-[15px] text-slate-800">Notifikasi Telegram</h2>
           </div>
           
           <div className="space-y-4">
             <div>
-              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Bot Token</label>
+              <label className="block text-[13px] font-medium text-slate-600 mb-2">Bot Token</label>
               <input
                 type="text"
                 value={telegramToken}
                 onChange={e => setTelegramToken(e.target.value)}
-                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-brand text-[15px] font-mono focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-sky-600 text-[15px] font-mono focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors"
               />
             </div>
             <div>
-              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Chat ID (Grup / Admin)</label>
+              <label className="block text-[13px] font-medium text-slate-600 mb-2">Chat ID (Grup / Admin)</label>
               <input
                 type="text"
                 value={telegramChatId}
                 onChange={e => setTelegramChatId(e.target.value)}
-                className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-brand text-[15px] font-mono focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-sky-600 text-[15px] font-mono focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors"
               />
             </div>
           </div>
@@ -363,17 +363,17 @@ export default function AdminSettings() {
         <button 
           type="submit"
           disabled={isSaving}
-          className={`w-full ${isSaved ? 'bg-success hover:bg-success' : 'bg-brand hover:bg-brand/90'} active:scale-[0.98] text-white font-semibold flex items-center justify-center gap-2 transition-all text-[15px] py-4 rounded-[16px] disabled:opacity-50`}
+          className={`w-full ${isSaved ? 'bg-teal-500 hover:bg-teal-500 shadow-[0_8px_20px_rgba(20,184,166,0.3)]' : 'bg-sky-500 hover:bg-sky-600 shadow-[0_8px_20px_rgba(14,165,233,0.3)]'} active:scale-95 text-white font-semibold flex items-center justify-center gap-2 transition-all text-[15px] py-4 rounded-[16px] disabled:opacity-50`}
         >
           {isSaved ? (
             <>
-              <Check className="w-5 h-5" /> Pengaturan Tersimpan
+              <Check className="w-5 h-5" strokeWidth={1.8} /> Pengaturan Tersimpan
             </>
           ) : isSaving ? (
             'Menyimpan...'
           ) : (
             <>
-              <Save className="w-5 h-5" /> Simpan Pengaturan
+              <Save className="w-5 h-5" strokeWidth={1.8} /> Simpan Pengaturan
             </>
           )}
         </button>

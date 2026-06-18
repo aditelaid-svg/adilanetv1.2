@@ -16,12 +16,12 @@ export default function EmptyState({ icon: Icon, title, description, action }: E
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center justify-center text-center py-14 px-6"
     >
-      <div className="w-16 h-16 rounded-[20px] bg-white/[0.04] border border-white/10 flex items-center justify-center mb-4">
-        <Icon className="w-7 h-7 text-white/40" />
+      <div className="w-16 h-16 rounded-[20px] glass-pill flex items-center justify-center mb-4">
+        <Icon className="w-7 h-7 text-sky-500" strokeWidth={1.5} />
       </div>
-      <h3 className="text-white font-semibold text-[15px] tracking-tight">{title}</h3>
+      <h3 className="text-slate-800 font-bold text-[15px] tracking-tight">{title}</h3>
       {description && (
-        <p className="text-white/40 text-[13px] font-medium mt-1.5 max-w-[260px] leading-relaxed">
+        <p className="text-slate-500 text-[13px] font-medium mt-1.5 max-w-[260px] leading-relaxed">
           {description}
         </p>
       )}

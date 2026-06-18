@@ -79,33 +79,33 @@ export default function PwaInstallPrompt() {
         transition={{ type: 'spring', bounce: 0.25, duration: 0.5 }}
         className="fixed bottom-20 left-3 right-3 z-[200] max-w-sm mx-auto"
       >
-        <div className="bg-surface/95 border border-brand/30 rounded-[20px] p-4 shadow-2xl shadow-black/60 backdrop-blur-xl">
+        <div className="glass-strong border border-sky-100 rounded-[20px] p-4 shadow-[0_12px_40px_rgba(14,165,233,0.18)]">
           {installed ? (
             <div className="flex items-center justify-center gap-2 py-1">
-              <div className="w-2 h-2 rounded-full bg-success" />
-              <p className="text-[14px] font-semibold text-white">Berhasil diinstall!</p>
+              <div className="w-2 h-2 rounded-full bg-teal-500" />
+              <p className="text-[14px] font-semibold text-slate-800">Berhasil diinstall!</p>
             </div>
           ) : (
             <div className="flex items-start gap-3">
-              <div className="w-11 h-11 rounded-[13px] bg-gradient-to-br from-brand to-brand-deep flex items-center justify-center shrink-0 shadow-lg mt-0.5">
+              <div className="w-11 h-11 rounded-[13px] bg-sky-500 flex items-center justify-center shrink-0 shadow-[0_8px_20px_rgba(14,165,233,0.3)] mt-0.5">
                 <Smartphone className="w-5 h-5 text-white" />
               </div>
 
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-white mb-0.5">
+                <p className="text-[13px] font-bold text-slate-800 mb-0.5">
                   Install AdilaNet
                 </p>
                 {isIos ? (
-                  <p className="text-[11px] text-white/60 leading-relaxed">
-                    Ketuk ikon <Share className="inline w-3 h-3 mx-0.5 text-brand" /> di bawah, lalu pilih{' '}
-                    <span className="text-white font-semibold">"Tambahkan ke Layar Utama"</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Ketuk ikon <Share className="inline w-3 h-3 mx-0.5 text-sky-600" /> di bawah, lalu pilih{' '}
+                    <span className="text-slate-700 font-semibold">"Tambahkan ke Layar Utama"</span>
                   </p>
                 ) : deferredPrompt ? (
-                  <p className="text-[11px] text-white/60">Akses lebih cepat tanpa browser</p>
+                  <p className="text-[11px] text-slate-500">Akses lebih cepat tanpa browser</p>
                 ) : (
-                  <p className="text-[11px] text-white/60 leading-relaxed">
-                    Di browser ketuk menu <span className="text-white font-semibold">⋮</span> lalu{' '}
-                    <span className="text-white font-semibold">"Tambahkan ke layar utama"</span> / <span className="text-white font-semibold">"Install App"</span>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Di browser ketuk menu <span className="text-slate-700 font-semibold">⋮</span> lalu{' '}
+                    <span className="text-slate-700 font-semibold">"Tambahkan ke layar utama"</span> / <span className="text-slate-700 font-semibold">"Install App"</span>
                   </p>
                 )}
               </div>
@@ -114,14 +114,14 @@ export default function PwaInstallPrompt() {
                 {!isIos && deferredPrompt && (
                   <button
                     onClick={handleInstall}
-                    className="bg-brand hover:bg-brand-hover active:scale-95 text-white text-[11px] font-bold px-3 py-1.5 rounded-[10px] flex items-center gap-1 transition-all"
+                    className="bg-sky-500 hover:bg-sky-600 active:scale-95 text-white text-[11px] font-bold px-3 py-1.5 rounded-[10px] flex items-center gap-1 transition-all"
                   >
                     <Download className="w-3 h-3" /> Install
                   </button>
                 )}
                 <button
                   onClick={handleDismiss}
-                  className="bg-white/5 hover:bg-white/10 text-white/50 text-[11px] font-medium px-3 py-1.5 rounded-[10px] flex items-center gap-1 transition-colors"
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-500 text-[11px] font-medium px-3 py-1.5 rounded-[10px] flex items-center gap-1 transition-colors"
                 >
                   <X className="w-3 h-3" /> Nanti
                 </button>

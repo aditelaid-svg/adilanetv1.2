@@ -55,8 +55,13 @@ export default function PublicBuy() {
   }, [step, refId]);
 
   if (!pkg) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      <div className="coastal-bg fixed inset-0">
+        <div className="coastal-glow coastal-glow-1" />
+        <div className="coastal-glow coastal-glow-2" />
+        <div className="coastal-glow coastal-glow-3" />
+      </div>
+      <div className="relative z-10 w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
@@ -98,8 +103,12 @@ export default function PublicBuy() {
   };
 
   return (
-    <div className="min-h-screen bg-[#000000] flex flex-col items-center justify-center p-4 overflow-hidden relative">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[500px] bg-brand/15 blur-[120px] rounded-full pointer-events-none" />
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden relative">
+      <div className="coastal-bg fixed inset-0">
+        <div className="coastal-glow coastal-glow-1" />
+        <div className="coastal-glow coastal-glow-2" />
+        <div className="coastal-glow coastal-glow-3" />
+      </div>
 
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -108,39 +117,39 @@ export default function PublicBuy() {
         className="w-full max-w-sm relative z-10"
       >
         <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 rounded-[18px] bg-gradient-to-br from-brand to-brand-deep flex items-center justify-center shadow-lg shadow-brand/30 mb-4">
-            <ShieldCheck className="w-7 h-7 text-white" />
+          <div className="w-14 h-14 rounded-[18px] bg-sky-500 flex items-center justify-center shadow-[0_8px_20px_rgba(14,165,233,0.3)] mb-4">
+            <ShieldCheck className="w-7 h-7 text-white" strokeWidth={1.8} />
           </div>
-          <h1 className="text-[20px] font-bold text-white tracking-tight">AdilaNet</h1>
-          <p className="text-white/40 text-[12px] font-medium mt-0.5">Portal Voucher WiFi</p>
+          <h1 className="text-[20px] font-bold text-slate-800 tracking-tight">AdilaNet</h1>
+          <p className="text-slate-500 text-[12px] font-medium mt-0.5">Portal Voucher WiFi</p>
         </div>
 
-        <div className="bg-surface/90 backdrop-blur-2xl border border-white/8 rounded-[28px] p-5 shadow-2xl mb-4">
-          <p className="text-[10px] font-bold text-white/40 tracking-widest uppercase mb-3">Paket Dipilih</p>
+        <div className="glass-strong rounded-[28px] p-5 mb-4">
+          <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-3">Paket Dipilih</p>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-white font-bold text-[16px] mb-2">{pkg.name}</h3>
+              <h3 className="text-slate-800 font-bold text-[16px] mb-2">{pkg.name}</h3>
               <div className="flex flex-wrap gap-1.5">
-                <span className="flex items-center gap-1 text-[10px] font-semibold bg-white/5 text-white/60 px-2 py-1 rounded-[8px] border border-white/5">
-                  <Clock className="w-3 h-3" /> {pkg.duration}
+                <span className="flex items-center gap-1 text-[10px] font-semibold bg-white text-slate-500 px-2 py-1 rounded-[8px] border border-slate-100">
+                  <Clock className="w-3 h-3" strokeWidth={1.8} /> {pkg.duration}
                 </span>
-                <span className="flex items-center gap-1 text-[10px] font-semibold bg-white/5 text-white/60 px-2 py-1 rounded-[8px] border border-white/5">
-                  <Zap className="w-3 h-3" /> {pkg.speed}
+                <span className="flex items-center gap-1 text-[10px] font-semibold bg-white text-slate-500 px-2 py-1 rounded-[8px] border border-slate-100">
+                  <Zap className="w-3 h-3" strokeWidth={1.8} /> {pkg.speed}
                 </span>
-                <span className="flex items-center gap-1 text-[10px] font-semibold bg-white/5 text-white/60 px-2 py-1 rounded-[8px] border border-white/5">
-                  <Wifi className="w-3 h-3" /> {pkg.quota}
+                <span className="flex items-center gap-1 text-[10px] font-semibold bg-white text-slate-500 px-2 py-1 rounded-[8px] border border-slate-100">
+                  <Wifi className="w-3 h-3" strokeWidth={1.8} /> {pkg.quota}
                 </span>
               </div>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-[22px] font-bold text-white tracking-tight">
+              <div className="text-[22px] font-bold text-slate-800 tracking-tight">
                 {formatRupiah(pkg.price)}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-surface/90 backdrop-blur-2xl border border-white/8 rounded-[28px] p-5 shadow-2xl">
+        <div className="glass-strong rounded-[28px] p-5">
           <AnimatePresence mode="wait">
             {step === 'input_phone' && (
               <motion.form
@@ -153,30 +162,30 @@ export default function PublicBuy() {
                 className="space-y-4"
               >
                 <div>
-                  <label className="block text-[11px] font-bold tracking-widest uppercase text-white/40 mb-2">No. WhatsApp / HP</label>
+                  <label className="block text-[11px] font-bold tracking-widest uppercase text-slate-400 mb-2">No. WhatsApp / HP</label>
                   <div className="relative">
                     <input
                       type="tel"
                       value={phone}
                       onChange={e => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
                       placeholder="08xxxxxxxxxx"
-                      className="w-full bg-white/[0.04] border border-white/8 rounded-[16px] pl-10 pr-4 py-3.5 text-white placeholder:text-white/20 focus:outline-none focus:border-brand/50 transition-all text-[15px]"
+                      className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-all text-[15px]"
                       required
                     />
-                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
+                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={1.8} />
                   </div>
                   {error && (
                     <motion.div
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-2 mt-2 text-[12px] text-danger bg-danger/10 rounded-[10px] px-3 py-2 border border-danger/15"
+                      className="flex items-center gap-2 mt-2 text-[12px] text-rose-500 bg-rose-50 rounded-[10px] px-3 py-2 border border-rose-100"
                     >
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={1.8} />
                       {error}
                     </motion.div>
                   )}
-                  <p className="text-[11px] text-white/35 mt-2 flex items-start gap-1.5">
-                    <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-slate-400 mt-2 flex items-start gap-1.5">
+                    <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" strokeWidth={1.8} />
                     Kode voucher ditampilkan setelah bayar. Simpan untuk login WiFi.
                   </p>
                 </div>
@@ -185,27 +194,27 @@ export default function PublicBuy() {
                   <button
                     type="submit"
                     disabled={isProcessing}
-                    className="w-full bg-brand disabled:opacity-50 hover:bg-brand-hover active:scale-[0.98] text-white font-semibold rounded-[16px] px-4 py-4 flex items-center justify-center gap-2 transition-transform text-[15px]"
+                    className="w-full bg-sky-500 disabled:opacity-50 text-white font-semibold rounded-[18px] px-4 py-4 flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(14,165,233,0.3)] active:scale-95 transition-transform text-[15px]"
                   >
                     {isProcessing ? (
                       <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Memproses...</>
                     ) : (
-                      <><ArrowRight className="w-4 h-4" /> Bayar dengan QRIS</>
+                      <><ArrowRight className="w-4 h-4" strokeWidth={1.8} /> Bayar dengan QRIS</>
                     )}
                   </button>
                 ) : (
-                  <div className="p-4 bg-danger/10 border border-danger/20 rounded-[16px] text-center">
-                    <p className="font-semibold text-[13px] text-danger">Pembayaran Sedang Maintenance</p>
-                    <p className="text-[11px] text-white/40 mt-1">Hubungi admin untuk pembelian.</p>
+                  <div className="p-4 bg-rose-50 border border-rose-100 rounded-[16px] text-center">
+                    <p className="font-semibold text-[13px] text-rose-500">Pembayaran Sedang Maintenance</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Hubungi admin untuk pembelian.</p>
                   </div>
                 )}
 
                 <button
                   type="button"
                   onClick={() => navigate('/login')}
-                  className="w-full bg-transparent border border-white/8 active:bg-white/5 text-white/50 font-medium rounded-[16px] px-4 py-3.5 flex items-center justify-center gap-2 transition-all text-[13px]"
+                  className="w-full bg-white border border-slate-100 shadow-sm active:scale-95 text-slate-700 font-medium rounded-[18px] px-4 py-3.5 flex items-center justify-center gap-2 transition-transform text-[13px]"
                 >
-                  <Wallet className="w-4 h-4" /> Punya akun? Login & bayar pakai saldo
+                  <Wallet className="w-4 h-4 text-slate-400" strokeWidth={1.8} /> Punya akun? Login & bayar pakai saldo
                 </button>
               </motion.form>
             )}
@@ -219,38 +228,38 @@ export default function PublicBuy() {
                 transition={{ duration: 0.22 }}
                 className="text-center"
               >
-                <p className="text-[11px] font-bold tracking-widest uppercase text-white/40 mb-4">Scan QRIS untuk Bayar</p>
+                <p className="text-[11px] font-bold tracking-widest uppercase text-slate-400 mb-4">Scan QRIS untuk Bayar</p>
 
-                <div className="bg-white p-4 rounded-[20px] inline-block mb-4 shadow-xl">
-                  <div className="w-[180px] h-[180px] rounded-lg overflow-hidden relative bg-gray-100">
+                <div className="bg-white p-4 rounded-[20px] inline-block mb-4 shadow-[0_8px_20px_rgba(14,165,233,0.15)] border border-slate-100">
+                  <div className="w-[180px] h-[180px] rounded-lg overflow-hidden relative bg-slate-50">
                     {qrisUrl && <img src={qrisUrl} alt="QRIS" className="w-full h-full object-contain" />}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-10 h-10 bg-white rounded-xl shadow border-2 border-gray-200 flex items-center justify-center">
-                        <ShieldCheck className="w-5 h-5 text-gray-700" />
+                      <div className="w-10 h-10 bg-white rounded-xl shadow border-2 border-slate-200 flex items-center justify-center">
+                        <ShieldCheck className="w-5 h-5 text-sky-500" strokeWidth={1.8} />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <p className="text-[12px] text-white/40 font-mono mb-1">{refId}</p>
-                <p className="text-[12px] text-white/50 mb-5">DANA · OVO · GoPay · ShopeePay · M-Banking</p>
+                <p className="text-[12px] text-slate-400 font-mono mb-1">{refId}</p>
+                <p className="text-[12px] text-slate-500 mb-5">DANA · OVO · GoPay · ShopeePay · M-Banking</p>
 
                 {error && (
-                  <div className="flex items-center gap-2 text-[12px] text-danger bg-danger/10 rounded-[12px] px-3 py-2.5 mb-4 border border-danger/15">
-                    <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+                  <div className="flex items-center gap-2 text-[12px] text-rose-500 bg-rose-50 rounded-[12px] px-3 py-2.5 mb-4 border border-rose-100">
+                    <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.8} /> {error}
                   </div>
                 )}
 
-                <div className="w-full flex items-center justify-center gap-2 bg-brand/10 border border-brand/20 text-brand font-semibold py-4 rounded-[16px] text-[14px] mb-2.5">
-                  <div className="w-4 h-4 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
+                <div className="w-full flex items-center justify-center gap-2 bg-sky-50 border border-sky-100 text-sky-600 font-semibold py-4 rounded-[16px] text-[14px] mb-2.5">
+                  <div className="w-4 h-4 border-2 border-sky-300 border-t-sky-600 rounded-full animate-spin" />
                   Menunggu pembayaran...
                 </div>
-                <p className="text-[11px] text-white/35 mb-2.5">
+                <p className="text-[11px] text-slate-400 mb-2.5">
                   Voucher muncul otomatis setelah pembayaran terverifikasi. Jangan tutup halaman ini.
                 </p>
                 <button
                   onClick={() => { setStep('input_phone'); setError(null); setRefId(null); setQrisUrl(null); }}
-                  className="w-full text-white/40 font-medium py-2.5 rounded-[14px] transition-all text-[13px] hover:text-white/60"
+                  className="w-full text-slate-400 font-medium py-2.5 rounded-[14px] transition-all text-[13px] hover:text-slate-600"
                 >
                   Batal
                 </button>
@@ -265,42 +274,42 @@ export default function PublicBuy() {
                 transition={{ type: 'spring', bounce: 0.3, duration: 0.4 }}
                 className="text-center py-2"
               >
-                <div className="w-16 h-16 bg-success/15 rounded-full flex items-center justify-center mx-auto mb-5 relative">
-                  <div className="absolute inset-0 bg-success/20 rounded-full animate-ping" />
-                  <Check className="w-8 h-8 text-success relative z-10" />
+                <div className="w-16 h-16 bg-teal-50 border border-teal-100 rounded-full flex items-center justify-center mx-auto mb-5 relative">
+                  <div className="absolute inset-0 bg-teal-200/40 rounded-full animate-ping" />
+                  <Check className="w-8 h-8 text-teal-600 relative z-10" strokeWidth={2} />
                 </div>
-                <h3 className="text-[20px] font-bold text-white mb-1 tracking-tight">Pembayaran Berhasil!</h3>
-                <p className="text-white/40 text-[13px] mb-6">Ini kode voucher WiFi Anda</p>
+                <h3 className="text-[20px] font-bold text-slate-800 mb-1 tracking-tight">Pembayaran Berhasil!</h3>
+                <p className="text-slate-500 text-[13px] mb-6">Ini kode voucher WiFi Anda</p>
 
-                <div className="bg-brand/8 border border-brand/20 rounded-[20px] p-5 mb-5 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-28 h-28 bg-brand/10 blur-[40px] rounded-full -mr-10 -mt-10" />
-                  <p className="text-white/40 text-[10px] font-bold tracking-widest uppercase mb-2">KODE VOUCHER</p>
+                <div className="bg-sky-50 border border-sky-100 rounded-[20px] p-5 mb-5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-sky-200/40 blur-[40px] rounded-full -mr-10 -mt-10" />
+                  <p className="text-slate-400 text-[10px] font-bold tracking-widest uppercase mb-2">KODE VOUCHER</p>
                   <div className="flex items-center gap-3">
-                    <code className="text-[22px] font-mono font-bold tracking-[0.15em] text-brand flex-1">
+                    <code className="text-[22px] font-mono font-bold tracking-[0.15em] text-sky-600 flex-1">
                       {successCode}
                     </code>
                     <button
                       onClick={copyCode}
                       aria-label="Salin kode voucher"
-                      className="w-10 h-10 bg-brand/15 hover:bg-brand/25 active:scale-95 rounded-[12px] flex items-center justify-center text-brand transition-all"
+                      className="w-10 h-10 bg-sky-100 hover:bg-sky-200 active:scale-95 rounded-[12px] flex items-center justify-center text-sky-600 transition-all"
                     >
-                      {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                      {copied ? <Check className="w-5 h-5" strokeWidth={1.8} /> : <Copy className="w-5 h-5" strokeWidth={1.8} />}
                     </button>
                   </div>
                 </div>
 
-                <div className="bg-white/[0.03] border border-white/5 rounded-[16px] p-4 text-left mb-5">
-                  <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">Cara Pakai:</p>
-                  <ol className="space-y-1.5 text-[12px] text-white/60">
-                    <li className="flex items-start gap-2"><span className="text-brand font-bold shrink-0">1.</span>Buka halaman login WiFi di browser</li>
-                    <li className="flex items-start gap-2"><span className="text-brand font-bold shrink-0">2.</span>Masukkan kode di atas sebagai Username &amp; Password</li>
-                    <li className="flex items-start gap-2"><span className="text-brand font-bold shrink-0">3.</span>Klik Login — Internet siap digunakan! 🎉</li>
+                <div className="bg-white border border-slate-100 rounded-[16px] p-4 text-left mb-5">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Cara Pakai:</p>
+                  <ol className="space-y-1.5 text-[12px] text-slate-500">
+                    <li className="flex items-start gap-2"><span className="text-sky-600 font-bold shrink-0">1.</span>Buka halaman login WiFi di browser</li>
+                    <li className="flex items-start gap-2"><span className="text-sky-600 font-bold shrink-0">2.</span>Masukkan kode di atas sebagai Username &amp; Password</li>
+                    <li className="flex items-start gap-2"><span className="text-sky-600 font-bold shrink-0">3.</span>Klik Login — Internet siap digunakan! 🎉</li>
                   </ol>
                 </div>
 
                 <button
                   onClick={() => navigate('/login')}
-                  className="w-full bg-white/[0.06] hover:bg-white/10 active:scale-[0.98] text-white/70 font-medium py-3.5 rounded-[16px] transition-all text-[13px]"
+                  className="w-full bg-white border border-slate-100 shadow-sm active:scale-95 text-slate-700 font-medium py-3.5 rounded-[16px] transition-transform text-[13px]"
                 >
                   Ke Halaman Utama
                 </button>

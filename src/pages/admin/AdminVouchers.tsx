@@ -123,54 +123,53 @@ export default function AdminVouchers() {
     <div className="space-y-6 pb-20">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white mb-1">Voucher Mikrotik</h1>
-          <p className="text-sm text-white/50">Generate & cetak voucher hotspot</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-800 mb-1">Voucher Mikrotik</h1>
+          <p className="text-sm text-slate-500">Generate & cetak voucher hotspot</p>
         </div>
         <button
           onClick={() => setShowGenerate(true)}
-          className="bg-brand hover:bg-brand-hover active:scale-95 text-white px-4 py-2 rounded-[14px] text-sm font-bold flex items-center gap-2 shadow-lg shadow-brand/20 transition-all"
+          className="bg-sky-500 hover:bg-sky-600 active:scale-95 text-white px-4 py-2 rounded-[16px] text-sm font-semibold flex items-center gap-2 shadow-[0_8px_20px_rgba(14,165,233,0.3)] transition-all"
         >
-          <Plus className="w-4 h-4" /> Bikin
+          <Plus className="w-4 h-4" strokeWidth={2} /> Bikin
         </button>
       </div>
 
       {generatedCodes.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white/5 border border-emerald-500/30 rounded-[24px] p-5 shadow-lg relative overflow-hidden"
+          className="glass-strong rounded-[24px] p-5 relative overflow-hidden"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] rounded-full pointer-events-none" />
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h3 className="font-bold text-white flex items-center gap-2">
-                <Ticket className="w-5 h-5 text-emerald-400" />
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-teal-600" strokeWidth={1.8} />
                 {generatedCodes.length} Voucher Dibuat
               </h3>
-              <p className="text-[11px] text-white/40 mt-0.5">
+              <p className="text-[11px] text-slate-400 mt-0.5">
                 Profil: {mikrotikProfile} • {duration} • {formatRupiah(parseInt(price || '0'))}
               </p>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handlePrint}
-                className="bg-white/10 hover:bg-white/20 p-2 rounded-[10px] text-white transition-colors" title="Cetak"
+                className="bg-white border border-slate-100 hover:bg-slate-50 p-2 rounded-[12px] text-slate-700 shadow-sm transition-colors" title="Cetak"
               >
-                <Printer className="w-4 h-4" />
+                <Printer className="w-4 h-4" strokeWidth={1.8} />
               </button>
               <button
                 onClick={() => setGeneratedCodes([])}
-                className="bg-white/5 hover:bg-white/10 p-2 rounded-[10px] text-white/50 hover:text-white transition-colors"
+                className="bg-white border border-slate-100 hover:bg-slate-50 p-2 rounded-[12px] text-slate-400 hover:text-slate-700 shadow-sm transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" strokeWidth={1.8} />
               </button>
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {generatedCodes.map((code, idx) => (
-              <div key={idx} className="bg-black/40 border border-white/10 rounded-[14px] px-3 py-2.5 flex flex-col items-center justify-center text-center">
-                <span className="font-mono text-sm text-brand font-bold tracking-wider">{code.user}</span>
+              <div key={idx} className="glass rounded-[14px] px-3 py-2.5 flex flex-col items-center justify-center text-center">
+                <span className="font-mono text-sm text-sky-600 font-bold tracking-wider">{code.user}</span>
                 {loginMode === 'separate' && (
-                  <span className="font-mono text-[10px] text-white/40 tracking-wider mt-0.5">Pass: {code.pass}</span>
+                  <span className="font-mono text-[10px] text-slate-400 tracking-wider mt-0.5">Pass: {code.pass}</span>
                 )}
               </div>
             ))}
@@ -178,24 +177,24 @@ export default function AdminVouchers() {
         </motion.div>
       )}
 
-      <div className="bg-white/[0.02] border border-white/5 rounded-[24px] p-5 shadow-sm">
-        <h3 className="font-bold text-white mb-4">Cara Kerja Profil Mikrotik</h3>
+      <div className="glass-strong rounded-[24px] p-5">
+        <h3 className="font-bold text-slate-800 mb-4">Cara Kerja Profil Mikrotik</h3>
         <div className="space-y-3">
-          <div className="flex items-start gap-3 bg-brand/5 border border-brand/20 rounded-[16px] p-4">
-            <Wifi className="w-5 h-5 text-brand shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 bg-sky-50 border border-sky-100 rounded-[16px] p-4">
+            <Wifi className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" strokeWidth={1.8} />
             <div>
-              <p className="text-[13px] font-semibold text-white mb-1">Profil Otomatis dari Router</p>
-              <p className="text-[12px] text-white/50 leading-relaxed">
-                Saat memilih router, sistem akan <span className="text-brand">otomatis mengambil profil</span> dari Mikrotik via API. 
-                Durasi voucher diambil dari field <code className="bg-white/10 px-1 rounded">session-timeout</code> profil.
+              <p className="text-[13px] font-semibold text-slate-800 mb-1">Profil Otomatis dari Router</p>
+              <p className="text-[12px] text-slate-500 leading-relaxed">
+                Saat memilih router, sistem akan <span className="text-sky-600">otomatis mengambil profil</span> dari Mikrotik via API. 
+                Durasi voucher diambil dari field <code className="bg-slate-100 px-1 rounded">session-timeout</code> profil.
               </p>
             </div>
           </div>
-          <div className="flex items-start gap-3 bg-gold/5 border border-gold/20 rounded-[16px] p-4">
-            <Clock className="w-5 h-5 text-gold shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-[16px] p-4">
+            <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" strokeWidth={1.8} />
             <div>
-              <p className="text-[13px] font-semibold text-white mb-1">Demo Mode (Router Offline)</p>
-              <p className="text-[12px] text-white/50 leading-relaxed">
+              <p className="text-[13px] font-semibold text-slate-800 mb-1">Demo Mode (Router Offline)</p>
+              <p className="text-[12px] text-slate-500 leading-relaxed">
                 Jika router tidak terjangkau, sistem tampilkan profil demo agar tetap bisa generate voucher untuk persiapan.
               </p>
             </div>
@@ -210,40 +209,40 @@ export default function AdminVouchers() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/60 backdrop-blur-md overflow-y-auto"
+            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur overflow-y-auto"
           >
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="w-full max-w-md bg-surface border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative my-auto"
+              className="w-full max-w-md glass-strong rounded-t-[28px] sm:rounded-[28px] p-6 shadow-2xl relative my-auto"
             >
-              <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 sm:hidden" />
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sm:hidden" />
               <button
                 onClick={() => setShowGenerate(false)}
-                className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white"
+                className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-400 hover:text-slate-700 transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" strokeWidth={1.8} />
               </button>
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-brand/20 text-brand rounded-[12px] flex items-center justify-center">
-                  <Settings2 className="w-5 h-5" />
+                <div className="w-10 h-10 bg-sky-100 text-sky-600 rounded-[12px] flex items-center justify-center">
+                  <Settings2 className="w-5 h-5" strokeWidth={1.8} />
                 </div>
-                <h3 className="text-[22px] font-bold text-white tracking-tight">Generate Voucher</h3>
+                <h3 className="text-[22px] font-bold text-slate-800 tracking-tight">Generate Voucher</h3>
               </div>
 
               <form onSubmit={handleGenerate} className="space-y-4">
                 {/* Router Selection */}
                 <div>
-                  <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Pilih Router</label>
+                  <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Pilih Router</label>
                   <select
                     value={selectedRouter}
                     onChange={e => setSelectedRouter(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 appearance-none"
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 appearance-none"
                     required
                   >
-                    <option value="" disabled className="bg-surface text-white/40">Pilih Router...</option>
+                    <option value="" disabled>Pilih Router...</option>
                     {routers.map(r => (
-                      <option value={r.id} key={r.id} className="bg-surface">
+                      <option value={r.id} key={r.id}>
                         {r.name} ({r.ip_address}) — {r.status}
                       </option>
                     ))}
@@ -254,47 +253,47 @@ export default function AdminVouchers() {
                 {selectedRouter && (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-[12px] font-semibold text-white/50 uppercase tracking-wide">
+                      <label className="block text-[13px] font-medium text-slate-600">
                         Profil Hotspot
                       </label>
-                      {loadingProfiles && <RefreshCw className="w-3.5 h-3.5 text-white/40 animate-spin" />}
+                      {loadingProfiles && <RefreshCw className="w-3.5 h-3.5 text-slate-400 animate-spin" />}
                       {profileSource === 'mikrotik' && (
-                        <span className="text-[10px] bg-success/10 text-success px-2 py-0.5 rounded font-semibold border border-success/20">LIVE Mikrotik</span>
+                        <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-0.5 rounded font-semibold">LIVE Mikrotik</span>
                       )}
                       {profileSource === 'demo' && (
-                        <span className="text-[10px] bg-gold/10 text-gold px-2 py-0.5 rounded font-semibold border border-gold/20">Demo Mode</span>
+                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-semibold">Demo Mode</span>
                       )}
                     </div>
                     {profileError && (
-                      <div className="flex items-center gap-2 text-[12px] text-danger bg-danger/10 rounded-[12px] p-3 mb-2 border border-danger/20">
-                        <AlertCircle className="w-4 h-4 shrink-0" /> {profileError}
+                      <div className="flex items-center gap-2 text-[12px] text-rose-700 bg-rose-50 rounded-[12px] p-3 mb-2 border border-rose-100">
+                        <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.8} /> {profileError}
                       </div>
                     )}
                     <select
                       value={mikrotikProfile}
                       onChange={e => handleProfileChange(e.target.value)}
-                      className={`w-full rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none appearance-none ${profileSource === 'mikrotik' ? 'bg-brand/5 border border-brand/30 focus:border-brand' : 'bg-white/[0.03] border border-white/5 focus:border-brand/50'}`}
+                      className={`w-full rounded-2xl px-4 py-3 text-slate-800 text-[15px] focus:outline-none appearance-none focus:ring-2 focus:ring-sky-200 ${profileSource === 'mikrotik' ? 'bg-sky-50 border border-sky-200 focus:border-sky-300' : 'bg-white border border-slate-200 focus:border-sky-300'}`}
                       required
                       disabled={loadingProfiles || profiles.length === 0}
                     >
-                      <option value="" disabled className="bg-surface text-white/40">
+                      <option value="" disabled>
                         {loadingProfiles ? 'Memuat profil dari router...' : 'Pilih Profil...'}
                       </option>
                       {profiles.map(p => (
-                        <option value={p.name} key={p.id} className="bg-surface">
+                        <option value={p.name} key={p.id}>
                           {p.name} — {p.sessionTimeout} — {p.rateLimit}
                         </option>
                       ))}
                     </select>
                     {selectedProfileInfo && (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        <span className="text-[11px] bg-brand/10 text-brand px-2 py-1 rounded-[8px] border border-brand/20 font-semibold">
+                        <span className="text-[11px] bg-sky-100 text-sky-700 px-2 py-1 rounded-[8px] font-semibold">
                           ⏱ {selectedProfileInfo.sessionTimeout}
                         </span>
-                        <span className="text-[11px] bg-white/5 text-white/60 px-2 py-1 rounded-[8px] border border-white/10 font-semibold">
+                        <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-1 rounded-[8px] font-semibold">
                           ⚡ {selectedProfileInfo.rateLimit}
                         </span>
-                        <span className="text-[11px] bg-white/5 text-white/60 px-2 py-1 rounded-[8px] border border-white/10 font-semibold">
+                        <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-1 rounded-[8px] font-semibold">
                           👤 ×{selectedProfileInfo.sharedUsers}
                         </span>
                       </div>
@@ -305,24 +304,24 @@ export default function AdminVouchers() {
                 {/* Price & Duration */}
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Harga Jual (Rp)</label>
+                    <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Harga Jual (Rp)</label>
                     <input
                       type="number"
                       placeholder="5000"
                       value={price}
                       onChange={e => setPrice(e.target.value)}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                       required
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Durasi</label>
+                    <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Durasi</label>
                     <input
                       type="text"
                       placeholder="Auto dari profil"
                       value={duration}
                       onChange={e => setDuration(e.target.value)}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                     />
                   </div>
                 </div>
@@ -330,46 +329,46 @@ export default function AdminVouchers() {
                 {/* Format & Login Mode */}
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Format Kode</label>
+                    <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Format Kode</label>
                     <select
                       value={codeFormat}
                       onChange={e => setCodeFormat(e.target.value)}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                     >
-                      <option value="alphanumeric" className="bg-surface">A-Z + 0-9</option>
-                      <option value="numbers" className="bg-surface">Angka Saja</option>
+                      <option value="alphanumeric">A-Z + 0-9</option>
+                      <option value="numbers">Angka Saja</option>
                     </select>
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Mode Login</label>
+                    <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Mode Login</label>
                     <select
                       value={loginMode}
                       onChange={e => setLoginMode(e.target.value)}
-                      className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                     >
-                      <option value="user_is_pass" className="bg-surface">User = Pass</option>
-                      <option value="separate" className="bg-surface">User ≠ Pass</option>
+                      <option value="user_is_pass">User = Pass</option>
+                      <option value="separate">User ≠ Pass</option>
                     </select>
                   </div>
                 </div>
 
                 {/* Quantity */}
                 <div>
-                  <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Jumlah Voucher</label>
+                  <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Jumlah Voucher</label>
                   <input
                     type="number"
                     min="1"
                     max="200"
                     value={quantity}
                     onChange={e => setQuantity(e.target.value)}
-                    className="w-full bg-white/[0.03] border border-white/5 rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50"
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                     required
                   />
                   <div className="flex gap-2 mt-2">
                     {[10, 25, 50, 100].map(n => (
                       <button
                         key={n} type="button" onClick={() => setQuantity(String(n))}
-                        className={`flex-1 py-1.5 rounded-[10px] text-[11px] font-semibold transition-colors ${quantity === String(n) ? 'bg-brand text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
+                        className={`flex-1 py-1.5 rounded-[10px] text-[11px] font-semibold transition-colors ${quantity === String(n) ? 'bg-sky-500 text-white' : 'bg-white border border-slate-100 text-slate-600 hover:bg-slate-50'}`}
                       >{n}</button>
                     ))}
                   </div>
@@ -378,7 +377,7 @@ export default function AdminVouchers() {
                 <button
                   type="submit"
                   disabled={isGenerating || !mikrotikProfile}
-                  className="w-full bg-brand disabled:opacity-50 hover:bg-brand-hover active:scale-[0.98] text-white font-bold py-4 rounded-[16px] mt-2 flex items-center justify-center gap-2 transition-transform text-[15px]"
+                  className="w-full bg-sky-500 disabled:opacity-50 hover:bg-sky-600 active:scale-95 text-white font-semibold py-4 rounded-[16px] mt-2 flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(14,165,233,0.3)] transition-all text-[15px]"
                 >
                   {isGenerating ? (
                     <>
@@ -386,7 +385,7 @@ export default function AdminVouchers() {
                     </>
                   ) : (
                     <>
-                      <Ticket className="w-5 h-5" /> Buat {quantity} Voucher
+                      <Ticket className="w-5 h-5" strokeWidth={1.8} /> Buat {quantity} Voucher
                     </>
                   )}
                 </button>

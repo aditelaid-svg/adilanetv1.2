@@ -4,6 +4,8 @@ import { useToast } from '../../components/Toast';
 import { Plus, Edit, Trash2, X, RefreshCw, Image as ImageIcon, Megaphone, Eye, EyeOff, Calendar, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PROMO_BG, PROMO_COLOR_OPTIONS, PROMO_ICON_OPTIONS, PromoIcon } from '../../lib/promoStyles';
+import EmptyState from '../../components/ui/EmptyState';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 type PromoForm = {
   title: string;
@@ -226,29 +228,31 @@ export default function AdminPromos() {
     <div className="space-y-5 pb-24">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-[26px] font-bold tracking-tight text-white mb-0.5">Promo / Banner</h1>
-          <p className="text-white/40 text-[13px] font-medium">{list.length} banner</p>
+          <h1 className="text-[26px] font-bold tracking-tight text-slate-800 mb-0.5">Promo / Banner</h1>
+          <p className="text-slate-500 text-[13px] font-medium">{list.length} banner</p>
         </div>
         <button
           onClick={openAdd}
-          className="bg-brand hover:bg-brand-hover active:scale-95 text-white px-4 py-2.5 rounded-[14px] text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-lg shadow-brand/20"
+          className="bg-sky-500 hover:bg-sky-600 active:scale-95 text-white px-4 py-2.5 rounded-[16px] text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-[0_8px_20px_rgba(14,165,233,0.3)]"
         >
-          <Plus className="w-4 h-4" /> Tambah
+          <Plus className="w-4 h-4" strokeWidth={2} /> Tambah
         </button>
       </div>
 
       {loading ? (
         <div className="space-y-3">
           {[0, 1].map(i => (
-            <div key={i} className="h-28 rounded-[24px] bg-white/[0.03] border border-white/[0.06] animate-pulse" />
+            <React.Fragment key={i}>
+              <Skeleton className="h-28 rounded-[24px]" />
+            </React.Fragment>
           ))}
         </div>
       ) : list.length === 0 ? (
-        <div className="text-center py-16 text-white/30">
-          <Megaphone className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Belum ada promo</p>
-          <p className="text-[13px] mt-1">Tambah banner promo pertama Anda</p>
-        </div>
+        <EmptyState
+          icon={Megaphone}
+          title="Belum ada promo"
+          description="Tambah banner promo pertama Anda."
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {list.map((p, idx) => (
@@ -257,11 +261,11 @@ export default function AdminPromos() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.04 }}
-              className={`bg-white/[0.025] border border-white/[0.07] rounded-[24px] p-4 relative overflow-hidden shadow-sm ${!p.active ? 'opacity-60' : ''}`}
+              className={`glass-strong rounded-[24px] p-4 relative overflow-hidden ${!p.active ? 'opacity-60' : ''}`}
             >
               <div className="flex gap-3">
                 {/* preview */}
-                <div className={`w-24 h-24 shrink-0 rounded-[18px] relative overflow-hidden flex flex-col justify-end p-2.5 ${p.image_url ? 'bg-black' : PROMO_BG[p.color] || 'bg-iris'}`}>
+                <div className={`w-24 h-24 shrink-0 rounded-[18px] relative overflow-hidden flex flex-col justify-end p-2.5 ${p.image_url ? 'bg-slate-900' : PROMO_BG[p.color] || 'bg-iris'}`}>
                   {p.image_url
                     ? <img src={p.image_url} alt={p.title} className="absolute inset-0 w-full h-full object-cover" />
                     : <div className="absolute -right-3 -top-4 w-14 h-14 bg-white/20 blur-xl rounded-full" />}
@@ -273,21 +277,21 @@ export default function AdminPromos() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                        <h3 className="text-[15px] font-bold text-white truncate">{p.title}</h3>
-                        {p.badge && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-white/70 uppercase tracking-wide">{p.badge}</span>}
+                        <h3 className="text-[15px] font-bold text-slate-800 truncate">{p.title}</h3>
+                        {p.badge && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase tracking-wide">{p.badge}</span>}
                       </div>
-                      {p.subtitle && <p className="text-[12px] text-white/50 line-clamp-2 leading-snug">{p.subtitle}</p>}
+                      {p.subtitle && <p className="text-[12px] text-slate-500 line-clamp-2 leading-snug">{p.subtitle}</p>}
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/5 text-white/55 flex items-center gap-1">
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 flex items-center gap-1">
                       <GripVertical className="w-2.5 h-2.5" />#{p.sort_order}
                     </span>
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/5 text-white/55">{LINK_LABEL[p.link_type]}</span>
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/5 text-white/55">{SHOW_LABEL[p.show_on]}</span>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">{LINK_LABEL[p.link_type]}</span>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">{SHOW_LABEL[p.show_on]}</span>
                     {isScheduled(p) && (
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-gold/10 text-gold flex items-center gap-1">
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 flex items-center gap-1">
                         <Calendar className="w-2.5 h-2.5" />
                         {p.start_date || '…'} → {p.end_date || '…'}
                       </span>
@@ -296,24 +300,24 @@ export default function AdminPromos() {
                 </div>
               </div>
 
-              <div className="flex gap-2 mt-3 pt-3 border-t border-white/[0.06]">
+              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
                 <button
                   onClick={() => toggleActive(p)}
-                  className={`flex-1 py-2 rounded-[12px] text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors ${p.active ? 'bg-success/10 text-success hover:bg-success/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
+                  className={`flex-1 py-2 rounded-[12px] text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors ${p.active ? 'bg-teal-100 text-teal-700 hover:bg-teal-200' : 'bg-white border border-slate-100 text-slate-400 hover:bg-slate-50'}`}
                 >
-                  {p.active ? <><Eye className="w-3.5 h-3.5" /> Aktif</> : <><EyeOff className="w-3.5 h-3.5" /> Nonaktif</>}
+                  {p.active ? <><Eye className="w-3.5 h-3.5" strokeWidth={2} /> Aktif</> : <><EyeOff className="w-3.5 h-3.5" strokeWidth={2} /> Nonaktif</>}
                 </button>
                 <button
                   onClick={() => openEdit(p)}
-                  className="w-9 flex items-center justify-center rounded-[12px] bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                  className="w-9 flex items-center justify-center rounded-[12px] bg-white border border-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  <Edit className="w-3.5 h-3.5" />
+                  <Edit className="w-3.5 h-3.5" strokeWidth={2} />
                 </button>
                 <button
                   onClick={() => handleDelete(p)}
-                  className="w-9 flex items-center justify-center rounded-[12px] bg-white/5 text-white/40 hover:text-danger hover:bg-danger/10 transition-colors"
+                  className="w-9 flex items-center justify-center rounded-[12px] bg-white border border-slate-100 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
                 </button>
               </div>
             </motion.div>
@@ -327,24 +331,24 @@ export default function AdminPromos() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/65 backdrop-blur-md"
+            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-md"
           >
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.38 }}
-              className="w-full max-w-md bg-surface border-t border-white/[0.08] rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+              className="w-full max-w-md glass-strong rounded-t-[28px] sm:rounded-[28px] p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
             >
-              <div className="w-10 h-1 bg-white/15 rounded-full mx-auto mb-5 sm:hidden" />
-              <button onClick={closeModal} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center bg-white/[0.06] rounded-full text-white/40 hover:text-white transition-colors">
-                <X className="w-4 h-4" />
+              <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5 sm:hidden" />
+              <button onClick={closeModal} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-400 hover:text-slate-700 transition-colors">
+                <X className="w-4 h-4" strokeWidth={2} />
               </button>
-              <h3 className="text-[20px] font-bold text-white mb-5">{editPromo ? 'Edit Promo' : 'Tambah Promo Baru'}</h3>
+              <h3 className="text-[20px] font-bold text-slate-800 mb-5">{editPromo ? 'Edit Promo' : 'Tambah Promo Baru'}</h3>
 
               <form onSubmit={handleSave} className="space-y-4">
                 {/* Live preview */}
-                <div className={`rounded-[20px] h-28 relative overflow-hidden flex flex-col justify-end p-4 ${form.image_url ? 'bg-black' : PROMO_BG[form.color] || 'bg-iris'}`}>
+                <div className={`rounded-[20px] h-28 relative overflow-hidden flex flex-col justify-end p-4 ${form.image_url ? 'bg-slate-900' : PROMO_BG[form.color] || 'bg-iris'}`}>
                   {form.image_url
                     ? <img src={form.image_url} alt="preview" className="absolute inset-0 w-full h-full object-cover" />
                     : <div className="absolute -right-4 -top-8 w-24 h-24 bg-white/20 blur-xl rounded-full" />}
@@ -357,48 +361,48 @@ export default function AdminPromos() {
                 </div>
 
                 <div>
-                  <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Judul</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Judul</label>
                   <input type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Anti Buffering" maxLength={120}
-                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors" required />
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors" required />
                 </div>
 
                 <div>
-                  <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Deskripsi (opsional)</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Deskripsi (opsional)</label>
                   <input type="text" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} placeholder="e.g. Streaming lancar tanpa putus" maxLength={200}
-                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors" />
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Badge (opsional)</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Badge (opsional)</label>
                     <input type="text" value={form.badge} onChange={e => setForm({ ...form, badge: e.target.value })} placeholder="e.g. Promo" maxLength={40}
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors" />
                   </div>
                   <div>
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Urutan</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Urutan</label>
                     <input type="number" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: e.target.value })} min="0"
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors" />
                   </div>
                 </div>
 
                 {/* Color */}
                 <div>
-                  <label className="block text-[12px] font-semibold text-white/50 mb-2 uppercase tracking-wide">Warna {form.image_url && <span className="normal-case text-white/30">(dipakai bila tanpa gambar)</span>}</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-2">Warna {form.image_url && <span className="font-normal text-slate-400">(dipakai bila tanpa gambar)</span>}</label>
                   <div className="flex gap-2.5 flex-wrap">
                     {PROMO_COLOR_OPTIONS.map(c => (
                       <button key={c} type="button" onClick={() => setForm({ ...form, color: c })}
-                        className={`w-8 h-8 rounded-full ${PROMO_BG[c]} transition-all ${form.color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-surface scale-110' : 'opacity-50 hover:opacity-75'}`} />
+                        className={`w-8 h-8 rounded-full ${PROMO_BG[c]} transition-all ${form.color === c ? 'ring-2 ring-sky-400 ring-offset-2 ring-offset-white scale-110' : 'opacity-50 hover:opacity-75'}`} />
                     ))}
                   </div>
                 </div>
 
                 {/* Icon */}
                 <div>
-                  <label className="block text-[12px] font-semibold text-white/50 mb-2 uppercase tracking-wide">Ikon</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-2">Ikon</label>
                   <div className="flex gap-2 flex-wrap">
                     {PROMO_ICON_OPTIONS.map(ic => (
                       <button key={ic} type="button" onClick={() => setForm({ ...form, icon: ic })}
-                        className={`w-9 h-9 rounded-[12px] flex items-center justify-center transition-all ${form.icon === ic ? 'bg-brand text-white' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}>
+                        className={`w-9 h-9 rounded-[12px] flex items-center justify-center transition-all ${form.icon === ic ? 'bg-sky-500 text-white' : 'bg-white border border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
                         <PromoIcon name={ic} className="w-4 h-4" />
                       </button>
                     ))}
@@ -407,98 +411,98 @@ export default function AdminPromos() {
 
                 {/* Image upload */}
                 <div>
-                  <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Gambar (opsional)</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Gambar (opsional)</label>
                   <div className="flex gap-2">
-                    <label className="flex-1 cursor-pointer bg-white/[0.03] border border-dashed border-white/15 rounded-[14px] px-4 py-3 text-white/60 text-[13px] flex items-center justify-center gap-2 hover:border-brand/40 transition-colors">
-                      {uploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                    <label className="flex-1 cursor-pointer bg-white border border-dashed border-slate-300 rounded-2xl px-4 py-3 text-slate-500 text-[13px] flex items-center justify-center gap-2 hover:border-sky-300 transition-colors">
+                      {uploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" strokeWidth={2} />}
                       {uploading ? 'Memproses...' : form.image_url ? 'Ganti gambar' : 'Unggah gambar'}
                       <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
                     </label>
                     {form.image_url && (
                       <button type="button" onClick={() => setForm({ ...form, image_url: '' })}
-                        className="px-3 rounded-[14px] bg-danger/10 text-danger text-[13px] font-semibold hover:bg-danger/20 transition-colors">
+                        className="px-3 rounded-2xl bg-rose-50 text-rose-600 text-[13px] font-semibold hover:bg-rose-100 transition-colors">
                         Hapus
                       </button>
                     )}
                   </div>
-                  <p className="text-[11px] text-white/30 mt-1.5">Gambar otomatis dikompres. Rasio lebar disarankan (mis. 16:9).</p>
+                  <p className="text-[11px] text-slate-400 mt-1.5">Gambar otomatis dikompres. Rasio lebar disarankan (mis. 16:9).</p>
                 </div>
 
                 {/* Link target */}
                 <div>
-                  <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Saat diklik</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Saat diklik</label>
                   <select value={form.link_type} onChange={e => setForm({ ...form, link_type: e.target.value as PromoForm['link_type'], link_value: '' })}
-                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 appearance-none">
-                    <option value="packages" className="bg-surface">Buka halaman Paket</option>
-                    <option value="package" className="bg-surface">Buka paket tertentu</option>
-                    <option value="external" className="bg-surface">Buka link eksternal (WhatsApp, dll)</option>
-                    <option value="none" className="bg-surface">Tanpa aksi</option>
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 appearance-none">
+                    <option value="packages">Buka halaman Paket</option>
+                    <option value="package">Buka paket tertentu</option>
+                    <option value="external">Buka link eksternal (WhatsApp, dll)</option>
+                    <option value="none">Tanpa aksi</option>
                   </select>
                 </div>
 
                 {form.link_type === 'package' && (
                   <div>
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Pilih Paket</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Pilih Paket</label>
                     <select value={form.link_value} onChange={e => setForm({ ...form, link_value: e.target.value })}
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 appearance-none">
-                      <option value="" className="bg-surface text-white/40">— Pilih paket —</option>
-                      {packages.map(pk => <option key={pk.id} value={String(pk.id)} className="bg-surface">{pk.name}</option>)}
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 appearance-none">
+                      <option value="">— Pilih paket —</option>
+                      {packages.map(pk => <option key={pk.id} value={String(pk.id)}>{pk.name}</option>)}
                     </select>
                   </div>
                 )}
 
                 {form.link_type === 'external' && (
                   <div>
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">URL</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">URL</label>
                     <input type="text" value={form.link_value} onChange={e => setForm({ ...form, link_value: e.target.value })} placeholder="https://wa.me/628..."
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors" />
                   </div>
                 )}
 
                 {form.link_type !== 'none' && (
                   <div>
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Teks tombol (opsional)</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Teks tombol (opsional)</label>
                     <input type="text" value={form.button_text} onChange={e => setForm({ ...form, button_text: e.target.value })} placeholder="e.g. Beli Sekarang" maxLength={40}
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 transition-colors" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors" />
                   </div>
                 )}
 
                 {/* Schedule */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Mulai (opsional)</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Mulai (opsional)</label>
                     <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-3 py-3 text-white text-[14px] focus:outline-none focus:border-brand/50 transition-colors [color-scheme:dark]" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-3 py-3 text-slate-800 text-[14px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors" />
                   </div>
                   <div>
-                    <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Berakhir (opsional)</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Berakhir (opsional)</label>
                     <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
-                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-3 py-3 text-white text-[14px] focus:outline-none focus:border-brand/50 transition-colors [color-scheme:dark]" />
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-3 py-3 text-slate-800 text-[14px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors" />
                   </div>
                 </div>
 
                 {/* Show on */}
                 <div>
-                  <label className="block text-[12px] font-semibold text-white/50 mb-1.5 uppercase tracking-wide">Tampil di</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">Tampil di</label>
                   <select value={form.show_on} onChange={e => setForm({ ...form, show_on: e.target.value as PromoForm['show_on'] })}
-                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 text-white text-[15px] focus:outline-none focus:border-brand/50 appearance-none">
-                    <option value="both" className="bg-surface">Beranda + Landing page</option>
-                    <option value="home" className="bg-surface">Beranda saja</option>
-                    <option value="landing" className="bg-surface">Landing page saja</option>
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 appearance-none">
+                    <option value="both">Beranda + Landing page</option>
+                    <option value="home">Beranda saja</option>
+                    <option value="landing">Landing page saja</option>
                   </select>
                 </div>
 
                 {/* Active toggle */}
-                <label className="flex items-center justify-between bg-white/[0.03] border border-white/[0.07] rounded-[14px] px-4 py-3 cursor-pointer">
-                  <span className="text-[14px] font-medium text-white/80">Aktifkan promo</span>
+                <label className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-3 cursor-pointer">
+                  <span className="text-[14px] font-medium text-slate-700">Aktifkan promo</span>
                   <button type="button" onClick={() => setForm({ ...form, active: !form.active })}
-                    className={`w-11 h-6 rounded-full transition-colors relative ${form.active ? 'bg-success' : 'bg-white/15'}`}>
-                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all ${form.active ? 'left-[22px]' : 'left-0.5'}`} />
+                    className={`w-11 h-6 rounded-full transition-colors relative ${form.active ? 'bg-teal-500' : 'bg-slate-200'}`}>
+                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all ${form.active ? 'left-[22px]' : 'left-0.5'}`} />
                   </button>
                 </label>
 
                 <button type="submit" disabled={saving}
-                  className="w-full bg-brand hover:bg-brand-hover disabled:opacity-50 active:scale-[0.98] transition-all text-white font-semibold py-4 rounded-[16px] mt-2 text-[15px]">
+                  className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 active:scale-95 transition-all text-white font-semibold py-4 rounded-[16px] mt-2 text-[15px] shadow-[0_8px_20px_rgba(14,165,233,0.3)]">
                   {saving
                     ? <span className="flex items-center justify-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" /> Menyimpan...</span>
                     : editPromo ? 'Simpan Perubahan' : 'Tambah Promo'}

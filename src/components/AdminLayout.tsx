@@ -20,32 +20,39 @@ export default function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#000000] text-slate-50 font-sans selection:bg-brand/30 overflow-hidden flex justify-center">
-      <div className="relative z-10 w-full max-w-md bg-[#000000] min-h-screen flex flex-col relative overflow-x-hidden border-x border-white/5">
-        
+    <div className="min-h-screen text-slate-800 font-sans selection:bg-sky-200 overflow-hidden flex justify-center">
+      <div className="relative w-full max-w-md min-h-screen flex flex-col overflow-x-hidden">
+
+        {/* Coastal gradient background */}
+        <div className="coastal-bg fixed inset-0 max-w-md mx-auto">
+          <div className="coastal-glow coastal-glow-1" />
+          <div className="coastal-glow coastal-glow-2" />
+          <div className="coastal-glow coastal-glow-3" />
+        </div>
+
         {/* Header */}
-        <header className="flex justify-between items-center px-4 py-4 sticky top-0 z-40 bg-[#000000]/80 backdrop-blur-xl border-b border-white/10">
+        <header className="relative z-10 flex justify-between items-center px-4 py-4 sticky top-0 glass rounded-b-[24px]">
           <div className="flex items-center gap-3">
              <button 
               onClick={() => setIsSidebarOpen(true)}
               aria-label="Buka menu"
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-slate-300 hover:text-white transition-all active:scale-95"
+              className="w-10 h-10 flex items-center justify-center rounded-xl glass-pill text-slate-600 hover:text-slate-800 transition-all active:scale-95"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-5 h-5" strokeWidth={1.8} />
             </button>
-            <span className="font-semibold text-white flex items-center gap-1.5 text-base tracking-tight">
-               Admin Panel <ChevronLeft className="w-4 h-4 rotate-180 text-white/50" />
+            <span className="font-bold text-slate-800 flex items-center gap-1.5 text-base tracking-tight">
+               Admin Panel <ChevronLeft className="w-4 h-4 rotate-180 text-slate-400" strokeWidth={1.8} />
             </span>
           </div>
           {loading && (
             <div className="absolute bottom-0 left-0 right-0 h-0.5 overflow-hidden">
-              <div className="h-full w-1/5 bg-brand loading-bar rounded-full" />
+              <div className="h-full w-1/5 bg-sky-500 loading-bar rounded-full" />
             </div>
           )}
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto pb-10 scroll-smooth hide-scrollbar p-5 pt-4 bg-[#000000]">
+        <main className="relative z-10 flex-1 overflow-y-auto pb-10 scroll-smooth hide-scrollbar p-5 pt-4">
            <Outlet />
         </main>
 
@@ -59,7 +66,7 @@ export default function AdminLayout() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setIsSidebarOpen(false)}
-                className="fixed inset-0 bg-black/60 z-50 backdrop-blur-md max-w-md mx-auto"
+                className="fixed inset-0 bg-slate-900/40 z-50 backdrop-blur-md max-w-md mx-auto"
               />
               
               {/* Drawer */}
@@ -68,25 +75,25 @@ export default function AdminLayout() {
                 animate={{ x: 0 }}
                 exit={{ x: '-100%' }}
                 transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-                className="fixed top-0 left-0 bottom-0 w-[280px] bg-surface/90 backdrop-blur-2xl z-[60] flex flex-col max-w-md mx-auto shadow-2xl border-r border-white/10"
+                className="fixed top-0 left-0 bottom-0 w-[280px] glass-strong z-[60] flex flex-col max-w-md mx-auto shadow-2xl"
               >
-                <div className="p-5 flex items-center justify-between border-b border-white/10 mt-safe">
+                <div className="p-5 flex items-center justify-between border-b border-slate-100 mt-safe">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-[10px] bg-brand flex items-center justify-center shadow-sm">
-                      <RouterIcon className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-[10px] bg-sky-500 flex items-center justify-center shadow-[0_8px_20px_rgba(14,165,233,0.3)]">
+                      <RouterIcon className="w-5 h-5 text-white" strokeWidth={1.8} />
                     </div>
                     <div>
-                        <h2 className="font-bold text-white text-[17px] leading-tight tracking-tight">AdilaNet</h2>
-                        <p className="text-[13px] text-white/60 font-medium">Admin Panel</p>
+                        <h2 className="font-bold text-slate-800 text-[17px] leading-tight tracking-tight">AdilaNet</h2>
+                        <p className="text-[13px] text-slate-500 font-medium">Admin Panel</p>
                     </div>
                   </div>
-                  <button onClick={() => setIsSidebarOpen(false)} aria-label="Tutup menu" className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white/70 hover:text-white transition-colors active:scale-95">
-                    <X className="w-4 h-4" />
+                  <button onClick={() => setIsSidebarOpen(false)} aria-label="Tutup menu" className="w-8 h-8 flex items-center justify-center rounded-full glass-pill text-slate-500 hover:text-slate-800 transition-colors active:scale-95">
+                    <X className="w-4 h-4" strokeWidth={1.8} />
                   </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto py-4 px-4 hide-scrollbar">
-                  <p className="text-[11px] font-semibold text-white/50 uppercase tracking-widest mb-3 px-2">Menu</p>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3 px-2">Menu</p>
                   <nav className="space-y-1">
                     {adminNav.map((item) => (
                       <NavLink
@@ -98,34 +105,34 @@ export default function AdminLayout() {
                           cn(
                             "flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 relative group font-medium text-[15px]",
                             isActive 
-                              ? "text-white bg-brand" 
-                              : "text-white/70 hover:text-white hover:bg-white/10 border-transparent"
+                              ? "text-white bg-sky-500 shadow-[0_8px_20px_rgba(14,165,233,0.3)]" 
+                              : "text-slate-600 hover:text-slate-800 hover:bg-white/70 border-transparent"
                           )
                         }
                       >
-                        <item.icon className="w-[18px] h-[18px]" />
+                        <item.icon className="w-[18px] h-[18px]" strokeWidth={1.8} />
                         <span>{item.label}</span>
                       </NavLink>
                     ))}
                   </nav>
                 </div>
 
-                <div className="p-5 border-t border-white/10 bg-white/5 pb-safe">
+                <div className="p-5 border-t border-slate-100 bg-white/40 pb-safe">
                   <div className="flex items-center gap-3 mb-5 px-2">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center font-bold text-white shadow-sm border border-white/10">
+                    <div className="w-10 h-10 rounded-full bg-sky-100 border border-sky-200 flex items-center justify-center font-bold text-sky-600 shadow-sm">
                       {currentUser?.name?.charAt(0) || 'A'}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white text-[15px] leading-tight tracking-tight">{currentUser?.name || 'Administrator'}</h3>
-                      <p className="text-[13px] text-white/60">Administrator</p>
+                      <h3 className="font-semibold text-slate-800 text-[15px] leading-tight tracking-tight">{currentUser?.name || 'Administrator'}</h3>
+                      <p className="text-[13px] text-slate-500">Administrator</p>
                     </div>
                   </div>
                   
                   <button 
                     onClick={() => setCurrentUser(null)}
-                    className="flex items-center gap-3 px-3 py-3 text-danger hover:bg-danger/10 rounded-xl transition-colors text-[15px] font-semibold w-full"
+                    className="flex items-center gap-3 px-3 py-3 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-[15px] font-semibold w-full"
                   >
-                    <LogOut className="w-[18px] h-[18px]" />
+                    <LogOut className="w-[18px] h-[18px]" strokeWidth={1.8} />
                     <span>Keluar</span>
                   </button>
                 </div>
