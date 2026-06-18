@@ -23,6 +23,10 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const BCRYPT_ROUNDS = 10;
 
+function formatRupiah(amount: number): string {
+  return `Rp ${Math.round(amount).toLocaleString("id-ID")}`;
+}
+
 function isBcryptHash(value: unknown): boolean {
   return typeof value === "string" && /^\$2[aby]\$/.test(value);
 }
@@ -162,6 +166,25 @@ async function initDb() {
       show_on VARCHAR(20) DEFAULT 'both',
       created_at TIMESTAMP DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS topups (
+      id SERIAL PRIMARY KEY,
+      user_id INT REFERENCES users(id) ON DELETE SET NULL,
+      admin_id INT REFERENCES users(id) ON DELETE SET NULL,
+      amount DECIMAL(10,2) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      user_id INT REFERENCES users(id) ON DELETE CASCADE,
+      title VARCHAR(120) NOT NULL,
+      body TEXT DEFAULT '',
+      type VARCHAR(20) DEFAULT 'info',
+      read BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, read);
   `);
 
   // Seed demo data if empty
@@ -551,20 +574,101 @@ async function startServer() {
 
   app.post("/api/users/:id/topup", requireAdmin, async (req, res) => {
     try {
-      const { amount } = req.body;
-      if (!amount || amount <= 0) return res.status(400).json({ success: false, error: "Nominal tidak valid." });
+      const amount = Number(req.body?.amount);
+      if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, error: "Nominal tidak valid." });
       const targetId = Number(req.params.id);
       const { rows: tgt } = await pool.query(`SELECT role FROM users WHERE id = $1`, [targetId]);
       if (tgt.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
       if (tgt[0].role === "superadmin" && targetId !== req.session.userId) {
         return res.status(403).json({ success: false, error: "Saldo superadmin tidak bisa diubah oleh admin lain." });
       }
+      // Balance, history, and notification must succeed or fail as one unit so
+      // a partial failure can never leave the saldo changed without a record
+      // (which would let an admin retry and double-credit).
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const { rows } = await client.query(
+          `UPDATE users SET balance = balance + $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, balance`,
+          [amount, targetId]
+        );
+        if (rows.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(404).json({ success: false, error: "User tidak ditemukan." });
+        }
+        const newBalance = parseFloat(rows[0].balance);
+        // Record the top-up for history (who topped up whom, how much, when).
+        await client.query(
+          `INSERT INTO topups (user_id, admin_id, amount) VALUES ($1, $2, $3)`,
+          [targetId, req.session.userId, amount]
+        );
+        // Notify the user whose balance was filled.
+        await client.query(
+          `INSERT INTO notifications (user_id, title, body, type) VALUES ($1, $2, $3, 'topup')`,
+          [targetId, 'Saldo Ditambahkan', `Saldo Anda bertambah ${formatRupiah(amount)}. Saldo sekarang ${formatRupiah(newBalance)}.`]
+        );
+        await client.query("COMMIT");
+        res.json({ success: true, data: { ...rows[0], balance: newBalance } });
+      } catch (txErr: any) {
+        await client.query("ROLLBACK");
+        throw txErr;
+      } finally {
+        client.release();
+      }
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ─── TOP-UP HISTORY ───────────────────────────────────────────────────────
+  app.get("/api/topups", requireAdmin, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT t.*, u.name AS user_name, a.name AS admin_name
+        FROM topups t
+        LEFT JOIN users u ON t.user_id = u.id
+        LEFT JOIN users a ON t.admin_id = a.id
+        ORDER BY t.created_at DESC
+        LIMIT 200
+      `);
+      res.json({ success: true, data: rows.map((t: any) => ({ ...t, amount: parseFloat(t.amount) })) });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ─── NOTIFICATIONS ────────────────────────────────────────────────────────
+  app.get("/api/notifications", requireAuth, async (req, res) => {
+    try {
       const { rows } = await pool.query(
-        `UPDATE users SET balance = balance + $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, balance`,
-        [amount, targetId]
+        `SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [req.session.userId]
       );
-      if (rows.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
-      res.json({ success: true, data: { ...rows[0], balance: parseFloat(rows[0].balance) } });
+      res.json({ success: true, data: rows });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+      await pool.query(
+        `UPDATE notifications SET read = true WHERE id = $1 AND user_id = $2`,
+        [Number(req.params.id), req.session.userId]
+      );
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/notifications/read-all", requireAuth, async (req, res) => {
+    try {
+      await pool.query(
+        `UPDATE notifications SET read = true WHERE user_id = $1 AND read = false`,
+        [req.session.userId]
+      );
+      res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -853,6 +957,21 @@ async function startServer() {
       );
 
       const tx = txRows[0];
+
+      // Notify the buyer that their voucher purchase succeeded. This is
+      // best-effort: the voucher is already minted and the balance deducted, so
+      // a notification failure must NOT fail the request (which would make the
+      // buyer retry and get charged twice).
+      if (payment_method === 'saldo') {
+        try {
+          await pool.query(
+            `INSERT INTO notifications (user_id, title, body, type) VALUES ($1, $2, $3, 'purchase')`,
+            [user_id, 'Pembelian Berhasil', `Voucher ${voucherCode} untuk paket ${pkg.name} berhasil dibeli. Sisa saldo ${formatRupiah(newBalance)}.`]
+          );
+        } catch (notifErr: any) {
+          console.error(`[Transaksi] Gagal membuat notifikasi pembelian (transaksi tetap sukses): ${notifErr.message}`);
+        }
+      }
 
       res.json({
         success: true,

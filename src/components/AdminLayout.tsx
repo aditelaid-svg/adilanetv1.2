@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Router as RouterIcon, Ticket, Receipt, Users, Settings, Menu, X, LogOut, ChevronLeft, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Router as RouterIcon, Ticket, Receipt, Users, Settings, Menu, X, LogOut, ChevronLeft, Megaphone, Wallet } from 'lucide-react';
 import { cn } from './UserLayout';
 import { useAppContext } from '../AppContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -12,6 +12,7 @@ const adminNav = [
   { icon: Ticket, label: 'Paket Voucher', path: '/admin/packages' },
   { icon: Megaphone, label: 'Promo / Banner', path: '/admin/promos' },
   { icon: Receipt, label: 'Transaksi', path: '/admin/transactions' },
+  { icon: Wallet, label: 'Riwayat Top Up', path: '/admin/topups' },
   { icon: Users, label: 'Pengguna', path: '/admin/users' },
   { icon: Settings, label: 'Pengaturan', path: '/admin/settings' },
 ];

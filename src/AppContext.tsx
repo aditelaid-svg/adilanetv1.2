@@ -69,6 +69,26 @@ export type Promo = {
 
 export type PromoInput = Omit<Promo, 'id'>;
 
+export type Topup = {
+  id: number;
+  user_id: number;
+  admin_id: number | null;
+  amount: number;
+  created_at: string;
+  user_name?: string;
+  admin_name?: string;
+};
+
+export type Notification = {
+  id: number;
+  user_id: number;
+  title: string;
+  body: string;
+  type: 'info' | 'topup' | 'purchase';
+  read: boolean;
+  created_at: string;
+};
+
 const API = '';
 
 async function apiFetch(path: string, options?: RequestInit) {
@@ -88,9 +108,15 @@ type AppContextType = {
   packages: Package[];
   transactions: Transaction[];
   promos: Promo[];
+  topups: Topup[];
+  notifications: Notification[];
   loading: boolean;
   refreshData: () => Promise<void>;
   refreshPromos: () => Promise<void>;
+  fetchTopups: () => Promise<void>;
+  fetchNotifications: () => Promise<void>;
+  markNotificationRead: (id: number) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
   login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   registerUser: (name: string, email: string, phone_number: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -171,6 +197,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [packages, setPackages] = useState<Package[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [promos, setPromos] = useState<Promo[]>([]);
+  const [topups, setTopups] = useState<Topup[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
 
   const setCurrentUser = (user: User | null) => {
@@ -197,19 +225,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       if (currentUser) {
         if (currentUser.role !== 'user') {
-          // Admin-only endpoints — users & routers list
-          const [usersRes, routersRes, txRes] = await Promise.all([
+          // Admin-only endpoints — users, routers, transactions & top-up history
+          const [usersRes, routersRes, txRes, topupRes, notifRes] = await Promise.all([
             apiFetch('/api/users'),
             apiFetch('/api/routers'),
             apiFetch('/api/transactions'),
+            apiFetch('/api/topups'),
+            apiFetch('/api/notifications'),
           ]);
           if (usersRes.success) setUsers(usersRes.data);
           if (routersRes.success) setRouters(routersRes.data);
           if (txRes.success) setTransactions(txRes.data);
+          if (topupRes.success) setTopups(topupRes.data);
+          if (notifRes.success) setNotifications(notifRes.data);
         } else {
-          // Regular users only get their own transactions (server scopes by session)
-          const txRes = await apiFetch('/api/transactions');
+          // Regular users only get their own transactions & notifications
+          const [txRes, notifRes] = await Promise.all([
+            apiFetch('/api/transactions'),
+            apiFetch('/api/notifications'),
+          ]);
           if (txRes.success) setTransactions(txRes.data);
+          if (notifRes.success) setNotifications(notifRes.data);
         }
       }
     } catch (err) {
@@ -218,6 +254,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   }, [currentUser, refreshPromos]);
+
+  const fetchTopups = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/topups');
+      if (res.success) setTopups(res.data);
+    } catch (err) {
+      console.error('Gagal memuat riwayat top-up:', err);
+    }
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/notifications');
+      if (res.success) setNotifications(res.data);
+    } catch (err) {
+      console.error('Gagal memuat notifikasi:', err);
+    }
+  }, []);
+
+  const markNotificationRead = useCallback(async (id: number) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    await apiFetch(`/api/notifications/${id}/read`, { method: 'POST' });
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    await apiFetch('/api/notifications/read-all', { method: 'POST' });
+  }, []);
+
+  // Poll notifications periodically so new top-ups/purchases show up live.
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(() => { fetchNotifications(); }, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser?.id, fetchNotifications]);
 
   // Hydrate session from the server on mount (cookie-based source of truth)
   useEffect(() => {
@@ -264,6 +335,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUsers([]);
     setRouters([]);
     setTransactions([]);
+    setTopups([]);
+    setNotifications([]);
   };
 
   const registerUser = async (name: string, email: string, phone_number: string, password: string) => {
@@ -304,6 +377,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (currentUser?.id === userId) {
         setCurrentUser({ ...currentUser, balance: newBalance });
       }
+      // Refresh top-up history so the new entry shows immediately.
+      fetchTopups();
     }
   };
 
@@ -460,7 +535,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       currentUser, setCurrentUser,
       users, routers, packages, transactions, promos,
+      topups, notifications,
       loading, refreshData, refreshPromos,
+      fetchTopups, fetchNotifications, markNotificationRead, markAllNotificationsRead,
       login, logout, registerUser,
       updateUser, topupBalance, buyPackage,
       addRouter, updateRouter, syncRouter, deleteRouter, testRouterConnection,

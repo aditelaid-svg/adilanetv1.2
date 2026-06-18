@@ -16,6 +16,7 @@ import UserPackages from './pages/user/UserPackages';
 import UserBuy from './pages/user/UserBuy';
 import UserHistory from './pages/user/UserHistory';
 import UserProfile from './pages/user/UserProfile';
+import UserNotifications from './pages/user/UserNotifications';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminRouters from './pages/admin/AdminRouters';
@@ -25,6 +26,7 @@ import AdminVouchers from './pages/admin/AdminVouchers';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminPromos from './pages/admin/AdminPromos';
+import AdminTopups from './pages/admin/AdminTopups';
 
 function AppRoutes() {
   const { currentUser } = useAppContext();
@@ -42,6 +44,7 @@ function AppRoutes() {
           <Route path="packages" element={<AdminPackages />} />
           <Route path="promos" element={<AdminPromos />} />
           <Route path="transactions" element={<AdminTransactions />} />
+          <Route path="topups" element={<AdminTopups />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="vouchers" element={<AdminVouchers />} />
           <Route path="settings" element={<AdminSettings />} />
@@ -55,6 +58,7 @@ function AppRoutes() {
           <Route path="packages" element={<UserPackages />} />
           <Route path="buy" element={<UserBuy />} />
           <Route path="history" element={<UserHistory />} />
+          <Route path="notifications" element={<UserNotifications />} />
           <Route path="profile" element={<UserProfile />} />
           <Route path="*" element={<Navigate to="/user" replace />} />
         </Route>

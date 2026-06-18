@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Package, ShoppingCart, Clock, User as UserIcon } from 'lucide-react';
+import { Home, Package, ShoppingCart, Clock, User as UserIcon, Bell } from 'lucide-react';
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useAppContext } from '../AppContext';
@@ -12,7 +12,8 @@ export function cn(...inputs: ClassValue[]) {
 
 export default function UserLayout() {
   const navigate = useNavigate();
-  const { loading } = useAppContext();
+  const { loading, notifications } = useAppContext();
+  const unread = notifications.filter(n => !n.read).length;
 
   return (
     <div className="min-h-screen text-slate-800 font-sans selection:bg-sky-200 overflow-hidden flex justify-center">
@@ -29,6 +30,21 @@ export default function UserLayout() {
             <div className="h-full w-1/5 bg-sky-500 loading-bar rounded-full" />
           </div>
         )}
+
+        {/* Notification Bell */}
+        <button
+          onClick={() => navigate('/user/notifications')}
+          aria-label="Notifikasi"
+          className="fixed top-4 right-4 max-w-md z-50 w-11 h-11 flex items-center justify-center rounded-full glass-pill text-slate-600 hover:text-slate-800 transition-all active:scale-95 shadow-sm"
+          style={{ right: 'max(1rem, calc((100vw - 28rem) / 2 + 1rem))' }}
+        >
+          <Bell className="w-5 h-5" strokeWidth={1.8} />
+          {unread > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
+              {unread > 9 ? '9+' : unread}
+            </span>
+          )}
+        </button>
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto pb-28 scroll-smooth hide-scrollbar relative z-10">
