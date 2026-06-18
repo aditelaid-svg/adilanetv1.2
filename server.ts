@@ -143,6 +143,25 @@ async function initDb() {
       config_value TEXT DEFAULT '',
       updated_at TIMESTAMP DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS promos (
+      id SERIAL PRIMARY KEY,
+      title VARCHAR(120) NOT NULL,
+      subtitle VARCHAR(200) DEFAULT '',
+      color VARCHAR(20) DEFAULT 'iris',
+      icon VARCHAR(30) DEFAULT 'star',
+      badge VARCHAR(40) DEFAULT '',
+      image_url TEXT DEFAULT '',
+      link_type VARCHAR(20) DEFAULT 'packages',
+      link_value TEXT DEFAULT '',
+      button_text VARCHAR(40) DEFAULT '',
+      active BOOLEAN DEFAULT true,
+      start_date DATE,
+      end_date DATE,
+      sort_order INT DEFAULT 0,
+      show_on VARCHAR(20) DEFAULT 'both',
+      created_at TIMESTAMP DEFAULT NOW()
+    );
   `);
 
   // Seed demo data if empty
@@ -204,6 +223,17 @@ async function initDb() {
       ('voucherPrefix', 'WFI-')
     ON CONFLICT (config_key) DO NOTHING;
   `);
+
+  // Seed a starter promo banner so the home screen isn't empty
+  const { rows: promoRows } = await pool.query("SELECT COUNT(*) as cnt FROM promos");
+  if (parseInt(promoRows[0].cnt) === 0) {
+    await pool.query(`
+      INSERT INTO promos (title, subtitle, color, icon, badge, link_type, button_text, active, sort_order, show_on) VALUES
+      ('Anti Buffering', 'Streaming & gaming lancar tanpa putus', 'iris', 'zap', 'Unggulan', 'packages', 'Lihat Paket', true, 1, 'both'),
+      ('Hemat Lebih Banyak', 'Beli paket mingguan, lebih irit!', 'gold', 'star', 'Promo', 'packages', 'Beli Sekarang', true, 2, 'both')
+      ON CONFLICT DO NOTHING;
+    `);
+  }
 
   // Ensure pin column can hold a bcrypt hash (~60 chars) on pre-existing DBs
   await pool.query(`ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255)`);
@@ -275,6 +305,7 @@ async function startServer() {
   app.use(cors({ origin: true, credentials: true }));
   // Capture the raw request body so we can verify the SanPay webhook HMAC signature.
   app.use(express.json({
+    limit: '3mb',
     verify: (req: any, _res, buf) => { req.rawBody = buf; },
   }));
 
@@ -873,6 +904,125 @@ async function startServer() {
       res.json({ success: true, data: { qrisEnabled: s.qrisEnabled !== 'false' } });
     } catch {
       res.json({ success: true, data: { qrisEnabled: true } });
+    }
+  });
+
+  // ─── PROMOS / BANNERS ──────────────────────────────────────────────────────
+  const PROMO_COLORS = ['iris', 'gold', 'brand', 'success', 'danger', 'grape'];
+  const PROMO_ICONS = ['star', 'zap', 'wifi', 'gift', 'percent', 'flame', 'rocket', 'sparkles'];
+  const PROMO_LINK_TYPES = ['packages', 'package', 'external', 'none'];
+  const PROMO_SHOW_ON = ['home', 'landing', 'both'];
+
+  function mapPromo(p: any) {
+    return {
+      id: p.id,
+      title: p.title,
+      subtitle: p.subtitle || '',
+      color: p.color || 'iris',
+      icon: p.icon || 'star',
+      badge: p.badge || '',
+      image_url: p.image_url || '',
+      link_type: p.link_type || 'packages',
+      link_value: p.link_value || '',
+      button_text: p.button_text || '',
+      active: !!p.active,
+      start_date: p.start_date ? new Date(p.start_date).toISOString().slice(0, 10) : null,
+      end_date: p.end_date ? new Date(p.end_date).toISOString().slice(0, 10) : null,
+      sort_order: p.sort_order ?? 0,
+      show_on: p.show_on || 'both',
+    };
+  }
+
+  function sanitizePromo(body: any) {
+    const title = String(body.title ?? '').trim().slice(0, 120);
+    const subtitle = String(body.subtitle ?? '').trim().slice(0, 200);
+    const color = PROMO_COLORS.includes(body.color) ? body.color : 'iris';
+    const icon = PROMO_ICONS.includes(body.icon) ? body.icon : 'star';
+    const badge = String(body.badge ?? '').trim().slice(0, 40);
+    let image_url = typeof body.image_url === 'string' ? body.image_url : '';
+    // Only accept inline image data URLs (jpeg/png/webp) or http(s) links.
+    if (image_url && !/^data:image\/(jpeg|png|webp);base64,/.test(image_url) && !/^https?:\/\//.test(image_url)) image_url = '';
+    // Hard cap inline image payload (~1.5 MB of base64 ≈ ~1.1 MB binary).
+    if (image_url.length > 1_500_000) image_url = '';
+    const link_type = PROMO_LINK_TYPES.includes(body.link_type) ? body.link_type : 'packages';
+    const link_value = String(body.link_value ?? '').trim().slice(0, 500);
+    const button_text = String(body.button_text ?? '').trim().slice(0, 40);
+    const active = body.active === undefined ? true : !!body.active;
+    const show_on = PROMO_SHOW_ON.includes(body.show_on) ? body.show_on : 'both';
+    let sort_order = parseInt(String(body.sort_order), 10);
+    if (!Number.isFinite(sort_order)) sort_order = 0;
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    const start_date = dateRe.test(body.start_date) ? body.start_date : null;
+    const end_date = dateRe.test(body.end_date) ? body.end_date : null;
+    return { title, subtitle, color, icon, badge, image_url, link_type, link_value, button_text, active, show_on, sort_order, start_date, end_date };
+  }
+
+  // Public: only active promos within their schedule window. Optional ?show_on=home|landing
+  app.get("/api/promos/public", async (req, res) => {
+    try {
+      const showOn = PROMO_SHOW_ON.includes(String(req.query.show_on)) ? String(req.query.show_on) : null;
+      const { rows } = await pool.query(
+        `SELECT * FROM promos
+         WHERE active = true
+           AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+           AND (end_date IS NULL OR end_date >= CURRENT_DATE)
+         ORDER BY sort_order ASC, id ASC
+         LIMIT 12`
+      );
+      let data = rows.map(mapPromo);
+      if (showOn) data = data.filter(p => p.show_on === showOn || p.show_on === 'both');
+      res.json({ success: true, data });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Admin: full list
+  app.get("/api/promos", requireAdmin, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`SELECT * FROM promos ORDER BY sort_order ASC, id ASC`);
+      res.json({ success: true, data: rows.map(mapPromo) });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/promos", requireAdmin, async (req, res) => {
+    try {
+      const p = sanitizePromo(req.body);
+      if (!p.title) return res.status(400).json({ success: false, error: "Judul promo wajib diisi." });
+      const { rows } = await pool.query(
+        `INSERT INTO promos (title, subtitle, color, icon, badge, image_url, link_type, link_value, button_text, active, start_date, end_date, sort_order, show_on)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+        [p.title, p.subtitle, p.color, p.icon, p.badge, p.image_url, p.link_type, p.link_value, p.button_text, p.active, p.start_date, p.end_date, p.sort_order, p.show_on]
+      );
+      res.json({ success: true, data: mapPromo(rows[0]) });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch("/api/promos/:id", requireAdmin, async (req, res) => {
+    try {
+      const p = sanitizePromo(req.body);
+      if (!p.title) return res.status(400).json({ success: false, error: "Judul promo wajib diisi." });
+      const { rows } = await pool.query(
+        `UPDATE promos SET title=$1, subtitle=$2, color=$3, icon=$4, badge=$5, image_url=$6, link_type=$7, link_value=$8, button_text=$9, active=$10, start_date=$11, end_date=$12, sort_order=$13, show_on=$14 WHERE id=$15 RETURNING *`,
+        [p.title, p.subtitle, p.color, p.icon, p.badge, p.image_url, p.link_type, p.link_value, p.button_text, p.active, p.start_date, p.end_date, p.sort_order, p.show_on, req.params.id]
+      );
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Promo tidak ditemukan." });
+      res.json({ success: true, data: mapPromo(rows[0]) });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete("/api/promos/:id", requireAdmin, async (req, res) => {
+    try {
+      await pool.query(`DELETE FROM promos WHERE id = $1`, [req.params.id]);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

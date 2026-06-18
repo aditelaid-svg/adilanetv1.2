@@ -24,6 +24,7 @@ import AdminTransactions from './pages/admin/AdminTransactions';
 import AdminVouchers from './pages/admin/AdminVouchers';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminPromos from './pages/admin/AdminPromos';
 
 function AppRoutes() {
   const { currentUser } = useAppContext();
@@ -39,6 +40,7 @@ function AppRoutes() {
           <Route index element={<AdminDashboard />} />
           <Route path="routers" element={<AdminRouters />} />
           <Route path="packages" element={<AdminPackages />} />
+          <Route path="promos" element={<AdminPromos />} />
           <Route path="transactions" element={<AdminTransactions />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="vouchers" element={<AdminVouchers />} />

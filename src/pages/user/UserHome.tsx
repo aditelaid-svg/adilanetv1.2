@@ -1,17 +1,24 @@
 import React from 'react';
-import { useAppContext } from '../../AppContext';
-import { Wifi, Zap, ArrowRight, Star, ChevronRight } from 'lucide-react';
+import { useAppContext, Promo } from '../../AppContext';
+import { Wifi, Zap, ArrowRight, ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { formatRupiah } from '../../lib/format';
+import { PROMO_BG, PromoIcon } from '../../lib/promoStyles';
 
 export default function UserHome() {
-  const { currentUser, packages, transactions } = useAppContext();
+  const { currentUser, packages, transactions, promos } = useAppContext();
   const navigate = useNavigate();
 
   const userTransactions = transactions.filter(t => t.user_id === currentUser?.id);
   const activeTx = userTransactions[0];
   const activePackage = packages.find(p => p.id === activeTx?.package_id);
+
+  const handlePromoClick = (p: Promo) => {
+    if (p.link_type === 'packages') navigate('/user/packages');
+    else if (p.link_type === 'package' && p.link_value) navigate('/user/buy', { state: { packageId: Number(p.link_value) } });
+    else if (p.link_type === 'external' && p.link_value) window.open(p.link_value, '_blank', 'noopener');
+  };
 
   return (
     <div className="space-y-5 pb-6 mt-2">
@@ -69,19 +76,43 @@ export default function UserHome() {
         </div>
       </div>
 
-      {/* Banners Horizonatl Scroll */}
-      <div className="flex overflow-x-auto gap-3 px-5 pb-2 hide-scrollbar snap-x">
-          <div className="min-w-[130px] w-[130px] h-24 rounded-[20px] bg-iris p-3.5 relative overflow-hidden snap-start shrink-0 flex flex-col justify-end">
-             <div className="absolute -right-4 -top-8 w-20 h-20 bg-white/20 blur-xl rounded-full" />
-             <h4 className="text-white text-[13px] font-semibold relative z-10 leading-tight">Anti<br/>Buffering</h4>
-          </div>
-          <div className="min-w-[240px] w-[240px] h-24 rounded-[20px] bg-gold p-3.5 relative overflow-hidden snap-start shrink-0 flex flex-col justify-center">
-             <div className="absolute right-0 top-0 w-24 h-24 bg-white/20 blur-xl rounded-full" />
-             <Star className="w-4 h-4 text-white mb-1.5 relative z-10" fill="currentColor"/>
-             <h4 className="text-white font-bold text-[14px] mb-0.5 relative z-10">Hemat Lebih Banyak</h4>
-             <p className="text-white/80 text-[11px] font-medium relative z-10">Beli paket mingguan, lebih irit!</p>
-          </div>
-      </div>
+      {/* Banners Horizontal Scroll (dikelola dari panel admin) */}
+      {promos.length > 0 && (
+        <div className="flex overflow-x-auto gap-3 px-5 pb-2 hide-scrollbar snap-x">
+          {promos.map((p) => {
+            const clickable = p.link_type !== 'none';
+            return (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                onClick={() => clickable && handlePromoClick(p)}
+                role={clickable ? 'button' : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                onKeyDown={(e) => { if (clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handlePromoClick(p); } }}
+                className={`min-w-[240px] w-[240px] h-24 rounded-[20px] p-3.5 relative overflow-hidden snap-start shrink-0 flex flex-col justify-end shadow-sm ${p.image_url ? 'bg-black' : (PROMO_BG[p.color] || 'bg-iris')} ${clickable ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''}`}
+              >
+                {p.image_url ? (
+                  <>
+                    <img src={p.image_url} alt={p.title} className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                  </>
+                ) : (
+                  <div className="absolute -right-4 -top-8 w-24 h-24 bg-white/20 blur-xl rounded-full" />
+                )}
+                <div className="relative z-10">
+                  {p.badge && (
+                    <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/30 text-white uppercase tracking-wide mb-1">{p.badge}</span>
+                  )}
+                  {!p.image_url && <PromoIcon name={p.icon} className="w-4 h-4 text-white mb-1" />}
+                  <h4 className="text-white font-bold text-[14px] leading-tight">{p.title}</h4>
+                  {p.subtitle && <p className="text-white/85 text-[11px] font-medium leading-snug mt-0.5 line-clamp-1">{p.subtitle}</p>}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Popular Packages */}
       <section className="px-5">

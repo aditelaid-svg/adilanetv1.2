@@ -48,6 +48,26 @@ export type Transaction = {
   package_name?: string;
 };
 
+export type Promo = {
+  id: number;
+  title: string;
+  subtitle: string;
+  color: string;
+  icon: string;
+  badge: string;
+  image_url: string;
+  link_type: 'packages' | 'package' | 'external' | 'none';
+  link_value: string;
+  button_text: string;
+  active: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  sort_order: number;
+  show_on: 'home' | 'landing' | 'both';
+};
+
+export type PromoInput = Omit<Promo, 'id'>;
+
 const API = '';
 
 async function apiFetch(path: string, options?: RequestInit) {
@@ -66,8 +86,10 @@ type AppContextType = {
   routers: RouterDevice[];
   packages: Package[];
   transactions: Transaction[];
+  promos: Promo[];
   loading: boolean;
   refreshData: () => Promise<void>;
+  refreshPromos: () => Promise<void>;
   login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   registerUser: (name: string, email: string, phone_number: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -132,6 +154,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [routers, setRouters] = useState<RouterDevice[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [promos, setPromos] = useState<Promo[]>([]);
   const [loading, setLoading] = useState(false);
 
   const setCurrentUser = (user: User | null) => {
@@ -139,12 +162,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveSession(user);
   };
 
+  const refreshPromos = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/promos/public?show_on=home');
+      if (res.success) setPromos(res.data);
+    } catch (err) {
+      console.error('Gagal memuat promo:', err);
+    }
+  }, []);
+
   const refreshData = useCallback(async () => {
     setLoading(true);
     try {
-      // Always load packages (needed for user view)
+      // Always load packages + promos (needed for user view)
       const pkgRes = await apiFetch('/api/packages');
       if (pkgRes.success) setPackages(pkgRes.data);
+      await refreshPromos();
 
       if (currentUser) {
         if (currentUser.role !== 'user') {
@@ -168,7 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, refreshPromos]);
 
   // Hydrate session from the server on mount (cookie-based source of truth)
   useEffect(() => {
@@ -403,8 +436,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       currentUser, setCurrentUser,
-      users, routers, packages, transactions,
-      loading, refreshData,
+      users, routers, packages, transactions, promos,
+      loading, refreshData, refreshPromos,
       login, logout, registerUser,
       updateUser, topupBalance, buyPackage,
       addRouter, updateRouter, syncRouter, deleteRouter, testRouterConnection,
