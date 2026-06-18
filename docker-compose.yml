@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ============================================================
 #  AdilaNet — WiFi Voucher Mikrotik
 #  Deploy via Dockge / Docker Compose
