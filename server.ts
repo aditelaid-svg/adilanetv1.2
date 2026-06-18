@@ -27,6 +27,20 @@ function formatRupiah(amount: number): string {
   return `Rp ${Math.round(amount).toLocaleString("id-ID")}`;
 }
 
+// Build the "dibuat oleh" tag stamped into the MikroTik voucher comment so it's
+// clear where each voucher came from: a registered user, a public (guest) QRIS
+// purchase, or an admin. Must start with a letter so it never collides with the
+// validity countdown (which keys off a leading digit).
+function buildVoucherIdentity(opts: { userId?: number | null; name?: string | null; phone?: string | null; admin?: boolean }): string {
+  if (opts.admin) return "Admin";
+  if (opts.userId) {
+    const nm = String(opts.name || "").trim().slice(0, 40);
+    return nm ? `User#${opts.userId} ${nm}` : `User#${opts.userId}`;
+  }
+  const ph = String(opts.phone || "").replace(/[^0-9+]/g, "").slice(0, 20);
+  return ph ? `Publik ${ph}` : "Publik";
+}
+
 function isBcryptHash(value: unknown): boolean {
   return typeof value === "string" && /^\$2[aby]\$/.test(value);
 }
@@ -939,7 +953,7 @@ async function startServer() {
       // If provisioning fails, refund the deducted balance so the buyer isn't charged.
       if (payment_method === 'saldo') {
         try {
-          await provisionVoucher(pkg, voucherCode);
+          await provisionVoucher(pkg, voucherCode, buildVoucherIdentity({ userId: user.id, name: user.name }));
         } catch (provErr: any) {
           await pool.query(
             `UPDATE users SET balance = balance + $1, updated_at = NOW() WHERE id = $2`,
@@ -1356,7 +1370,7 @@ async function startServer() {
       const { rows: claim } = await pool.query(
         `UPDATE transactions SET status = 'provisioning'
          WHERE reference_id = $1 AND status = 'pending'
-         RETURNING id, package_id, amount`,
+         RETURNING id, package_id, amount, user_id, phone`,
         [ref]
       );
       if (claim.length === 0) {
@@ -1385,7 +1399,16 @@ async function startServer() {
 
       try {
         const code = await generateUniqueVoucher();
-        await provisionVoucher(pkgRows[0], code);
+        // Tag the voucher with who bought it: a registered user (look up name) or
+        // a public/guest QRIS purchase (fall back to the phone they entered).
+        let identity: string;
+        if (claim[0].user_id) {
+          const { rows: bu } = await pool.query(`SELECT name FROM users WHERE id = $1`, [claim[0].user_id]);
+          identity = buildVoucherIdentity({ userId: claim[0].user_id, name: bu[0]?.name });
+        } else {
+          identity = buildVoucherIdentity({ phone: claim[0].phone });
+        }
+        await provisionVoucher(pkgRows[0], code, identity);
         await pool.query(
           `UPDATE transactions SET voucher_code = $1, status = 'success' WHERE id = $2`,
           [code, txId]
@@ -1458,7 +1481,7 @@ async function startServer() {
   // Create the actual hotspot voucher on the package's Mikrotik router using its
   // configured profile (profile defines duration & rate/quota limits).
   // Throws a clear error if the package is misconfigured or the router is unreachable.
-  async function provisionVoucher(pkg: any, voucherCode: string) {
+  async function provisionVoucher(pkg: any, voucherCode: string, identity?: string) {
     if (!pkg.router_id) {
       throw new Error("Paket belum terhubung ke router Mikrotik. Hubungi admin.");
     }
@@ -1474,7 +1497,8 @@ async function startServer() {
       { host: r.ip_address, user: r.username, pass: r.password, port: r.api_port },
       pkg.mikrotik_profile,
       voucherCode,
-      voucherCode
+      voucherCode,
+      identity
     );
   }
 
@@ -1564,7 +1588,8 @@ async function startServer() {
         { host: router.ip_address, user: router.username, pass: router.password, port: router.api_port },
         profile,
         name,
-        password
+        password,
+        buildVoucherIdentity({ admin: true })
       );
       res.json({ success: true, data: result });
     } catch (err: any) {

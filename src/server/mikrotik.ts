@@ -70,8 +70,19 @@ function humanizeValidity(raw: string): string {
 // `... set comment=600 ...`, so we recover the duration from that number.
 function parseOnLoginValidity(script: string): string {
   if (!script) return '';
-  const m = String(script).match(/comment=(\d+)/);
+  // Matches both the legacy `comment=600` and the current `comment=("600 " . $c)`.
+  const m = String(script).match(/comment=\(?"?(\d+)/);
   return m ? minutesToRaw(parseInt(m[1], 10)) : '';
+}
+
+// Hotspot comment is shared with the validity countdown below, which detects an
+// already-armed user by a LEADING DIGIT. So any identifier comment must never
+// start with a digit, and must stay free of quotes/control chars that could
+// disturb the on-login/reaper scripts. Keep it short for the RouterOS UI.
+export function sanitizeComment(raw: string): string {
+  let s = String(raw ?? '').replace(/[\x00-\x1f"]/g, '').replace(/\s+/g, ' ').trim();
+  if (/^[0-9]/.test(s)) s = `#${s}`;
+  return s.slice(0, 60);
 }
 
 // on-login arming script: on the FIRST login only (comment still empty), stamp
@@ -80,20 +91,56 @@ function parseOnLoginValidity(script: string): string {
 // at first login and runs on wall-clock time regardless of usage/reconnects.
 function buildExpiryScript(validityRaw: string): string {
   const minutes = validityToMinutes(validityRaw);
-  return `:local id [/ip hotspot user find name=$user]; :if ([:len $id]>0) do={:if ([/ip hotspot user get $id comment]="") do={/ip hotspot user set comment=${minutes} $id}}`;
+  // Arm only if the comment isn't already counting down (a leading digit means
+  // armed). We PREPEND the minutes to whatever identifier comment is there, so
+  // the "dibuat oleh" tag set at creation survives alongside the countdown.
+  return `:local id [/ip hotspot user find name=$user]; :if ([:len $id]>0) do={:local c [/ip hotspot user get $id comment]; :if (!($c~"^[0-9]")) do={/ip hotspot user set comment=("${minutes} " . $c) $id}}`;
 }
 
 // on-event for the single global reaper scheduler. Every minute it decrements the
 // minute-counter stored in each armed user's comment and removes the user when it
 // reaches zero. No per-user schedulers, no date math, no immediate-fire risk.
 function reaperScript(): string {
-  return `:foreach u in=[/ip hotspot user find where comment~"^[0-9]+\\$"] do={:local r [:tonum [/ip hotspot user get $u comment]]; :if ($r<=1) do={/ip hotspot user remove $u} else={/ip hotspot user set comment=($r-1) $u}}`;
+  // Decrement the LEADING minute-counter of every armed user (comment starts
+  // with a digit). The counter may be followed by a space + identifier text,
+  // e.g. "599 User#5 Ahmad" — that trailing text is preserved on each tick.
+  // Legacy pure-number comments ("599") have no space and still work.
+  return `:foreach u in=[/ip hotspot user find where comment~"^[0-9]"] do={:local c [/ip hotspot user get $u comment]; :local sp [:find $c " "]; :local n $c; :local rest ""; :if ([:typeof $sp]="num") do={:set n [:pick $c 0 $sp]; :set rest [:pick $c $sp [:len $c]]}; :local r [:tonum $n]; :if ($r<=1) do={/ip hotspot user remove $u} else={/ip hotspot user set comment=(($r-1) . $rest) $u}}`;
+}
+
+// If a reaper scheduler already exists on this router, make sure it runs the
+// LATEST script. Does NOT create one — routers without fixed-validity profiles
+// don't need a reaper. Called on the voucher-provisioning path so the script
+// format upgrade reaches already-deployed routers without waiting for an admin
+// to edit a validity profile. Best-effort: never fails voucher creation.
+async function syncReaperIfPresent(api: RouterOSAPI) {
+  try {
+    const existing = await api.write('/system/scheduler/print', [`?name=${REAPER_NAME}`]) as any[];
+    if (Array.isArray(existing) && existing.length > 0) {
+      const id = existing[0]['.id'] || existing[0].id;
+      if (id) await api.write('/system/scheduler/set', [`=.id=${id}`, `=on-event=${reaperScript()}`]);
+    }
+  } catch (e: any) {
+    console.warn('[Mikrotik] syncReaperIfPresent gagal:', e?.message || e);
+  }
 }
 
 // Make sure the global reaper scheduler exists on the router (idempotent).
 async function ensureReaper(api: RouterOSAPI) {
   const existing = await api.write('/system/scheduler/print', [`?name=${REAPER_NAME}`]) as any[];
-  if (Array.isArray(existing) && existing.length > 0) return;
+  if (Array.isArray(existing) && existing.length > 0) {
+    // Keep an already-installed reaper in sync with the latest script so format
+    // changes (e.g. identifier-aware counting) propagate to existing routers.
+    const id = existing[0]['.id'] || existing[0].id;
+    if (id) {
+      try {
+        await api.write('/system/scheduler/set', [`=.id=${id}`, `=on-event=${reaperScript()}`]);
+      } catch (e: any) {
+        console.warn('[Mikrotik] ensureReaper gagal memperbarui scheduler:', e?.message || e);
+      }
+    }
+    return;
+  }
   await api.write('/system/scheduler/add', [
     `=name=${REAPER_NAME}`,
     `=interval=60s`,
@@ -282,7 +329,8 @@ export async function createVoucher(
   config: MikrotikConfig,
   profile: string,
   name: string,
-  password: string
+  password: string,
+  comment?: string
 ) {
   const port = config.port ? parseInt(String(config.port)) : 8728;
   const api = new RouterOSAPI({
@@ -295,11 +343,21 @@ export async function createVoucher(
 
   try {
     await api.connect();
-    const result = await api.write('/ip/hotspot/user/add', [
+    const params = [
       `=name=${name}`,
       `=password=${password}`,
       `=profile=${profile}`,
-    ]);
+    ];
+    // Identifier of who/where this voucher was generated from. Visible in
+    // MikroTik/Mikhmon as the user comment. Sanitized so it can never collide
+    // with the validity countdown (which keys off a leading digit).
+    const c = sanitizeComment(comment ?? '');
+    if (c) params.push(`=comment=${c}`);
+    const result = await api.write('/ip/hotspot/user/add', params);
+    // Push the latest reaper script to routers that already run one, so the new
+    // identifier-aware comment format is counted down correctly even before any
+    // profile is re-edited. Best-effort; never blocks voucher creation.
+    await syncReaperIfPresent(api);
     return result;
   } catch (error: any) {
     console.error('[Mikrotik] createVoucher error:', error?.message || error);
