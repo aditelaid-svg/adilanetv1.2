@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../AppContext';
+import { useToast } from '../../components/Toast';
 import { Users, Search, UserCheck, UserX, Wallet, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function AdminUsers() {
   const { users, updateUser, deleteUser, topupBalance } = useAppContext();
+  const toast = useToast();
 
   const [topupModalUser, setTopupModalUser] = useState<number | null>(null);
   const [topupAmount, setTopupAmount] = useState<string>('');
@@ -34,9 +36,15 @@ export default function AdminUsers() {
     }
   };
 
-  const handleDelete = async (userId: number) => {
-    if (window.confirm('Yakin ingin menghapus pengguna ini?')) {
+  const handleDelete = async (userId: number, name: string) => {
+    const ok = await toast.confirm(
+      'Hapus Pengguna?',
+      `Akun "${name}" akan dihapus permanen beserta semua datanya.`,
+      { confirmText: 'Ya, Hapus', danger: true }
+    );
+    if (ok) {
       await deleteUser(userId);
+      toast.success('Pengguna dihapus', `"${name}" berhasil dihapus.`);
     }
   };
 
@@ -168,7 +176,7 @@ export default function AdminUsers() {
                 </button>
               )}
               <button
-                onClick={() => handleDelete(user.id)}
+                onClick={() => handleDelete(user.id, user.name)}
                 className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-[#FF453A]/20 text-white/50 hover:text-[#FF453A] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
               >
                 <X className="w-3.5 h-3.5" /> Hapus

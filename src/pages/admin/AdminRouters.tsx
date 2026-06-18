@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../AppContext';
+import { useToast } from '../../components/Toast';
 import { Router, Plus, Wifi, X, Pencil, CheckCircle, XCircle, Loader2, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -10,6 +11,7 @@ type TestResult = { connected: boolean; message: string; latency?: number } | nu
 
 export default function AdminRouters() {
   const { routers, addRouter, updateRouter, syncRouter, deleteRouter, testRouterConnection } = useAppContext();
+  const toast = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<RouterForm>(emptyForm);
@@ -46,8 +48,16 @@ export default function AdminRouters() {
     setTestingId(null);
   };
 
-  const handleDelete = (id: number) => {
-    if (window.confirm('Yakin ingin menghapus router ini?')) deleteRouter(id);
+  const handleDelete = async (id: number, name: string) => {
+    const ok = await toast.confirm(
+      'Hapus Router?',
+      `Router "${name}" akan dihapus. Pastikan tidak ada voucher aktif yang bergantung pada router ini.`,
+      { confirmText: 'Ya, Hapus', danger: true }
+    );
+    if (ok) {
+      await deleteRouter(id);
+      toast.success('Router dihapus', `${name} berhasil dihapus.`);
+    }
   };
 
   const statusColor = (s: string) =>
@@ -100,7 +110,7 @@ export default function AdminRouters() {
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => handleDelete(router.id)}
+                    onClick={() => handleDelete(router.id, router.name)}
                     className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/50 hover:text-[#FF453A] hover:bg-[#FF453A]/10 transition-colors"
                   >
                     <X className="w-4 h-4" />

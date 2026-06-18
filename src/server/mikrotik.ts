@@ -4,6 +4,7 @@ interface MikrotikConfig {
   host: string;
   user: string;
   pass: string;
+  port?: string | number;
 }
 
 export interface MikrotikProfile {
@@ -15,8 +16,7 @@ export interface MikrotikProfile {
 }
 
 function parseTimeout(timeout: string): string {
-  if (!timeout || timeout === '0s' || timeout === '') return 'Unlimited';
-  // convert RouterOS duration like "1d00:00:00" or "00:30:00" to readable
+  if (!timeout || timeout === '0s' || timeout === '' || timeout === '0') return 'Unlimited';
   const dayMatch = timeout.match(/^(\d+)d/);
   const timeMatch = timeout.match(/(\d{2}):(\d{2}):(\d{2})$/);
   const days = dayMatch ? parseInt(dayMatch[1]) : 0;
@@ -24,7 +24,7 @@ function parseTimeout(timeout: string): string {
   const minutes = timeMatch ? parseInt(timeMatch[2]) : 0;
 
   if (days > 0 && hours === 0 && minutes === 0) return `${days} Hari`;
-  if (days > 0 && hours > 0) return `${days}d ${hours}j`;
+  if (days > 0 && hours > 0) return `${days}h ${hours}j`;
   if (hours > 0 && minutes === 0) return `${hours} Jam`;
   if (hours > 0 && minutes > 0) return `${hours}j ${minutes}m`;
   if (minutes > 0) return `${minutes} Menit`;
@@ -32,51 +32,63 @@ function parseTimeout(timeout: string): string {
 }
 
 export async function getProfiles(config: MikrotikConfig): Promise<MikrotikProfile[]> {
+  const port = config.port ? parseInt(String(config.port)) : 8728;
   const api = new RouterOSAPI({
     host: config.host,
     user: config.user,
     password: config.pass,
+    port,
     timeout: 5000,
   });
 
   try {
     await api.connect();
     const result = await api.write('/ip/hotspot/user/profile/print') as any[];
-    return result.map((p: any) => ({
-      id: p['.id'] || p.id,
-      name: p.name,
-      sessionTimeout: parseTimeout(p['session-timeout'] || ''),
-      sharedUsers: p['shared-users'] || '1',
-      rateLimit: p['rate-limit'] || 'N/A',
-    }));
-  } catch (error) {
-    console.error('Mikrotik getProfiles Error:', error);
+    const profiles = Array.isArray(result) ? result : [];
+    return profiles
+      .filter((p: any) => p && p.name)
+      .map((p: any) => ({
+        id: p['.id'] || p.id || p.name,
+        name: p.name,
+        sessionTimeout: parseTimeout(p['session-timeout'] || p.sessionTimeout || ''),
+        sharedUsers: p['shared-users'] || p.sharedUsers || '1',
+        rateLimit: p['rate-limit'] || p.rateLimit || 'N/A',
+      }));
+  } catch (error: any) {
+    console.error('[Mikrotik] getProfiles error:', error?.message || error);
     throw error;
   } finally {
-    api.close();
+    try { api.close(); } catch {}
   }
 }
 
-export async function createVoucher(config: MikrotikConfig, profile: string, name: string, password: string) {
+export async function createVoucher(
+  config: MikrotikConfig,
+  profile: string,
+  name: string,
+  password: string
+) {
+  const port = config.port ? parseInt(String(config.port)) : 8728;
   const api = new RouterOSAPI({
     host: config.host,
     user: config.user,
     password: config.pass,
+    port,
     timeout: 5000,
   });
 
   try {
     await api.connect();
-    const result = await api.write('/ip/hotspot/user/add', {
-      name,
-      password,
-      profile,
-    });
+    const result = await api.write('/ip/hotspot/user/add', [
+      `=name=${name}`,
+      `=password=${password}`,
+      `=profile=${profile}`,
+    ]);
     return result;
-  } catch (error) {
-    console.error('Mikrotik createVoucher Error:', error);
+  } catch (error: any) {
+    console.error('[Mikrotik] createVoucher error:', error?.message || error);
     throw error;
   } finally {
-    api.close();
+    try { api.close(); } catch {}
   }
 }

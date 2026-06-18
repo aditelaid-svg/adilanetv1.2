@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../AppContext';
+import { useToast } from '../../components/Toast';
 import { Search, CheckCircle2, Clock, XCircle, ArrowUpRight, Trash2 } from 'lucide-react';
 
 export default function AdminTransactions() {
   const { transactions, deleteVoucher } = useAppContext();
+  const toast = useToast();
   const [search, setSearch] = useState('');
 
   const handleDelete = async (txId: number) => {
-    if (window.confirm('Yakin ingin menghapus data transaksi/voucher ini?')) {
+    const ok = await toast.confirm(
+      'Hapus Transaksi?',
+      'Data transaksi dan voucher ini akan dihapus permanen.',
+      { confirmText: 'Ya, Hapus', danger: true }
+    );
+    if (ok) {
       await deleteVoucher(txId);
+      toast.success('Transaksi dihapus');
     }
   };
 

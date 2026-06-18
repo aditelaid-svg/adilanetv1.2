@@ -36,6 +36,8 @@ async function initDb() {
       badge_color VARCHAR(50) DEFAULT 'blue',
       created_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE packages ADD COLUMN IF NOT EXISTS router_id INTEGER REFERENCES routers(id) ON DELETE SET NULL;
+    ALTER TABLE packages ADD COLUMN IF NOT EXISTS mikrotik_profile VARCHAR(100);
 
     CREATE TABLE IF NOT EXISTS routers (
       id SERIAL PRIMARY KEY,
@@ -287,13 +289,13 @@ async function startServer() {
 
   app.post("/api/packages", async (req, res) => {
     try {
-      const { name, speed, quota, duration, price, badge_color } = req.body;
+      const { name, speed, quota, duration, price, badge_color, router_id, mikrotik_profile } = req.body;
       if (!name || !speed || !quota || !duration || !price) {
         return res.status(400).json({ success: false, error: "Semua field paket wajib diisi." });
       }
       const { rows } = await pool.query(
-        `INSERT INTO packages (name, speed, quota, duration, price, badge_color) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-        [name, speed, quota, duration, price, badge_color || 'blue']
+        `INSERT INTO packages (name, speed, quota, duration, price, badge_color, router_id, mikrotik_profile) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [name, speed, quota, duration, price, badge_color || 'blue', router_id || null, mikrotik_profile || null]
       );
       res.json({ success: true, data: { ...rows[0], price: parseFloat(rows[0].price) } });
     } catch (err: any) {
@@ -303,10 +305,10 @@ async function startServer() {
 
   app.patch("/api/packages/:id", async (req, res) => {
     try {
-      const { name, speed, quota, duration, price, badge_color } = req.body;
+      const { name, speed, quota, duration, price, badge_color, router_id, mikrotik_profile } = req.body;
       const { rows } = await pool.query(
-        `UPDATE packages SET name=$1, speed=$2, quota=$3, duration=$4, price=$5, badge_color=$6 WHERE id=$7 RETURNING *`,
-        [name, speed, quota, duration, price, badge_color, req.params.id]
+        `UPDATE packages SET name=$1, speed=$2, quota=$3, duration=$4, price=$5, badge_color=$6, router_id=$7, mikrotik_profile=$8 WHERE id=$9 RETURNING *`,
+        [name, speed, quota, duration, price, badge_color, router_id || null, mikrotik_profile || null, req.params.id]
       );
       if (rows.length === 0) return res.status(404).json({ success: false, error: "Paket tidak ditemukan." });
       res.json({ success: true, data: { ...rows[0], price: parseFloat(rows[0].price) } });
@@ -602,18 +604,41 @@ async function startServer() {
     try {
       const { reference_id, status, user_id, package_id } = req.body;
       console.log(`[Webhook] Pembayaran ${reference_id}: ${status}`);
+      let voucherCode = null;
       if ((status === "Success" || status === "PAID") && user_id && package_id) {
-        const voucherCode = `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`;
+        voucherCode = `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`;
         await pool.query(
           `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status) 
            SELECT $1, $2, $3, price, 'qris', 'success' FROM packages WHERE id = $2`,
           [user_id, package_id, voucherCode]
         );
       }
-      res.status(200).json({ received: true });
+      res.status(200).json({ received: true, voucher_code: voucherCode });
     } catch (err) {
       console.error("Webhook error:", err);
       res.status(500).send("Webhook Error");
+    }
+  });
+
+  // ─── PUBLIC PURCHASE (no login needed - for hotspot portal) ───────────────
+  app.post("/api/transactions/public", async (req, res) => {
+    try {
+      const { package_id, phone } = req.body;
+      if (!package_id) return res.status(400).json({ success: false, error: "package_id wajib diisi." });
+      const { rows: pkgRows } = await pool.query(`SELECT * FROM packages WHERE id = $1`, [package_id]);
+      if (pkgRows.length === 0) return res.status(404).json({ success: false, error: "Paket tidak ditemukan." });
+      const pkg = pkgRows[0];
+      const voucherCode = `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`;
+      const { rows: txRows } = await pool.query(
+        `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status) VALUES (NULL, $1, $2, $3, 'qris', 'success') RETURNING *`,
+        [package_id, voucherCode, parseFloat(pkg.price)]
+      );
+      const tx = txRows[0];
+      console.log(`[PublicBuy] Voucher dibuat: ${voucherCode} untuk paket ${pkg.name}, HP: ${phone || 'N/A'}`);
+      res.json({ success: true, data: { transaction: tx, voucher_code: voucherCode, package: pkg } });
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -640,7 +665,7 @@ async function startServer() {
           setTimeout(() => reject(new Error("Mikrotik connection timeout")), 4000)
         );
         const profiles = await Promise.race([
-          getProfiles({ host: router.ip_address, user: router.username, pass: router.password }),
+          getProfiles({ host: router.ip_address, user: router.username, pass: router.password, port: router.api_port }),
           timeoutPromise,
         ]);
         return res.json({ success: true, data: profiles, source: "mikrotik" });

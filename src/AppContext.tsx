@@ -31,6 +31,8 @@ export type Package = {
   duration: string;
   price: number;
   badge_color: string;
+  router_id?: number | null;
+  mikrotik_profile?: string | null;
 };
 
 export type Transaction = {
@@ -79,6 +81,7 @@ type AppContextType = {
   deleteUser: (userId: number) => Promise<void>;
   deleteVoucher: (txId: number) => Promise<void>;
   addPackage: (pkg: Omit<Package, 'id'>) => Promise<void>;
+  updatePackage: (packageId: number, pkg: Omit<Package, 'id'>) => Promise<void>;
   deletePackage: (packageId: number) => Promise<void>;
   generateVoucherReal: (routerId: number, profile: string, name: string, password: string) => Promise<any>;
 };
@@ -228,6 +231,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updatePackage = async (packageId: number, pkg: Omit<Package, 'id'>) => {
+    const res = await apiFetch(`/api/packages/${packageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(pkg),
+    });
+    if (res.success) {
+      setPackages(prev => prev.map(p => p.id === packageId ? res.data : p));
+    }
+  };
+
   const deletePackage = async (packageId: number) => {
     await apiFetch(`/api/packages/${packageId}`, { method: 'DELETE' });
     setPackages(prev => prev.filter(p => p.id !== packageId));
@@ -335,7 +348,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
         setUsers(prev => prev.filter(u => u.id !== userId));
       },
-      deleteVoucher, addPackage, deletePackage, generateVoucherReal,
+      deleteVoucher, addPackage, updatePackage, deletePackage, generateVoucherReal,
     }}>
       {children}
     </AppContext.Provider>

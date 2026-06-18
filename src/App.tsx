@@ -1,16 +1,15 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useAppContext } from './AppContext';
+import { ToastProvider } from './components/Toast';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
 
-// Layouts
 import UserLayout from './components/UserLayout';
 import AdminLayout from './components/AdminLayout';
 
-// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-import PublicBuy from './pages/PublicBuy'; // We will create this
+import PublicBuy from './pages/PublicBuy';
 
 import UserHome from './pages/user/UserHome';
 import UserPackages from './pages/user/UserPackages';
@@ -31,12 +30,10 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public Routes for Hotspot Portal Linking */}
       <Route path="/checkout/:packageId" element={<PublicBuy />} />
       <Route path="/login" element={!currentUser ? <Login /> : <Navigate to={currentUser.role === 'admin' ? '/admin' : '/user'} replace />} />
       <Route path="/register" element={!currentUser ? <Register /> : <Navigate to={currentUser.role === 'admin' ? '/admin' : '/user'} replace />} />
 
-      {/* Admin Protected Routes */}
       {currentUser?.role === 'admin' && (
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
@@ -50,7 +47,6 @@ function AppRoutes() {
         </Route>
       )}
 
-      {/* User Protected Routes */}
       {currentUser?.role === 'user' && (
         <Route path="/user" element={<UserLayout />}>
           <Route index element={<UserHome />} />
@@ -62,7 +58,6 @@ function AppRoutes() {
         </Route>
       )}
 
-      {/* Default Catch-all */}
       <Route path="/" element={<Navigate to={!currentUser ? '/login' : currentUser.role === 'admin' ? '/admin' : '/user'} replace />} />
       <Route path="*" element={<Navigate to={!currentUser ? '/login' : currentUser.role === 'admin' ? '/admin' : '/user'} replace />} />
     </Routes>
@@ -72,11 +67,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <AppProvider>
-      <BrowserRouter>
-        <AppRoutes />
-        <PwaInstallPrompt />
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <AppRoutes />
+          <PwaInstallPrompt />
+        </BrowserRouter>
+      </ToastProvider>
     </AppProvider>
   );
 }
-
