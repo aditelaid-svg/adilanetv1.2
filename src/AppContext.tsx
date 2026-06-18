@@ -53,6 +53,7 @@ const API = '';
 async function apiFetch(path: string, options?: RequestInit) {
   const res = await fetch(`${API}${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     ...options,
   });
   return res.json();
@@ -68,7 +69,7 @@ type AppContextType = {
   loading: boolean;
   refreshData: () => Promise<void>;
   login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
   registerUser: (name: string, email: string, phone_number: string, password: string) => Promise<{ success: boolean; error?: string }>;
   updateUser: (userId: number, data: Partial<User & { password?: string }>) => Promise<void>;
   topupBalance: (userId: number, amount: number) => Promise<void>;
@@ -126,9 +127,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const pkgRes = await apiFetch('/api/packages');
       if (pkgRes.success) setPackages(pkgRes.data);
 
-      // Load user-specific or admin data
       if (currentUser) {
         if (currentUser.role === 'admin') {
+          // Admin-only endpoints — users & routers list
           const [usersRes, routersRes, txRes] = await Promise.all([
             apiFetch('/api/users'),
             apiFetch('/api/routers'),
@@ -138,13 +139,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (routersRes.success) setRouters(routersRes.data);
           if (txRes.success) setTransactions(txRes.data);
         } else {
-          const [usersRes, routersRes, txRes] = await Promise.all([
-            apiFetch('/api/users'),
-            apiFetch('/api/routers'),
-            apiFetch(`/api/transactions?user_id=${currentUser.id}`),
-          ]);
-          if (usersRes.success) setUsers(usersRes.data);
-          if (routersRes.success) setRouters(routersRes.data);
+          // Regular users only get their own transactions (server scopes by session)
+          const txRes = await apiFetch('/api/transactions');
           if (txRes.success) setTransactions(txRes.data);
         }
       }
@@ -154,6 +150,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
   }, [currentUser]);
+
+  // Hydrate session from the server on mount (cookie-based source of truth)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiFetch('/api/auth/me');
+        if (res.success) {
+          _setCurrentUser(res.data);
+          saveSession(res.data);
+        } else {
+          _setCurrentUser(null);
+          saveSession(null);
+        }
+      } catch {
+        // network error — keep cached session, if any
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     refreshData();
@@ -172,7 +186,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { success: false, error: res.error };
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // ignore network error — clear local state regardless
+    }
     setCurrentUser(null);
     setUsers([]);
     setRouters([]);
@@ -297,7 +316,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const res = await apiFetch('/api/transactions', {
       method: 'POST',
       body: JSON.stringify({
-        user_id: currentUser.id,
         package_id: pkg.id,
         payment_method: method,
         pin,
@@ -325,15 +343,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ─── MIKROTIK ─────────────────────────────────────────────────────────
   const generateVoucherReal = async (routerId: number, profile: string, name: string, password: string) => {
-    const router = routers.find(r => r.id === routerId);
-    if (!router) throw new Error("Router tidak ditemukan");
-    const response = await fetch("/api/router/create-voucher", {
+    const res = await apiFetch("/api/router/create-voucher", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ host: router.ip_address, user: router.username, pass: router.password, profile, name, password })
+      body: JSON.stringify({ routerId, profile, name, password }),
     });
-    if (!response.ok) throw new Error("Gagal membuat voucher di Mikrotik");
-    return await response.json();
+    if (!res.success) throw new Error(res.error || "Gagal membuat voucher di Mikrotik");
+    return res;
   };
 
   return (

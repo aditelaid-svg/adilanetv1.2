@@ -21,7 +21,7 @@ export default function AdminRouters() {
 
   const openAdd = () => { setForm(emptyForm); setEditId(null); setShowAdd(true); };
   const openEdit = (r: typeof routers[0]) => {
-    setForm({ name: r.name, ip_address: r.ip_address, api_port: r.api_port || '8728', username: r.username, password: r.password });
+    setForm({ name: r.name, ip_address: r.ip_address, api_port: r.api_port || '8728', username: r.username || 'admin', password: r.password || '' });
     setEditId(r.id);
     setShowAdd(true);
   };

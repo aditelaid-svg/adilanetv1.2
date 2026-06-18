@@ -3,3 +3,4 @@
 - [Public checkout](public-checkout.md) — POST /api/transactions/public creates real voucher without login; PublicBuy.tsx calls this after "Saya Sudah Bayar" button.
 - [Mikrotik API](mikrotik-api.md) — createVoucher uses array param format `=key=value`, port passed from router.api_port; getProfiles with port support.
 - [PWA SW](pwa-sw.md) — SW registered in ALL environments (not just PROD); cache name adilanet-v3; proper SPA navigation fallback.
+- [Auth & session](auth-session.md) — cookie sessions (pg store), bcrypt password+pin w/ idempotent boot migration, requireAuth/requireAdmin, session-scoped data, atomic balance deduction.

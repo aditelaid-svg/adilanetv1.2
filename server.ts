@@ -1,13 +1,62 @@
 import express from "express";
-import path from "path";
+import type { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import path from "path";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { Pool } from "pg";
 import { createVoucher } from "./src/server/mikrotik";
 import dotenv from "dotenv";
 
 dotenv.config();
 
+declare module "express-session" {
+  interface SessionData {
+    userId?: number;
+    role?: string;
+  }
+}
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const BCRYPT_ROUNDS = 10;
+
+function isBcryptHash(value: unknown): boolean {
+  return typeof value === "string" && /^\$2[aby]\$/.test(value);
+}
+
+async function hashSecret(value: string): Promise<string> {
+  return bcrypt.hash(value, BCRYPT_ROUNDS);
+}
+
+async function generateUniqueVoucher(): Promise<string> {
+  for (let i = 0; i < 12; i++) {
+    const code = `WFI-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+    const { rows } = await pool.query("SELECT 1 FROM transactions WHERE voucher_code = $1", [code]);
+    if (rows.length === 0) return code;
+  }
+  throw new Error("Gagal menghasilkan kode voucher unik, coba lagi.");
+}
+
+// ─── AUTH MIDDLEWARE ────────────────────────────────────────────────────────
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.userId) {
+    return res.status(401).json({ success: false, error: "Silakan login terlebih dahulu." });
+  }
+  next();
+}
+
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.userId) {
+    return res.status(401).json({ success: false, error: "Silakan login terlebih dahulu." });
+  }
+  if (req.session.role !== "admin") {
+    return res.status(403).json({ success: false, error: "Akses ditolak: khusus administrator." });
+  }
+  next();
+}
 
 async function initDb() {
   // Create tables
@@ -18,7 +67,7 @@ async function initDb() {
       email VARCHAR(255) UNIQUE NOT NULL,
       phone_number VARCHAR(30) UNIQUE,
       password VARCHAR(255) NOT NULL,
-      pin VARCHAR(6),
+      pin VARCHAR(255),
       role VARCHAR(10) DEFAULT 'user',
       balance DECIMAL(10,2) DEFAULT 0.00,
       status VARCHAR(10) DEFAULT 'active',
@@ -117,6 +166,32 @@ async function initDb() {
     `);
   }
 
+  // Ensure pin column can hold a bcrypt hash (~60 chars) on pre-existing DBs
+  await pool.query(`ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255)`);
+
+  // Migrate any plaintext password/pin values to bcrypt hashes (idempotent)
+  const { rows: allUsers } = await pool.query("SELECT id, password, pin FROM users");
+  for (const u of allUsers) {
+    const updates: string[] = [];
+    const vals: any[] = [];
+    let idx = 1;
+    if (u.password && !isBcryptHash(u.password)) {
+      updates.push(`password = $${idx++}`);
+      vals.push(await hashSecret(u.password));
+    }
+    if (u.pin && !isBcryptHash(u.pin)) {
+      updates.push(`pin = $${idx++}`);
+      vals.push(await hashSecret(u.pin));
+    }
+    if (updates.length > 0) {
+      vals.push(u.id);
+      await pool.query(`UPDATE users SET ${updates.join(", ")} WHERE id = $${idx}`, vals);
+    }
+  }
+  if (allUsers.some((u: any) => !isBcryptHash(u.password))) {
+    console.log("[DB] Migrasi password plaintext ke bcrypt selesai.");
+  }
+
   console.log("[DB] Schema & seed selesai.");
 }
 
@@ -131,8 +206,32 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 5000;
 
-  app.use(cors());
+  const SESSION_SECRET = process.env.SESSION_SECRET;
+  if (!SESSION_SECRET) {
+    throw new Error("SESSION_SECRET tidak diset. Wajib diisi untuk keamanan sesi.");
+  }
+
+  const isProd = process.env.NODE_ENV === "production";
+  app.set("trust proxy", 1);
+  app.use(cors({ origin: true, credentials: true }));
   app.use(express.json());
+
+  const PgSession = connectPgSimple(session);
+  app.use(
+    session({
+      store: new PgSession({ pool, tableName: "user_sessions", createTableIfMissing: true }),
+      secret: SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      rolling: true,
+      cookie: {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        maxAge: 1000 * 60 * 60 * 24 * 7,
+      },
+    })
+  );
 
   // Init database
   try {
@@ -159,22 +258,54 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "Identifier dan password wajib diisi." });
       }
       const { rows } = await pool.query(
-        `SELECT * FROM users WHERE (email = $1 OR phone_number = $1 OR name = $1) AND password = $2 LIMIT 1`,
-        [identifier, password]
+        `SELECT * FROM users WHERE (email = $1 OR phone_number = $1 OR name = $1) LIMIT 1`,
+        [identifier]
       );
       if (rows.length === 0) {
         return res.status(401).json({ success: false, error: "Username/Nomor HP atau Password salah." });
       }
       const user = rows[0];
+      const match = await bcrypt.compare(password, user.password);
+      if (!match) {
+        return res.status(401).json({ success: false, error: "Username/Nomor HP atau Password salah." });
+      }
       if (user.status === 'blocked') {
         return res.status(403).json({ success: false, error: "Akun Anda telah ditangguhkan. Hubungi Administrator." });
       }
-      const { password: _pw, ...safeUser } = user;
+      req.session.userId = user.id;
+      req.session.role = user.role;
+      const { password: _pw, pin: _pin, ...safeUser } = user;
       res.json({ success: true, data: { ...safeUser, balance: parseFloat(safeUser.balance) } });
     } catch (err: any) {
       console.error(err);
       res.status(500).json({ success: false, error: err.message });
     }
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ success: false, error: "Belum login." });
+    }
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, name, email, phone_number, role, balance, status FROM users WHERE id = $1`,
+        [req.session.userId]
+      );
+      if (rows.length === 0 || rows[0].status === 'blocked') {
+        return req.session.destroy(() => res.status(401).json({ success: false, error: "Sesi tidak valid." }));
+      }
+      const u = rows[0];
+      res.json({ success: true, data: { ...u, balance: parseFloat(u.balance) } });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.json({ success: true });
+    });
   });
 
   app.post("/api/auth/register", async (req, res) => {
@@ -183,12 +314,15 @@ async function startServer() {
       if (!name || !email || !password) {
         return res.status(400).json({ success: false, error: "Nama, email, dan password wajib diisi." });
       }
+      const hashed = await hashSecret(password);
       const { rows } = await pool.query(
         `INSERT INTO users (name, email, phone_number, password, role, balance) VALUES ($1, $2, $3, $4, 'user', 0) RETURNING *`,
-        [name, email, phone_number || null, password]
+        [name, email, phone_number || null, hashed]
       );
       const user = rows[0];
-      const { password: _pw, ...safeUser } = user;
+      req.session.userId = user.id;
+      req.session.role = user.role;
+      const { password: _pw, pin: _pin, ...safeUser } = user;
       res.json({ success: true, data: { ...safeUser, balance: parseFloat(safeUser.balance) } });
     } catch (err: any) {
       if (err.code === '23505') {
@@ -200,10 +334,10 @@ async function startServer() {
   });
 
   // ─── USERS ───────────────────────────────────────────────────────────────
-  app.get("/api/users", async (req, res) => {
+  app.get("/api/users", requireAdmin, async (req, res) => {
     try {
       const { rows } = await pool.query(
-        `SELECT id, name, email, phone_number, pin, role, balance, status, created_at FROM users ORDER BY id`
+        `SELECT id, name, email, phone_number, role, balance, status, created_at FROM users ORDER BY id`
       );
       res.json({ success: true, data: rows.map((u: any) => ({ ...u, balance: parseFloat(u.balance) })) });
     } catch (err: any) {
@@ -211,10 +345,13 @@ async function startServer() {
     }
   });
 
-  app.get("/api/users/:id", async (req, res) => {
+  app.get("/api/users/:id", requireAuth, async (req, res) => {
     try {
+      if (req.session.role !== "admin" && Number(req.params.id) !== req.session.userId) {
+        return res.status(403).json({ success: false, error: "Akses ditolak." });
+      }
       const { rows } = await pool.query(
-        `SELECT id, name, email, phone_number, pin, role, balance, status, created_at FROM users WHERE id = $1`,
+        `SELECT id, name, email, phone_number, role, balance, status, created_at FROM users WHERE id = $1`,
         [req.params.id]
       );
       if (rows.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
@@ -225,8 +362,13 @@ async function startServer() {
     }
   });
 
-  app.patch("/api/users/:id", async (req, res) => {
+  app.patch("/api/users/:id", requireAuth, async (req, res) => {
     try {
+      const isAdmin = req.session.role === "admin";
+      const targetId = Number(req.params.id);
+      if (!isAdmin && targetId !== req.session.userId) {
+        return res.status(403).json({ success: false, error: "Akses ditolak." });
+      }
       const { name, email, phone_number, password, pin, role, balance, status } = req.body;
       const fields: string[] = [];
       const values: any[] = [];
@@ -234,27 +376,37 @@ async function startServer() {
       if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
       if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email); }
       if (phone_number !== undefined) { fields.push(`phone_number = $${idx++}`); values.push(phone_number); }
-      if (password !== undefined) { fields.push(`password = $${idx++}`); values.push(password); }
-      if (pin !== undefined) { fields.push(`pin = $${idx++}`); values.push(pin); }
-      if (role !== undefined) { fields.push(`role = $${idx++}`); values.push(role); }
-      if (balance !== undefined) { fields.push(`balance = $${idx++}`); values.push(balance); }
-      if (status !== undefined) { fields.push(`status = $${idx++}`); values.push(status); }
+      if (password !== undefined && password !== "") { fields.push(`password = $${idx++}`); values.push(await hashSecret(password)); }
+      if (pin !== undefined && pin !== "") { fields.push(`pin = $${idx++}`); values.push(await hashSecret(pin)); }
+      // Privileged fields — admin only
+      if (isAdmin && role !== undefined) { fields.push(`role = $${idx++}`); values.push(role); }
+      if (isAdmin && balance !== undefined) { fields.push(`balance = $${idx++}`); values.push(balance); }
+      if (isAdmin && status !== undefined) { fields.push(`status = $${idx++}`); values.push(status); }
+      if (fields.length === 0) {
+        return res.status(400).json({ success: false, error: "Tidak ada perubahan yang dikirim." });
+      }
       fields.push(`updated_at = NOW()`);
-      values.push(req.params.id);
+      values.push(targetId);
       const { rows } = await pool.query(
-        `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, name, email, phone_number, pin, role, balance, status`,
+        `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx} RETURNING id, name, email, phone_number, role, balance, status`,
         values
       );
       if (rows.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
       const u = rows[0];
       res.json({ success: true, data: { ...u, balance: parseFloat(u.balance) } });
     } catch (err: any) {
+      if (err.code === '23505') {
+        return res.status(409).json({ success: false, error: "Email atau nomor HP sudah dipakai." });
+      }
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  app.delete("/api/users/:id", async (req, res) => {
+  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
     try {
+      if (Number(req.params.id) === req.session.userId) {
+        return res.status(400).json({ success: false, error: "Tidak bisa menghapus akun sendiri." });
+      }
       await pool.query(`DELETE FROM users WHERE id = $1`, [req.params.id]);
       res.json({ success: true });
     } catch (err: any) {
@@ -262,7 +414,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/users/:id/topup", async (req, res) => {
+  app.post("/api/users/:id/topup", requireAdmin, async (req, res) => {
     try {
       const { amount } = req.body;
       if (!amount || amount <= 0) return res.status(400).json({ success: false, error: "Nominal tidak valid." });
@@ -287,7 +439,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/packages", async (req, res) => {
+  app.post("/api/packages", requireAdmin, async (req, res) => {
     try {
       const { name, speed, quota, duration, price, badge_color, router_id, mikrotik_profile } = req.body;
       if (!name || !speed || !quota || !duration || !price) {
@@ -303,7 +455,7 @@ async function startServer() {
     }
   });
 
-  app.patch("/api/packages/:id", async (req, res) => {
+  app.patch("/api/packages/:id", requireAdmin, async (req, res) => {
     try {
       const { name, speed, quota, duration, price, badge_color, router_id, mikrotik_profile } = req.body;
       const { rows } = await pool.query(
@@ -317,7 +469,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/packages/:id", async (req, res) => {
+  app.delete("/api/packages/:id", requireAdmin, async (req, res) => {
     try {
       await pool.query(`DELETE FROM packages WHERE id = $1`, [req.params.id]);
       res.json({ success: true });
@@ -327,21 +479,23 @@ async function startServer() {
   });
 
   // ─── ROUTERS ─────────────────────────────────────────────────────────────
-  app.get("/api/routers", async (req, res) => {
+  app.get("/api/routers", requireAdmin, async (req, res) => {
     try {
-      const { rows } = await pool.query(`SELECT * FROM routers ORDER BY id`);
+      const { rows } = await pool.query(
+        `SELECT id, name, ip_address, api_port, username, status, connected_users, created_at FROM routers ORDER BY id`
+      );
       res.json({ success: true, data: rows });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  app.post("/api/routers", async (req, res) => {
+  app.post("/api/routers", requireAdmin, async (req, res) => {
     try {
       const { name, ip_address, api_port, username, password } = req.body;
       if (!name || !ip_address) return res.status(400).json({ success: false, error: "Nama dan IP wajib diisi." });
       const { rows } = await pool.query(
-        `INSERT INTO routers (name, ip_address, api_port, username, password, status, connected_users) VALUES ($1,$2,$3,$4,$5,'offline',0) RETURNING *`,
+        `INSERT INTO routers (name, ip_address, api_port, username, password, status, connected_users) VALUES ($1,$2,$3,$4,$5,'offline',0) RETURNING id, name, ip_address, api_port, username, status, connected_users, created_at`,
         [name, ip_address, api_port || '8728', username || 'admin', password || '']
       );
       res.json({ success: true, data: rows[0] });
@@ -350,7 +504,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/routers/:id", async (req, res) => {
+  app.delete("/api/routers/:id", requireAdmin, async (req, res) => {
     try {
       await pool.query(`DELETE FROM routers WHERE id = $1`, [req.params.id]);
       res.json({ success: true });
@@ -359,12 +513,21 @@ async function startServer() {
     }
   });
 
-  app.put("/api/routers/:id", async (req, res) => {
+  app.put("/api/routers/:id", requireAdmin, async (req, res) => {
     try {
       const { name, ip_address, api_port, username, password } = req.body;
+      const fields = ["name=$1", "ip_address=$2", "api_port=$3", "username=$4"];
+      const values: any[] = [name, ip_address, api_port || '8728', username];
+      let idx = 5;
+      // Only overwrite password when a new one is explicitly provided
+      if (password !== undefined && password !== "") {
+        fields.push(`password=$${idx++}`);
+        values.push(password);
+      }
+      values.push(req.params.id);
       const { rows } = await pool.query(
-        `UPDATE routers SET name=$1, ip_address=$2, api_port=$3, username=$4, password=$5 WHERE id=$6 RETURNING *`,
-        [name, ip_address, api_port || '8728', username, password, req.params.id]
+        `UPDATE routers SET ${fields.join(", ")} WHERE id=$${idx} RETURNING id, name, ip_address, api_port, username, status, connected_users, created_at`,
+        values
       );
       if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
       res.json({ success: true, data: rows[0] });
@@ -373,7 +536,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/routers/:id/test", async (req, res) => {
+  app.post("/api/routers/:id/test", requireAdmin, async (req, res) => {
     try {
       const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [req.params.id]);
       if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
@@ -385,7 +548,7 @@ async function startServer() {
           setTimeout(() => reject(new Error("Connection timeout (4s)")), 4000)
         );
         await Promise.race([
-          getProfiles({ host: router.ip_address, user: router.username, pass: router.password }),
+          getProfiles({ host: router.ip_address, user: router.username, pass: router.password, port: router.api_port }),
           timeoutPromise,
         ]);
         const latency = Date.now() - start;
@@ -400,11 +563,11 @@ async function startServer() {
     }
   });
 
-  app.post("/api/routers/:id/sync", async (req, res) => {
+  app.post("/api/routers/:id/sync", requireAdmin, async (req, res) => {
     try {
       const newCount = Math.floor(Math.random() * 20) + 5;
       const { rows } = await pool.query(
-        `UPDATE routers SET connected_users = connected_users + $1 WHERE id = $2 RETURNING *`,
+        `UPDATE routers SET connected_users = connected_users + $1 WHERE id = $2 RETURNING id, name, ip_address, api_port, username, status, connected_users, created_at`,
         [newCount, req.params.id]
       );
       res.json({ success: true, data: rows[0] });
@@ -414,9 +577,9 @@ async function startServer() {
   });
 
   // ─── TRANSACTIONS ────────────────────────────────────────────────────────
-  app.get("/api/transactions", async (req, res) => {
+  app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
-      const userId = req.query.user_id;
+      const isAdmin = req.session.role === "admin";
       let query = `
         SELECT t.*, u.name as user_name, p.name as package_name
         FROM transactions t
@@ -424,9 +587,13 @@ async function startServer() {
         LEFT JOIN packages p ON t.package_id = p.id
       `;
       const params: any[] = [];
-      if (userId) {
+      if (!isAdmin) {
+        // Regular users only ever see their own transactions
         query += ` WHERE t.user_id = $1`;
-        params.push(userId);
+        params.push(req.session.userId);
+      } else if (req.query.user_id) {
+        query += ` WHERE t.user_id = $1`;
+        params.push(req.query.user_id);
       }
       query += ` ORDER BY t.created_at DESC`;
       const { rows } = await pool.query(query, params);
@@ -439,10 +606,11 @@ async function startServer() {
     }
   });
 
-  app.post("/api/transactions", async (req, res) => {
+  app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
-      const { user_id, package_id, payment_method, pin } = req.body;
-      if (!user_id || !package_id || !payment_method) {
+      const user_id = req.session.userId;
+      const { package_id, payment_method, pin } = req.body;
+      if (!package_id || !payment_method) {
         return res.status(400).json({ success: false, error: "Data transaksi tidak lengkap." });
       }
 
@@ -457,22 +625,28 @@ async function startServer() {
       const pkg = pkgRows[0];
       const amount = parseFloat(pkg.price);
 
+      let newBalance = parseFloat(user.balance);
+
       if (payment_method === 'saldo') {
-        // Validate PIN
-        if (user.pin && user.pin !== pin) {
-          return res.status(401).json({ success: false, error: "Otorisasi Gagal: PIN salah." });
+        // Validate PIN (stored hashed)
+        if (user.pin) {
+          const pinOk = pin ? await bcrypt.compare(String(pin), user.pin) : false;
+          if (!pinOk) {
+            return res.status(401).json({ success: false, error: "Otorisasi Gagal: PIN salah." });
+          }
         }
-        // Check balance
-        const balance = parseFloat(user.balance);
-        if (balance < amount) {
+        // Atomic conditional deduction — prevents race/overdraft
+        const { rows: deducted } = await pool.query(
+          `UPDATE users SET balance = balance - $1, updated_at = NOW() WHERE id = $2 AND balance >= $1 RETURNING balance`,
+          [amount, user_id]
+        );
+        if (deducted.length === 0) {
           return res.status(400).json({ success: false, error: "Saldo tidak mencukupi." });
         }
-        // Deduct balance
-        await pool.query(`UPDATE users SET balance = balance - $1, updated_at = NOW() WHERE id = $2`, [amount, user_id]);
+        newBalance = parseFloat(deducted[0].balance);
       }
 
-      // Generate voucher code
-      const voucherCode = `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`;
+      const voucherCode = await generateUniqueVoucher();
 
       // Create transaction
       const { rows: txRows } = await pool.query(
@@ -482,15 +656,12 @@ async function startServer() {
 
       const tx = txRows[0];
 
-      // Get updated user balance
-      const { rows: updatedUser } = await pool.query(`SELECT balance FROM users WHERE id = $1`, [user_id]);
-
       res.json({
         success: true,
         data: {
           transaction: { ...tx, amount: parseFloat(tx.amount) },
           voucher_code: voucherCode,
-          new_balance: parseFloat(updatedUser[0].balance)
+          new_balance: newBalance
         }
       });
     } catch (err: any) {
@@ -499,7 +670,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/transactions/:id", async (req, res) => {
+  app.delete("/api/transactions/:id", requireAdmin, async (req, res) => {
     try {
       await pool.query(`DELETE FROM transactions WHERE id = $1`, [req.params.id]);
       res.json({ success: true });
@@ -509,7 +680,7 @@ async function startServer() {
   });
 
   // ─── SETTINGS ────────────────────────────────────────────────────────────
-  app.get("/api/settings", async (req, res) => {
+  app.get("/api/settings", requireAdmin, async (req, res) => {
     try {
       const s = await getSettings();
       res.json({
@@ -527,7 +698,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/settings", async (req, res) => {
+  app.post("/api/settings", requireAdmin, async (req, res) => {
     try {
       const { sanpayApiKey, merchantId, telegramToken, telegramChatId, qrisEnabled } = req.body;
       const updates = [
@@ -602,11 +773,19 @@ async function startServer() {
 
   app.post("/api/webhook/sanpay", async (req, res) => {
     try {
+      // Verify webhook authenticity via shared secret
+      const expectedSecret = process.env.SANPAY_WEBHOOK_SECRET;
+      if (expectedSecret) {
+        const provided = req.get("x-webhook-secret") || req.body?.secret;
+        if (provided !== expectedSecret) {
+          return res.status(401).json({ received: false, error: "Webhook signature tidak valid." });
+        }
+      }
       const { reference_id, status, user_id, package_id } = req.body;
       console.log(`[Webhook] Pembayaran ${reference_id}: ${status}`);
       let voucherCode = null;
       if ((status === "Success" || status === "PAID") && user_id && package_id) {
-        voucherCode = `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`;
+        voucherCode = await generateUniqueVoucher();
         await pool.query(
           `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status) 
            SELECT $1, $2, $3, price, 'qris', 'success' FROM packages WHERE id = $2`,
@@ -628,7 +807,7 @@ async function startServer() {
       const { rows: pkgRows } = await pool.query(`SELECT * FROM packages WHERE id = $1`, [package_id]);
       if (pkgRows.length === 0) return res.status(404).json({ success: false, error: "Paket tidak ditemukan." });
       const pkg = pkgRows[0];
-      const voucherCode = `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`;
+      const voucherCode = await generateUniqueVoucher();
       const { rows: txRows } = await pool.query(
         `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status) VALUES (NULL, $1, $2, $3, 'qris', 'success') RETURNING *`,
         [package_id, voucherCode, parseFloat(pkg.price)]
@@ -643,7 +822,7 @@ async function startServer() {
   });
 
   // ─── MIKROTIK PROFILES ───────────────────────────────────────────────────
-  app.get("/api/routers/:id/profiles", async (req, res) => {
+  app.get("/api/routers/:id/profiles", requireAdmin, async (req, res) => {
     try {
       const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [req.params.id]);
       if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
@@ -684,10 +863,21 @@ async function startServer() {
   });
 
   // ─── MIKROTIK VOUCHER ─────────────────────────────────────────────────────
-  app.post("/api/router/create-voucher", async (req, res) => {
+  app.post("/api/router/create-voucher", requireAdmin, async (req, res) => {
     try {
-      const { host, user, pass, profile, name, password } = req.body;
-      const result = await createVoucher({ host, user, pass }, profile, name, password);
+      const { routerId, profile, name, password } = req.body;
+      if (!routerId || !profile || !name) {
+        return res.status(400).json({ success: false, error: "routerId, profile, dan name wajib diisi." });
+      }
+      const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [routerId]);
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      const router = rows[0];
+      const result = await createVoucher(
+        { host: router.ip_address, user: router.username, pass: router.password, port: router.api_port },
+        profile,
+        name,
+        password
+      );
       res.json({ success: true, data: result });
     } catch (err: any) {
       console.error(err);
