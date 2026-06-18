@@ -16,7 +16,7 @@ export default function UserHome() {
 
   const handlePromoClick = (p: Promo) => {
     if (p.link_type === 'packages') navigate('/user/packages');
-    else if (p.link_type === 'package' && p.link_value) navigate('/user/buy', { state: { packageId: Number(p.link_value) } });
+    else if (p.link_type === 'package' && p.link_value) navigate('/user/buy', { state: { packageId: Number(p.link_value), promoId: p.id } });
     else if (p.link_type === 'external' && p.link_value) window.open(p.link_value, '_blank', 'noopener');
   };
 

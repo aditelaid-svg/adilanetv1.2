@@ -77,7 +77,7 @@ export default function PublicBuy() {
       const response = await fetch('/api/payment/create-qris', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: pkg.price, packageId: pkg.id, phone }),
+        body: JSON.stringify({ packageId: pkg.id, phone }),
       });
       const data = await response.json();
       if (data.success) {

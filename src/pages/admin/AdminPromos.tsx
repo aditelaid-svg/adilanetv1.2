@@ -22,12 +22,15 @@ type PromoForm = {
   end_date: string;
   sort_order: string;
   show_on: 'home' | 'landing' | 'both';
+  discount_type: 'none' | 'percent' | 'amount';
+  discount_value: string;
 };
 
 const emptyForm: PromoForm = {
   title: '', subtitle: '', color: 'iris', icon: 'star', badge: '', image_url: '',
   link_type: 'packages', link_value: '', button_text: '', active: true,
   start_date: '', end_date: '', sort_order: '0', show_on: 'both',
+  discount_type: 'none', discount_value: '',
 };
 
 const LINK_LABEL: Record<string, string> = {
@@ -116,6 +119,8 @@ export default function AdminPromos() {
       end_date: p.end_date || '',
       sort_order: String(p.sort_order),
       show_on: p.show_on,
+      discount_type: p.discount_type || 'none',
+      discount_value: p.discount_value ? String(p.discount_value) : '',
     });
     setShowModal(true);
   };
@@ -160,6 +165,8 @@ export default function AdminPromos() {
     end_date: form.end_date || null,
     sort_order: parseInt(form.sort_order, 10) || 0,
     show_on: form.show_on,
+    discount_type: form.link_type === 'package' ? form.discount_type : 'none',
+    discount_value: form.link_type === 'package' ? (parseFloat(form.discount_value) || 0) : 0,
   });
 
   const handleSave = async (e: React.FormEvent) => {
@@ -448,6 +455,27 @@ export default function AdminPromos() {
                       <option value="">— Pilih paket —</option>
                       {packages.map(pk => <option key={pk.id} value={String(pk.id)}>{pk.name}</option>)}
                     </select>
+                  </div>
+                )}
+
+                {form.link_type === 'package' && (
+                  <div className="rounded-2xl border border-slate-200 p-4 space-y-3">
+                    <label className="block text-sm font-medium text-slate-700">Diskon Harga (opsional)</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <select value={form.discount_type} onChange={e => setForm({ ...form, discount_type: e.target.value as PromoForm['discount_type'] })}
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 appearance-none">
+                        <option value="none">Tanpa diskon</option>
+                        <option value="percent">Persen (%)</option>
+                        <option value="amount">Potongan (Rp)</option>
+                      </select>
+                      <input type="number" min="0" step="any"
+                        value={form.discount_value}
+                        disabled={form.discount_type === 'none'}
+                        onChange={e => setForm({ ...form, discount_value: e.target.value })}
+                        placeholder={form.discount_type === 'percent' ? 'mis. 20' : 'mis. 5000'}
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-800 text-[15px] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors disabled:opacity-50 disabled:bg-slate-50" />
+                    </div>
+                    <p className="text-[12px] text-slate-400 font-medium">Harga paket otomatis dipotong saat pembeli membuka promo ini. Harga lama tampil dicoret.</p>
                   </div>
                 )}
 

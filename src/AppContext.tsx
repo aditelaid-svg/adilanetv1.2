@@ -65,6 +65,8 @@ export type Promo = {
   end_date: string | null;
   sort_order: number;
   show_on: 'home' | 'landing' | 'both';
+  discount_type: 'none' | 'percent' | 'amount';
+  discount_value: number;
 };
 
 export type PromoInput = Omit<Promo, 'id'>;
@@ -122,7 +124,7 @@ type AppContextType = {
   registerUser: (name: string, email: string, phone_number: string, password: string) => Promise<{ success: boolean; error?: string }>;
   updateUser: (userId: number, data: Partial<User & { password?: string }>) => Promise<void>;
   topupBalance: (userId: number, amount: number) => Promise<void>;
-  buyPackage: (pkg: Package, method: 'saldo' | 'qris', pin?: string) => Promise<{ success: boolean; error?: string; voucher_code?: string }>;
+  buyPackage: (pkg: Package, method: 'saldo' | 'qris', pin?: string, promoId?: number) => Promise<{ success: boolean; error?: string; voucher_code?: string }>;
   addRouter: (router: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => Promise<void>;
   updateRouter: (routerId: number, data: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => Promise<void>;
   syncRouter: (routerId: number) => Promise<void>;
@@ -453,7 +455,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ─── TRANSACTIONS ─────────────────────────────────────────────────────
-  const buyPackage = async (pkg: Package, method: 'saldo' | 'qris', pin?: string) => {
+  const buyPackage = async (pkg: Package, method: 'saldo' | 'qris', pin?: string, promoId?: number) => {
     if (!currentUser) return { success: false, error: 'Akses ditolak: User belum login.' };
 
     const res = await apiFetch('/api/transactions', {
@@ -462,6 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         package_id: pkg.id,
         payment_method: method,
         pin,
+        promo_id: promoId,
       }),
     });
 

@@ -1,16 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppContext, Package } from '../../AppContext';
+import { useAppContext, Package, Promo } from '../../AppContext';
 import { Wifi, Zap, ShieldCheck, X, Check, Copy, Wallet, CheckCircle2, ChevronRight, Lock, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation } from 'react-router-dom';
 import { formatRupiah } from '../../lib/format';
 
 export default function UserBuy() {
-  const { packages, currentUser, buyPackage, refreshData } = useAppContext();
+  const { packages, promos, currentUser, buyPackage, refreshData } = useAppContext();
   const location = useLocation();
+  const statePromoId: number | undefined = location.state?.promoId;
   const [selectedPkg, setSelectedPkg] = useState<Package | null>(
     packages.find(p => p.id === location.state?.packageId) || null
   );
+
+  // A discount only applies when the buyer arrived via a specific package promo
+  // (deep-link carries promoId) AND that promo targets this exact package.
+  const promoFor = (pkg: Package | null): Promo | null => {
+    if (!pkg || statePromoId == null) return null;
+    return promos.find(p =>
+      p.id === statePromoId &&
+      p.link_type === 'package' &&
+      String(p.link_value) === String(pkg.id) &&
+      (p.discount_type === 'percent' || p.discount_type === 'amount') &&
+      p.discount_value > 0
+    ) || null;
+  };
+
+  const discountedPrice = (base: number, promo: Promo | null): number => {
+    if (!promo) return base;
+    if (promo.discount_type === 'percent') return Math.max(0, Math.round(base * (1 - Math.min(promo.discount_value, 100) / 100)));
+    if (promo.discount_type === 'amount') return Math.max(0, Math.round(base - promo.discount_value));
+    return base;
+  };
   const [paymentMethod, setPaymentMethod] = useState<'saldo' | 'qris'>('saldo');
   const [successCode, setSuccessCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -80,9 +101,9 @@ export default function UserBuy() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            amount: selectedPkg.price,
             packageId: selectedPkg.id,
-            phone: currentUser?.phone_number
+            phone: currentUser?.phone_number,
+            promoId: promoFor(selectedPkg)?.id,
           }),
         });
         const data = await response.json();
@@ -124,7 +145,7 @@ export default function UserBuy() {
 
   const buyPackageWithPin = async (currentPin: string) => {
     if (!selectedPkg) return;
-    const result = await buyPackage(selectedPkg, 'saldo', currentPin);
+    const result = await buyPackage(selectedPkg, 'saldo', currentPin, promoFor(selectedPkg)?.id);
     if (result.success) {
       setSuccessCode(result.voucher_code || `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`);
       setShowPinInput(false);
@@ -163,6 +184,10 @@ export default function UserBuy() {
 
   const badges = ['Murah', 'Populer', 'Best Value', 'Premium'];
 
+  const activePromo = promoFor(selectedPkg);
+  const payAmount = selectedPkg ? discountedPrice(Number(selectedPkg.price), activePromo) : 0;
+  const savings = selectedPkg ? Number(selectedPkg.price) - payAmount : 0;
+
   return (
     <div className="p-5 pb-24 pt-14">
       <div className="mb-6 px-1">
@@ -199,7 +224,17 @@ export default function UserBuy() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[15px] font-bold text-slate-800">{formatRupiah(pkg.price)}</span>
+              {(() => {
+                const pp = promoFor(pkg);
+                return pp ? (
+                  <div className="flex flex-col items-end leading-tight">
+                    <span className="text-[11px] font-medium text-slate-400 line-through">{formatRupiah(pkg.price)}</span>
+                    <span className="text-[15px] font-bold text-rose-500">{formatRupiah(discountedPrice(Number(pkg.price), pp))}</span>
+                  </div>
+                ) : (
+                  <span className="text-[15px] font-bold text-slate-800">{formatRupiah(pkg.price)}</span>
+                );
+              })()}
               <ChevronRight className="w-4 h-4 text-slate-300" />
             </div>
           </motion.div>
@@ -235,8 +270,21 @@ export default function UserBuy() {
                     <p className="font-bold text-[17px] text-slate-800">{selectedPkg.name}</p>
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100">
                       <span className="text-slate-500 text-[13px] font-medium">Total Pembayaran</span>
-                      <span className="font-bold text-slate-800 text-[17px]">{formatRupiah(selectedPkg.price)}</span>
+                      {activePromo ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-medium text-slate-400 line-through">{formatRupiah(selectedPkg.price)}</span>
+                          <span className="font-bold text-rose-500 text-[17px]">{formatRupiah(payAmount)}</span>
+                        </div>
+                      ) : (
+                        <span className="font-bold text-slate-800 text-[17px]">{formatRupiah(selectedPkg.price)}</span>
+                      )}
                     </div>
+                    {activePromo && savings > 0 && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">Diskon Promo</span>
+                        <span className="text-[11px] font-semibold text-emerald-600">Hemat {formatRupiah(savings)}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3 mb-8">
@@ -282,10 +330,10 @@ export default function UserBuy() {
 
                   <button
                     onClick={initiateBuy}
-                    disabled={isProcessing || (paymentMethod === 'saldo' && (currentUser?.balance || 0) < selectedPkg.price)}
+                    disabled={isProcessing || (paymentMethod === 'saldo' && (currentUser?.balance || 0) < payAmount)}
                     className="w-full bg-sky-500 disabled:opacity-50 text-white font-semibold py-4 rounded-[18px] shadow-[0_8px_20px_rgba(14,165,233,0.3)] transition-transform active:scale-95 text-[15px]"
                   >
-                    {isProcessing ? 'Memproses...' : (paymentMethod === 'saldo' && (currentUser?.balance || 0) < selectedPkg.price) ? 'Saldo Tidak Cukup' : 'Bayar Sekarang'}
+                    {isProcessing ? 'Memproses...' : (paymentMethod === 'saldo' && (currentUser?.balance || 0) < payAmount) ? 'Saldo Tidak Cukup' : 'Bayar Sekarang'}
                   </button>
                 </>
               ) : showPinInput && !successCode ? (

@@ -180,6 +180,8 @@ async function initDb() {
       show_on VARCHAR(20) DEFAULT 'both',
       created_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE promos ADD COLUMN IF NOT EXISTS discount_type VARCHAR(10) DEFAULT 'none';
+    ALTER TABLE promos ADD COLUMN IF NOT EXISTS discount_value DECIMAL(10,2) DEFAULT 0;
 
     CREATE TABLE IF NOT EXISTS topups (
       id SERIAL PRIMARY KEY,
@@ -928,7 +930,7 @@ async function startServer() {
 
       const user = userRows[0];
       const pkg = pkgRows[0];
-      const amount = parseFloat(pkg.price);
+      const amount = await resolvePurchaseAmount(pkg, req.body.promo_id);
 
       let newBalance = parseFloat(user.balance);
 
@@ -1137,6 +1139,8 @@ async function startServer() {
       end_date: p.end_date ? new Date(p.end_date).toISOString().slice(0, 10) : null,
       sort_order: p.sort_order ?? 0,
       show_on: p.show_on || 'both',
+      discount_type: ['percent', 'amount'].includes(p.discount_type) ? p.discount_type : 'none',
+      discount_value: parseFloat(p.discount_value) || 0,
     };
   }
 
@@ -1161,7 +1165,37 @@ async function startServer() {
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
     const start_date = dateRe.test(body.start_date) ? body.start_date : null;
     const end_date = dateRe.test(body.end_date) ? body.end_date : null;
-    return { title, subtitle, color, icon, badge, image_url, link_type, link_value, button_text, active, show_on, sort_order, start_date, end_date };
+    // Discount only applies when the promo targets a specific package.
+    let discount_type = ['percent', 'amount'].includes(body.discount_type) ? body.discount_type : 'none';
+    let discount_value = parseFloat(String(body.discount_value));
+    if (!Number.isFinite(discount_value) || discount_value < 0) discount_value = 0;
+    if (discount_type === 'percent' && discount_value > 100) discount_value = 100;
+    if (discount_type === 'amount' && discount_value > 99_999_999) discount_value = 99_999_999;
+    if (link_type !== 'package' || discount_value <= 0) { discount_type = 'none'; discount_value = 0; }
+    return { title, subtitle, color, icon, badge, image_url, link_type, link_value, button_text, active, show_on, sort_order, start_date, end_date, discount_type, discount_value };
+  }
+
+  // Authoritative purchase price: starts from the package price and applies a
+  // promo discount ONLY when the promo is valid (active, in its date window,
+  // targets THIS package). Never trust a client-supplied amount.
+  async function resolvePurchaseAmount(pkg: any, promoId: any): Promise<number> {
+    const base = Math.round(parseFloat(pkg.price));
+    const pid = parseInt(String(promoId), 10);
+    if (!Number.isFinite(pid)) return base;
+    const { rows } = await pool.query(
+      `SELECT * FROM promos WHERE id = $1 AND active = true
+         AND (start_date IS NULL OR start_date <= CURRENT_DATE)
+         AND (end_date IS NULL OR end_date >= CURRENT_DATE)`,
+      [pid]
+    );
+    const promo = rows[0];
+    if (!promo) return base;
+    if (promo.link_type !== 'package' || String(promo.link_value) !== String(pkg.id)) return base;
+    const dval = parseFloat(promo.discount_value) || 0;
+    if (dval <= 0) return base;
+    if (promo.discount_type === 'percent') return Math.max(0, Math.round(base * (1 - Math.min(dval, 100) / 100)));
+    if (promo.discount_type === 'amount') return Math.max(0, Math.round(base - dval));
+    return base;
   }
 
   // Public: only active promos within their schedule window. Optional ?show_on=home|landing
@@ -1199,9 +1233,9 @@ async function startServer() {
       const p = sanitizePromo(req.body);
       if (!p.title) return res.status(400).json({ success: false, error: "Judul promo wajib diisi." });
       const { rows } = await pool.query(
-        `INSERT INTO promos (title, subtitle, color, icon, badge, image_url, link_type, link_value, button_text, active, start_date, end_date, sort_order, show_on)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-        [p.title, p.subtitle, p.color, p.icon, p.badge, p.image_url, p.link_type, p.link_value, p.button_text, p.active, p.start_date, p.end_date, p.sort_order, p.show_on]
+        `INSERT INTO promos (title, subtitle, color, icon, badge, image_url, link_type, link_value, button_text, active, start_date, end_date, sort_order, show_on, discount_type, discount_value)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        [p.title, p.subtitle, p.color, p.icon, p.badge, p.image_url, p.link_type, p.link_value, p.button_text, p.active, p.start_date, p.end_date, p.sort_order, p.show_on, p.discount_type, p.discount_value]
       );
       res.json({ success: true, data: mapPromo(rows[0]) });
     } catch (err: any) {
@@ -1214,8 +1248,8 @@ async function startServer() {
       const p = sanitizePromo(req.body);
       if (!p.title) return res.status(400).json({ success: false, error: "Judul promo wajib diisi." });
       const { rows } = await pool.query(
-        `UPDATE promos SET title=$1, subtitle=$2, color=$3, icon=$4, badge=$5, image_url=$6, link_type=$7, link_value=$8, button_text=$9, active=$10, start_date=$11, end_date=$12, sort_order=$13, show_on=$14 WHERE id=$15 RETURNING *`,
-        [p.title, p.subtitle, p.color, p.icon, p.badge, p.image_url, p.link_type, p.link_value, p.button_text, p.active, p.start_date, p.end_date, p.sort_order, p.show_on, req.params.id]
+        `UPDATE promos SET title=$1, subtitle=$2, color=$3, icon=$4, badge=$5, image_url=$6, link_type=$7, link_value=$8, button_text=$9, active=$10, start_date=$11, end_date=$12, sort_order=$13, show_on=$14, discount_type=$15, discount_value=$16 WHERE id=$17 RETURNING *`,
+        [p.title, p.subtitle, p.color, p.icon, p.badge, p.image_url, p.link_type, p.link_value, p.button_text, p.active, p.start_date, p.end_date, p.sort_order, p.show_on, p.discount_type, p.discount_value, req.params.id]
       );
       if (rows.length === 0) return res.status(404).json({ success: false, error: "Promo tidak ditemukan." });
       res.json({ success: true, data: mapPromo(rows[0]) });
@@ -1259,8 +1293,9 @@ async function startServer() {
       if (pkgRows.length === 0) return res.status(404).json({ success: false, error: "Paket tidak ditemukan." });
       const pkg = pkgRows[0];
 
-      // Authoritative amount from the package — never trust the client.
-      const amount = Math.round(parseFloat(pkg.price));
+      // Authoritative amount from the package + any valid promo discount —
+      // never trust a client-supplied price.
+      const amount = await resolvePurchaseAmount(pkg, req.body.promoId);
       const phone = typeof req.body.phone === 'string' ? req.body.phone.slice(0, 30) : null;
       const userId = req.session?.userId || null;
 
