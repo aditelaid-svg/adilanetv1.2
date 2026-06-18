@@ -7,7 +7,7 @@ export type User = {
   email: string;
   phone_number?: string;
   pin?: string;
-  role: 'admin' | 'user';
+  role: 'superadmin' | 'admin' | 'user';
   balance: number;
   status: 'active' | 'blocked';
 };
@@ -128,7 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (pkgRes.success) setPackages(pkgRes.data);
 
       if (currentUser) {
-        if (currentUser.role === 'admin') {
+        if (currentUser.role !== 'user') {
           // Admin-only endpoints — users & routers list
           const [usersRes, routersRes, txRes] = await Promise.all([
             apiFetch('/api/users'),

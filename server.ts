@@ -48,11 +48,15 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+function isAdminRole(role?: string): boolean {
+  return role === "admin" || role === "superadmin";
+}
+
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
     return res.status(401).json({ success: false, error: "Silakan login terlebih dahulu." });
   }
-  if (req.session.role !== "admin") {
+  if (!isAdminRole(req.session.role)) {
     return res.status(403).json({ success: false, error: "Akses ditolak: khusus administrator." });
   }
   next();
@@ -124,7 +128,7 @@ async function initDb() {
   if (parseInt(userRows[0].cnt) === 0) {
     await pool.query(`
       INSERT INTO users (name, email, phone_number, password, role, balance) VALUES
-      ('Admin Web', 'admin@wifivoucher.com', '08999999999', 'admin', 'admin', 0),
+      ('Super Admin', 'admin@wifivoucher.com', '08999999999', 'admin', 'superadmin', 0),
       ('Ahmad Pelanggan', 'user@demo.com', '081234567890', 'user123', 'user', 50000),
       ('Budi Santoso', 'budi@demo.com', '082211223344', 'user123', 'user', 15000)
       ON CONFLICT DO NOTHING;
@@ -168,6 +172,20 @@ async function initDb() {
 
   // Ensure pin column can hold a bcrypt hash (~60 chars) on pre-existing DBs
   await pool.query(`ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255)`);
+  // Widen role column to fit 'superadmin'
+  await pool.query(`ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(20)`);
+  // Guarantee a protected superadmin exists (promote oldest admin if none)
+  await pool.query(`
+    UPDATE users SET role = 'superadmin'
+    WHERE id = (SELECT id FROM users WHERE role IN ('admin','superadmin') ORDER BY id ASC LIMIT 1)
+      AND NOT EXISTS (SELECT 1 FROM users WHERE role = 'superadmin')
+  `);
+  // Fallback: if no admins exist at all, promote the oldest user so there is always a superadmin
+  await pool.query(`
+    UPDATE users SET role = 'superadmin'
+    WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)
+      AND NOT EXISTS (SELECT 1 FROM users WHERE role = 'superadmin')
+  `);
 
   // Migrate any plaintext password/pin values to bcrypt hashes (idempotent)
   const { rows: allUsers } = await pool.query("SELECT id, password, pin FROM users");
@@ -347,7 +365,7 @@ async function startServer() {
 
   app.get("/api/users/:id", requireAuth, async (req, res) => {
     try {
-      if (req.session.role !== "admin" && Number(req.params.id) !== req.session.userId) {
+      if (!isAdminRole(req.session.role) && Number(req.params.id) !== req.session.userId) {
         return res.status(403).json({ success: false, error: "Akses ditolak." });
       }
       const { rows } = await pool.query(
@@ -364,12 +382,39 @@ async function startServer() {
 
   app.patch("/api/users/:id", requireAuth, async (req, res) => {
     try {
-      const isAdmin = req.session.role === "admin";
+      const isAdmin = isAdminRole(req.session.role);
+      const isSuper = req.session.role === "superadmin";
       const targetId = Number(req.params.id);
       if (!isAdmin && targetId !== req.session.userId) {
         return res.status(403).json({ success: false, error: "Akses ditolak." });
       }
       const { name, email, phone_number, password, pin, role, balance, status } = req.body;
+
+      // Load target role to apply superadmin protections
+      const { rows: tgtRows } = await pool.query(`SELECT role FROM users WHERE id = $1`, [targetId]);
+      if (tgtRows.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
+      const targetIsSuper = tgtRows[0].role === "superadmin";
+
+      // A superadmin account can only be modified by itself (no field changes by others)
+      if (targetIsSuper && targetId !== req.session.userId) {
+        return res.status(403).json({ success: false, error: "Akun superadmin tidak bisa diubah oleh admin lain." });
+      }
+      // Role value allowlist
+      if (role !== undefined && !["user", "admin", "superadmin"].includes(role)) {
+        return res.status(400).json({ success: false, error: "Role tidak valid." });
+      }
+      // Only a superadmin may grant admin/superadmin rights (no privilege escalation)
+      if (role !== undefined && isAdminRole(role) && !isSuper) {
+        return res.status(403).json({ success: false, error: "Hanya superadmin yang dapat memberi hak admin." });
+      }
+      // Prevent demoting the last remaining superadmin (lock-out protection)
+      if (targetIsSuper && role !== undefined && role !== "superadmin") {
+        const { rows: cnt } = await pool.query(`SELECT COUNT(*)::int AS n FROM users WHERE role = 'superadmin'`);
+        if (cnt[0].n <= 1) {
+          return res.status(400).json({ success: false, error: "Tidak bisa menurunkan superadmin terakhir." });
+        }
+      }
+
       const fields: string[] = [];
       const values: any[] = [];
       let idx = 1;
@@ -404,10 +449,20 @@ async function startServer() {
 
   app.delete("/api/users/:id", requireAdmin, async (req, res) => {
     try {
-      if (Number(req.params.id) === req.session.userId) {
+      const targetId = Number(req.params.id);
+      if (targetId === req.session.userId) {
         return res.status(400).json({ success: false, error: "Tidak bisa menghapus akun sendiri." });
       }
-      await pool.query(`DELETE FROM users WHERE id = $1`, [req.params.id]);
+      const { rows } = await pool.query(`SELECT role FROM users WHERE id = $1`, [targetId]);
+      if (rows.length === 0) return res.json({ success: true });
+      const targetRole = rows[0].role;
+      if (targetRole === "superadmin") {
+        return res.status(403).json({ success: false, error: "Akun superadmin tidak bisa dihapus." });
+      }
+      if (isAdminRole(targetRole) && req.session.role !== "superadmin") {
+        return res.status(403).json({ success: false, error: "Hanya superadmin yang dapat menghapus admin." });
+      }
+      await pool.query(`DELETE FROM users WHERE id = $1`, [targetId]);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -418,9 +473,15 @@ async function startServer() {
     try {
       const { amount } = req.body;
       if (!amount || amount <= 0) return res.status(400).json({ success: false, error: "Nominal tidak valid." });
+      const targetId = Number(req.params.id);
+      const { rows: tgt } = await pool.query(`SELECT role FROM users WHERE id = $1`, [targetId]);
+      if (tgt.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
+      if (tgt[0].role === "superadmin" && targetId !== req.session.userId) {
+        return res.status(403).json({ success: false, error: "Saldo superadmin tidak bisa diubah oleh admin lain." });
+      }
       const { rows } = await pool.query(
         `UPDATE users SET balance = balance + $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, balance`,
-        [amount, req.params.id]
+        [amount, targetId]
       );
       if (rows.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
       res.json({ success: true, data: { ...rows[0], balance: parseFloat(rows[0].balance) } });
@@ -579,7 +640,7 @@ async function startServer() {
   // ─── TRANSACTIONS ────────────────────────────────────────────────────────
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {
-      const isAdmin = req.session.role === "admin";
+      const isAdmin = isAdminRole(req.session.role);
       let query = `
         SELECT t.*, u.name as user_name, p.name as package_name
         FROM transactions t

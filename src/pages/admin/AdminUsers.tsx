@@ -5,7 +5,7 @@ import { Users, Search, UserCheck, UserX, Wallet, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function AdminUsers() {
-  const { users, updateUser, deleteUser, topupBalance } = useAppContext();
+  const { users, updateUser, deleteUser, topupBalance, currentUser } = useAppContext();
   const toast = useToast();
 
   const [topupModalUser, setTopupModalUser] = useState<number | null>(null);
@@ -133,6 +133,9 @@ export default function AdminUsers() {
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${user.status === 'active' ? 'bg-[#34C759]/10 text-[#34C759] border-[#34C759]/20' : 'bg-[#FF453A]/10 text-[#FF453A] border-[#FF453A]/20'}`}>
                     {user.status === 'active' ? 'Aktif' : 'Diblokir'}
                   </span>
+                  {user.role === 'superadmin' && (
+                    <span className="bg-[#BF5AF2]/10 text-[#BF5AF2] text-[9px] font-bold px-1.5 py-0.5 rounded border border-[#BF5AF2]/20 uppercase">Super Admin</span>
+                  )}
                   {user.role === 'admin' && (
                     <span className="bg-[#FF9500]/10 text-[#FF9500] text-[9px] font-bold px-1.5 py-0.5 rounded border border-[#FF9500]/20 uppercase">Admin</span>
                   )}
@@ -153,35 +156,46 @@ export default function AdminUsers() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => setTopupModalUser(user.id)}
-                className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 active:bg-white/15 text-white/80 font-medium py-2 rounded-[12px] text-[12px] transition-colors"
-              >
-                <Wallet className="w-3.5 h-3.5" /> Top Up
-              </button>
-              {user.status === 'active' ? (
-                <button
-                  onClick={() => toggleBlockStatus(user.id, user.status)}
-                  className="flex items-center justify-center gap-1.5 bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
-                >
-                  <UserX className="w-3.5 h-3.5" /> Blokir
-                </button>
-              ) : (
-                <button
-                  onClick={() => toggleBlockStatus(user.id, user.status)}
-                  className="flex items-center justify-center gap-1.5 bg-[#34C759]/10 hover:bg-[#34C759]/20 text-[#34C759] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
-                >
-                  <UserCheck className="w-3.5 h-3.5" /> Buka
-                </button>
-              )}
-              <button
-                onClick={() => handleDelete(user.id, user.name)}
-                className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-[#FF453A]/20 text-white/50 hover:text-[#FF453A] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
-              >
-                <X className="w-3.5 h-3.5" /> Hapus
-              </button>
-            </div>
+            {(() => {
+              const isSelf = user.id === currentUser?.id;
+              const isProtected =
+                user.role === 'superadmin' ||
+                (user.role === 'admin' && currentUser?.role !== 'superadmin') ||
+                isSelf;
+              return (
+                <div className={`grid ${isProtected ? 'grid-cols-1' : 'grid-cols-3'} gap-2`}>
+                  <button
+                    onClick={() => setTopupModalUser(user.id)}
+                    className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 active:bg-white/15 text-white/80 font-medium py-2 rounded-[12px] text-[12px] transition-colors"
+                  >
+                    <Wallet className="w-3.5 h-3.5" /> Top Up
+                  </button>
+                  {!isProtected && (user.status === 'active' ? (
+                    <button
+                      onClick={() => toggleBlockStatus(user.id, user.status)}
+                      className="flex items-center justify-center gap-1.5 bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[#FF453A] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
+                    >
+                      <UserX className="w-3.5 h-3.5" /> Blokir
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => toggleBlockStatus(user.id, user.status)}
+                      className="flex items-center justify-center gap-1.5 bg-[#34C759]/10 hover:bg-[#34C759]/20 text-[#34C759] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
+                    >
+                      <UserCheck className="w-3.5 h-3.5" /> Buka
+                    </button>
+                  ))}
+                  {!isProtected && (
+                    <button
+                      onClick={() => handleDelete(user.id, user.name)}
+                      className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-[#FF453A]/20 text-white/50 hover:text-[#FF453A] font-medium py-2 rounded-[12px] text-[12px] transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" /> Hapus
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </motion.div>
         ))}
 

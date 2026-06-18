@@ -31,10 +31,10 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/checkout/:packageId" element={<PublicBuy />} />
-      <Route path="/login" element={!currentUser ? <Login /> : <Navigate to={currentUser.role === 'admin' ? '/admin' : '/user'} replace />} />
-      <Route path="/register" element={!currentUser ? <Register /> : <Navigate to={currentUser.role === 'admin' ? '/admin' : '/user'} replace />} />
+      <Route path="/login" element={!currentUser ? <Login /> : <Navigate to={currentUser.role !== 'user' ? '/admin' : '/user'} replace />} />
+      <Route path="/register" element={!currentUser ? <Register /> : <Navigate to={currentUser.role !== 'user' ? '/admin' : '/user'} replace />} />
 
-      {currentUser?.role === 'admin' && (
+      {currentUser && currentUser.role !== 'user' && (
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="routers" element={<AdminRouters />} />
@@ -58,8 +58,8 @@ function AppRoutes() {
         </Route>
       )}
 
-      <Route path="/" element={<Navigate to={!currentUser ? '/login' : currentUser.role === 'admin' ? '/admin' : '/user'} replace />} />
-      <Route path="*" element={<Navigate to={!currentUser ? '/login' : currentUser.role === 'admin' ? '/admin' : '/user'} replace />} />
+      <Route path="/" element={<Navigate to={!currentUser ? '/login' : currentUser.role !== 'user' ? '/admin' : '/user'} replace />} />
+      <Route path="*" element={<Navigate to={!currentUser ? '/login' : currentUser.role !== 'user' ? '/admin' : '/user'} replace />} />
     </Routes>
   );
 }
