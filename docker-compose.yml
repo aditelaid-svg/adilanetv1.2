@@ -48,11 +48,13 @@ services:
       PORT: 5000
       # PostgreSQL — sesuaikan password dengan service db di atas
       DATABASE_URL: postgres://adilanet:adilanet_pass_2024@db:5432/adilanet
-      # Payment Gateway Sanpay (opsional)
-      SANPAY_API_KEY: ""
-      SANPAY_MERCHANT_ID: ""
-      # URL publik server kamu (untuk webhook QRIS)
-      APP_URL: "http://IP_SERVER_KAMU:5000"
+      # ── WAJIB ── String acak panjang untuk keamanan sesi/login.
+      # App TIDAK akan jalan kalau ini kosong. Ganti nilainya!
+      # Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      SESSION_SECRET: "GANTI_DENGAN_STRING_ACAK_PANJANG_64_KARAKTER"
+      # Catatan: Merchant Code & API Key Sanpay TIDAK diisi di sini.
+      # Cukup masukkan lewat menu Pengaturan di panel admin setelah app jalan,
+      # lalu daftarkan URL callback yang tertera di sana ke dashboard Sanpay.
     depends_on:
       db:
         condition: service_healthy
