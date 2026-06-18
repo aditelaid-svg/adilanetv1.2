@@ -50,6 +50,10 @@ services:
       # App TIDAK akan jalan kalau ini kosong. Ganti nilainya!
       # Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
       SESSION_SECRET: "GANTI_DENGAN_STRING_ACAK_PANJANG_64_KARAKTER"
+      # Biarkan "false" kalau akses lewat HTTP (mis. http://IP:5000).
+      # Set "true" HANYA jika app sudah di belakang HTTPS (domain + TLS).
+      # Kalau salah set "true" di HTTP, login akan auto-logout terus.
+      COOKIE_SECURE: "false"
       # Catatan: Merchant Code & API Key Sanpay TIDAK diisi di sini.
       # Cukup masukkan lewat menu Pengaturan di panel admin setelah app jalan,
       # lalu daftarkan URL callback yang tertera di sana ke dashboard Sanpay.

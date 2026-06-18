@@ -288,7 +288,10 @@ async function startServer() {
       rolling: true,
       cookie: {
         httpOnly: true,
-        secure: isProd,
+        // Hanya aktifkan secure cookie kalau benar-benar di belakang HTTPS.
+        // Default mati supaya tetap jalan saat diakses lewat HTTP (mis. IP LAN).
+        // Set COOKIE_SECURE=true di env kalau app dilayani via HTTPS.
+        secure: process.env.COOKIE_SECURE === "true",
         sameSite: "lax",
         maxAge: 1000 * 60 * 60 * 24 * 7,
       },
