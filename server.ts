@@ -26,6 +26,18 @@ async function initDb() {
       updated_at TIMESTAMP DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS routers (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      ip_address VARCHAR(50) NOT NULL,
+      api_port VARCHAR(10) DEFAULT '8728',
+      username VARCHAR(50) NOT NULL,
+      password TEXT NOT NULL,
+      status VARCHAR(20) DEFAULT 'offline',
+      connected_users INT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS packages (
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
@@ -38,18 +50,6 @@ async function initDb() {
     );
     ALTER TABLE packages ADD COLUMN IF NOT EXISTS router_id INTEGER REFERENCES routers(id) ON DELETE SET NULL;
     ALTER TABLE packages ADD COLUMN IF NOT EXISTS mikrotik_profile VARCHAR(100);
-
-    CREATE TABLE IF NOT EXISTS routers (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      ip_address VARCHAR(50) NOT NULL,
-      api_port VARCHAR(10) DEFAULT '8728',
-      username VARCHAR(50) NOT NULL,
-      password TEXT NOT NULL,
-      status VARCHAR(20) DEFAULT 'offline',
-      connected_users INT DEFAULT 0,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
 
     CREATE TABLE IF NOT EXISTS transactions (
       id SERIAL PRIMARY KEY,
