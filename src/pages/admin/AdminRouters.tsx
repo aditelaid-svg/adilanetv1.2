@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
-import { useAppContext } from '../../AppContext';
+import { useAppContext, MikrotikProfile } from '../../AppContext';
 import { useToast } from '../../components/Toast';
-import { Router, Plus, Wifi, X, Pencil, CheckCircle, XCircle, Loader2, Activity } from 'lucide-react';
+import { Router, Plus, X, Pencil, CheckCircle, XCircle, Loader2, Activity, Layers, Trash2, Gauge, Users, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type RouterForm = { name: string; ip_address: string; api_port: string; username: string; password: string };
 const emptyForm: RouterForm = { name: '', ip_address: '', api_port: '8728', username: 'admin', password: '' };
 
+type ProfileForm = { name: string; rateLimit: string; sharedUsers: string; sessionTimeout: string };
+const emptyProfileForm: ProfileForm = { name: '', rateLimit: '', sharedUsers: '1', sessionTimeout: '' };
+
 type TestResult = { connected: boolean; message: string; latency?: number } | null;
 
 export default function AdminRouters() {
-  const { routers, addRouter, updateRouter, syncRouter, deleteRouter, testRouterConnection } = useAppContext();
+  const {
+    routers, addRouter, updateRouter, deleteRouter, testRouterConnection,
+    getRouterProfiles, createRouterProfile, updateRouterProfile, deleteRouterProfile,
+  } = useAppContext();
   const toast = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -18,6 +24,115 @@ export default function AdminRouters() {
   const [testResults, setTestResults] = useState<Record<number, TestResult>>({});
   const [testingId, setTestingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // ─── Profile management state ───
+  const [profileRouterId, setProfileRouterId] = useState<number | null>(null);
+  const [profiles, setProfiles] = useState<MikrotikProfile[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(false);
+  const [profilesSource, setProfilesSource] = useState<string>('');
+  const [profilesWarning, setProfilesWarning] = useState<string | undefined>();
+  const [showProfileForm, setShowProfileForm] = useState(false);
+  const [profileEditId, setProfileEditId] = useState<string | null>(null);
+  const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfileForm);
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  const loadProfiles = async (routerId: number) => {
+    setProfilesLoading(true);
+    try {
+      const res = await getRouterProfiles(routerId);
+      setProfiles(res.data);
+      setProfilesSource(res.source);
+      setProfilesWarning(res.warning);
+    } catch (e: any) {
+      toast.error('Gagal memuat profil', e.message);
+      setProfiles([]);
+    } finally {
+      setProfilesLoading(false);
+    }
+  };
+
+  const openProfiles = async (routerId: number) => {
+    setProfileRouterId(routerId);
+    setShowProfileForm(false);
+    setProfileForm(emptyProfileForm);
+    setProfileEditId(null);
+    await loadProfiles(routerId);
+  };
+
+  const closeProfiles = () => {
+    setProfileRouterId(null);
+    setProfiles([]);
+    setShowProfileForm(false);
+  };
+
+  const openProfileAdd = () => {
+    setProfileForm(emptyProfileForm);
+    setProfileEditId(null);
+    setShowProfileForm(true);
+  };
+
+  const openProfileEdit = (p: MikrotikProfile) => {
+    setProfileForm({
+      name: p.name,
+      rateLimit: p.rateLimit === 'N/A' ? '' : p.rateLimit,
+      sharedUsers: p.sharedUsers || '1',
+      sessionTimeout: '',
+    });
+    setProfileEditId(p.id);
+    setShowProfileForm(true);
+  };
+
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileRouterId || !profileForm.name) return;
+    if (profilesSource !== 'mikrotik') {
+      toast.error('Router tidak terhubung', 'Profil hanya bisa diubah saat router MikroTik terhubung.');
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      const payload = {
+        name: profileForm.name,
+        rateLimit: profileForm.rateLimit || undefined,
+        sharedUsers: profileForm.sharedUsers || undefined,
+        sessionTimeout: profileForm.sessionTimeout || undefined,
+      };
+      if (profileEditId) {
+        await updateRouterProfile(profileRouterId, profileEditId, payload);
+        toast.success('Profil diperbarui', `"${profileForm.name}" berhasil disimpan.`);
+      } else {
+        await createRouterProfile(profileRouterId, payload);
+        toast.success('Profil dibuat', `"${profileForm.name}" berhasil ditambahkan.`);
+      }
+      setShowProfileForm(false);
+      await loadProfiles(profileRouterId);
+    } catch (err: any) {
+      toast.error('Gagal menyimpan profil', err.message);
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleProfileDelete = async (p: MikrotikProfile) => {
+    if (!profileRouterId) return;
+    if (profilesSource !== 'mikrotik') {
+      toast.error('Router tidak terhubung', 'Profil hanya bisa dihapus saat router MikroTik terhubung.');
+      return;
+    }
+    const ok = await toast.confirm(
+      'Hapus Profil?',
+      `Profil "${p.name}" akan dihapus dari router MikroTik.`,
+      { confirmText: 'Ya, Hapus', danger: true }
+    );
+    if (!ok) return;
+    try {
+      await deleteRouterProfile(profileRouterId, p.id);
+      toast.success('Profil dihapus', `"${p.name}" berhasil dihapus.`);
+      await loadProfiles(profileRouterId);
+    } catch (err: any) {
+      toast.error('Gagal menghapus profil', err.message);
+    }
+  };
 
   const openAdd = () => { setForm(emptyForm); setEditId(null); setShowAdd(true); };
   const openEdit = (r: typeof routers[0]) => {
@@ -170,11 +285,11 @@ export default function AdminRouters() {
                   }
                 </button>
                 <button
-                  onClick={() => syncRouter(router.id)}
+                  onClick={() => openProfiles(router.id)}
                   className="flex-1 bg-[#0A84FF]/10 hover:bg-[#0A84FF]/20 active:bg-[#0A84FF]/30 text-[#0A84FF] text-[13px] font-semibold py-2.5 rounded-[14px] transition-all flex items-center justify-center gap-2"
                 >
-                  <Wifi className="w-4 h-4" />
-                  Sync Profil
+                  <Layers className="w-4 h-4" />
+                  Kelola Profil
                 </button>
               </div>
             </motion.div>
@@ -251,6 +366,136 @@ export default function AdminRouters() {
                   {saving ? 'Menyimpan...' : (editId !== null ? 'Simpan Perubahan' : 'Tambah Router')}
                 </button>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Profile Manager Modal */}
+      <AnimatePresence>
+        {profileRouterId !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/40 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+              className="w-full max-w-md bg-[#1C1C1E] border-t border-white/10 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl relative max-h-[88vh] flex flex-col"
+            >
+              <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-5 sm:hidden" />
+              <button onClick={closeProfiles} className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-white/40 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-2 mb-1">
+                <Layers className="w-5 h-5 text-[#0A84FF]" />
+                <h3 className="text-[22px] font-bold text-white">Profil Hotspot</h3>
+              </div>
+              <p className="text-white/40 text-[12px] mb-4">
+                {routers.find(r => r.id === profileRouterId)?.name}
+              </p>
+
+              {profilesSource === 'demo' && (
+                <div className="flex items-center gap-2 rounded-[12px] px-3 py-2 mb-3 text-[12px] font-medium bg-[#FF9F0A]/10 border border-[#FF9F0A]/20 text-[#FF9F0A]">
+                  <XCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span className="flex-1">{profilesWarning || 'Router tidak terjangkau — perubahan dinonaktifkan.'}</span>
+                </div>
+              )}
+
+              {showProfileForm ? (
+                <form onSubmit={handleProfileSubmit} className="space-y-4 overflow-y-auto">
+                  <div>
+                    <label className="block text-[13px] font-medium text-white/60 mb-1.5">Nama Profil</label>
+                    <input type="text" value={profileForm.name} onChange={e => setProfileForm({ ...profileForm, name: e.target.value })}
+                      placeholder="e.g. 1jam" required disabled={profileEditId !== null}
+                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50 disabled:opacity-50" />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-medium text-white/60 mb-1.5">Rate Limit (up/down)</label>
+                    <input type="text" value={profileForm.rateLimit} onChange={e => setProfileForm({ ...profileForm, rateLimit: e.target.value })}
+                      placeholder="e.g. 2M/2M"
+                      className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white font-mono text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[13px] font-medium text-white/60 mb-1.5">Shared Users</label>
+                      <input type="text" value={profileForm.sharedUsers} onChange={e => setProfileForm({ ...profileForm, sharedUsers: e.target.value })}
+                        placeholder="1"
+                        className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                    </div>
+                    <div>
+                      <label className="block text-[13px] font-medium text-white/60 mb-1.5">Session Timeout</label>
+                      <input type="text" value={profileForm.sessionTimeout} onChange={e => setProfileForm({ ...profileForm, sessionTimeout: e.target.value })}
+                        placeholder={profileEditId ? 'kosong = tetap' : 'e.g. 1h, 1d'}
+                        className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#0A84FF]/50" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1 max-sm:pb-6">
+                    <button type="button" onClick={() => setShowProfileForm(false)}
+                      className="flex-1 bg-white/5 hover:bg-white/10 text-white/70 font-semibold py-3.5 rounded-[16px] text-[15px] transition-colors">
+                      Batal
+                    </button>
+                    <button type="submit" disabled={profileSaving}
+                      className="flex-1 bg-[#0A84FF] hover:bg-[#0A84FF]/90 active:scale-[0.98] disabled:opacity-60 transition-all text-white font-semibold py-3.5 rounded-[16px] text-[15px]">
+                      {profileSaving ? 'Menyimpan...' : (profileEditId ? 'Simpan' : 'Tambah')}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <button
+                    onClick={openProfileAdd}
+                    disabled={profilesSource !== 'mikrotik'}
+                    className="w-full flex items-center justify-center gap-2 bg-[#0A84FF]/10 hover:bg-[#0A84FF]/20 disabled:opacity-40 disabled:cursor-not-allowed text-[#0A84FF] font-semibold py-3 rounded-[16px] text-[14px] transition-colors mb-3"
+                  >
+                    <Plus className="w-4 h-4" /> Tambah Profil
+                  </button>
+
+                  <div className="space-y-2 overflow-y-auto -mx-1 px-1">
+                    {profilesLoading ? (
+                      <div className="flex items-center justify-center py-10 text-white/40">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      </div>
+                    ) : profiles.length === 0 ? (
+                      <div className="text-center py-10 text-white/30 text-[14px]">Belum ada profil.</div>
+                    ) : (
+                      profiles.map(p => (
+                        <div key={p.id} className="bg-white/[0.02] border border-white/5 rounded-[16px] p-3.5">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-white text-[15px]">{p.name}</span>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => openProfileEdit(p)}
+                                disabled={profilesSource !== 'mikrotik'}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-[#0A84FF] hover:bg-[#0A84FF]/10 disabled:opacity-30 transition-colors"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleProfileDelete(p)}
+                                disabled={profilesSource !== 'mikrotik'}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-white/50 hover:text-[#FF453A] hover:bg-[#FF453A]/10 disabled:opacity-30 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/50">
+                            <span className="flex items-center gap-1"><Gauge className="w-3 h-3" /> {p.rateLimit}</span>
+                            <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {p.sharedUsers}</span>
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {p.sessionTimeout}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}

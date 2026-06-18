@@ -62,6 +62,71 @@ export async function getProfiles(config: MikrotikConfig): Promise<MikrotikProfi
   }
 }
 
+export interface ProfileInput {
+  name: string;
+  rateLimit?: string;
+  sharedUsers?: string;
+  sessionTimeout?: string;
+}
+
+function connect(config: MikrotikConfig): RouterOSAPI {
+  const port = config.port ? parseInt(String(config.port)) : 8728;
+  return new RouterOSAPI({
+    host: config.host,
+    user: config.user,
+    password: config.pass,
+    port,
+    timeout: 5000,
+  });
+}
+
+function profileParams(p: ProfileInput): string[] {
+  const params: string[] = [`=name=${p.name}`];
+  if (p.rateLimit) params.push(`=rate-limit=${p.rateLimit}`);
+  if (p.sharedUsers) params.push(`=shared-users=${p.sharedUsers}`);
+  if (p.sessionTimeout) params.push(`=session-timeout=${p.sessionTimeout}`);
+  return params;
+}
+
+export async function createProfile(config: MikrotikConfig, p: ProfileInput) {
+  const api = connect(config);
+  try {
+    await api.connect();
+    return await api.write('/ip/hotspot/user/profile/add', profileParams(p));
+  } catch (error: any) {
+    console.error('[Mikrotik] createProfile error:', error?.message || error);
+    throw error;
+  } finally {
+    try { api.close(); } catch {}
+  }
+}
+
+export async function updateProfile(config: MikrotikConfig, id: string, p: ProfileInput) {
+  const api = connect(config);
+  try {
+    await api.connect();
+    return await api.write('/ip/hotspot/user/profile/set', [`=.id=${id}`, ...profileParams(p)]);
+  } catch (error: any) {
+    console.error('[Mikrotik] updateProfile error:', error?.message || error);
+    throw error;
+  } finally {
+    try { api.close(); } catch {}
+  }
+}
+
+export async function deleteProfile(config: MikrotikConfig, id: string) {
+  const api = connect(config);
+  try {
+    await api.connect();
+    return await api.write('/ip/hotspot/user/profile/remove', [`=.id=${id}`]);
+  } catch (error: any) {
+    console.error('[Mikrotik] deleteProfile error:', error?.message || error);
+    throw error;
+  } finally {
+    try { api.close(); } catch {}
+  }
+}
+
 export async function createVoucher(
   config: MikrotikConfig,
   profile: string,

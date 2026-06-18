@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { Pool } from "pg";
-import { createVoucher } from "./src/server/mikrotik";
+import { createVoucher, createProfile, updateProfile, deleteProfile } from "./src/server/mikrotik";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -920,6 +920,81 @@ async function startServer() {
       }
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  async function getRouterConfig(id: string) {
+    const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [id]);
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return { host: r.ip_address, user: r.username, pass: r.password, port: r.api_port };
+  }
+
+  // Validate hotspot profile fields before sending to RouterOS
+  function validateProfileInput(body: any): string | null {
+    const { name, rateLimit, sharedUsers, sessionTimeout } = body;
+    const hasCtrl = (s: string) => /[\x00-\x1f]/.test(s);
+    if (typeof name !== "string" || !/^[\w .\-]{1,64}$/.test(name)) {
+      return "Nama profil hanya boleh huruf, angka, spasi, titik, dash; maks 64 karakter.";
+    }
+    if (rateLimit !== undefined && rateLimit !== "" &&
+        (typeof rateLimit !== "string" || rateLimit.length > 64 || hasCtrl(rateLimit))) {
+      return "Rate limit tidak valid.";
+    }
+    if (sharedUsers !== undefined && sharedUsers !== "" &&
+        !/^\d{1,4}$/.test(String(sharedUsers))) {
+      return "Shared users harus angka (1-9999).";
+    }
+    if (sessionTimeout !== undefined && sessionTimeout !== "" &&
+        (typeof sessionTimeout !== "string" || sessionTimeout.length > 32 || hasCtrl(sessionTimeout))) {
+      return "Session timeout tidak valid.";
+    }
+    return null;
+  }
+
+  app.post("/api/routers/:id/profiles", requireAdmin, async (req, res) => {
+    try {
+      const { name, rateLimit, sharedUsers, sessionTimeout } = req.body;
+      if (!name) return res.status(400).json({ success: false, error: "Nama profil wajib diisi." });
+      const vErr = validateProfileInput(req.body);
+      if (vErr) return res.status(400).json({ success: false, error: vErr });
+      const cfg = await getRouterConfig(req.params.id);
+      if (!cfg) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      await createProfile(cfg, { name, rateLimit, sharedUsers, sessionTimeout });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: `Gagal membuat profil di router: ${err.message}` });
+    }
+  });
+
+  app.put("/api/routers/:id/profiles", requireAdmin, async (req, res) => {
+    try {
+      const { profileId, name, rateLimit, sharedUsers, sessionTimeout } = req.body;
+      if (!profileId || !name) return res.status(400).json({ success: false, error: "profileId dan name wajib diisi." });
+      if (typeof profileId !== "string" || profileId.length > 64 || /[\x00-\x1f]/.test(profileId)) {
+        return res.status(400).json({ success: false, error: "profileId tidak valid." });
+      }
+      const vErr = validateProfileInput(req.body);
+      if (vErr) return res.status(400).json({ success: false, error: vErr });
+      const cfg = await getRouterConfig(req.params.id);
+      if (!cfg) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      await updateProfile(cfg, profileId, { name, rateLimit, sharedUsers, sessionTimeout });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: `Gagal memperbarui profil di router: ${err.message}` });
+    }
+  });
+
+  app.delete("/api/routers/:id/profiles", requireAdmin, async (req, res) => {
+    try {
+      const { profileId } = req.body;
+      if (!profileId) return res.status(400).json({ success: false, error: "profileId wajib diisi." });
+      const cfg = await getRouterConfig(req.params.id);
+      if (!cfg) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      await deleteProfile(cfg, profileId);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: `Gagal menghapus profil di router: ${err.message}` });
     }
   });
 

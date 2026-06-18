@@ -85,6 +85,25 @@ type AppContextType = {
   updatePackage: (packageId: number, pkg: Omit<Package, 'id'>) => Promise<void>;
   deletePackage: (packageId: number) => Promise<void>;
   generateVoucherReal: (routerId: number, profile: string, name: string, password: string) => Promise<any>;
+  getRouterProfiles: (routerId: number) => Promise<{ data: MikrotikProfile[]; source: string; warning?: string }>;
+  createRouterProfile: (routerId: number, p: ProfileInput) => Promise<void>;
+  updateRouterProfile: (routerId: number, profileId: string, p: ProfileInput) => Promise<void>;
+  deleteRouterProfile: (routerId: number, profileId: string) => Promise<void>;
+};
+
+export type MikrotikProfile = {
+  id: string;
+  name: string;
+  sessionTimeout: string;
+  sharedUsers: string;
+  rateLimit: string;
+};
+
+export type ProfileInput = {
+  name: string;
+  rateLimit?: string;
+  sharedUsers?: string;
+  sessionTimeout?: string;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -351,6 +370,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return res;
   };
 
+  const getRouterProfiles = async (routerId: number) => {
+    const res = await apiFetch(`/api/routers/${routerId}/profiles`);
+    if (!res.success) throw new Error(res.error || "Gagal memuat profil");
+    return { data: res.data as MikrotikProfile[], source: res.source, warning: res.warning };
+  };
+
+  const createRouterProfile = async (routerId: number, p: ProfileInput) => {
+    const res = await apiFetch(`/api/routers/${routerId}/profiles`, {
+      method: "POST",
+      body: JSON.stringify(p),
+    });
+    if (!res.success) throw new Error(res.error || "Gagal membuat profil");
+  };
+
+  const updateRouterProfile = async (routerId: number, profileId: string, p: ProfileInput) => {
+    const res = await apiFetch(`/api/routers/${routerId}/profiles`, {
+      method: "PUT",
+      body: JSON.stringify({ profileId, ...p }),
+    });
+    if (!res.success) throw new Error(res.error || "Gagal memperbarui profil");
+  };
+
+  const deleteRouterProfile = async (routerId: number, profileId: string) => {
+    const res = await apiFetch(`/api/routers/${routerId}/profiles`, {
+      method: "DELETE",
+      body: JSON.stringify({ profileId }),
+    });
+    if (!res.success) throw new Error(res.error || "Gagal menghapus profil");
+  };
+
   return (
     <AppContext.Provider value={{
       currentUser, setCurrentUser,
@@ -364,6 +413,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUsers(prev => prev.filter(u => u.id !== userId));
       },
       deleteVoucher, addPackage, updatePackage, deletePackage, generateVoucherReal,
+      getRouterProfiles, createRouterProfile, updateRouterProfile, deleteRouterProfile,
     }}>
       {children}
     </AppContext.Provider>
