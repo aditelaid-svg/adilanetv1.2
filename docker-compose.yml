@@ -32,9 +32,12 @@ services:
   # ── Aplikasi AdilaNet ───────────────────────────────────────
   app:
     build:
-      # Ganti URL ini dengan repo GitHub kamu setelah push
-      # Contoh: https://github.com/namakamu/adilanet.git
-      context: https://github.com/GITHUB_USERNAME/NAMA_REPO.git
+      # Ganti URL ini dengan repo GitHub kamu setelah push.
+      # WAJIB tambahkan #main di akhir (nama branch). Tanpa itu Docker mencari
+      # branch "master" dan gagal: "repository does not contain ref master".
+      # Kalau branch repo kamu bernama "master", ganti #main jadi #master.
+      # Contoh: https://github.com/namakamu/adilanet.git#main
+      context: https://github.com/GITHUB_USERNAME/NAMA_REPO.git#main
       # Untuk build dari folder lokal (tanpa GitHub), ganti baris di atas dengan:
       # context: .
     container_name: adilanet_app
