@@ -32,8 +32,25 @@ async function hashSecret(value: string): Promise<string> {
 }
 
 async function generateUniqueVoucher(): Promise<string> {
-  for (let i = 0; i < 12; i++) {
-    const code = `WFI-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+  // Format is configurable from the admin Settings page (stored in `settings`):
+  // voucherCharset (alphanumeric|numeric|alpha), voucherLength, voucherPrefix.
+  // Sensible defaults are used when a setting is missing (e.g. older DBs).
+  const s = await getSettings();
+  const NUM = "0123456789";
+  const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let chars = ALPHA + NUM;
+  if (s.voucherCharset === "numeric") chars = NUM;
+  else if (s.voucherCharset === "alpha") chars = ALPHA;
+  let length = parseInt(s.voucherLength || "8", 10);
+  if (!Number.isFinite(length) || length < 4) length = 8;
+  if (length > 20) length = 20;
+  const prefix = s.voucherPrefix !== undefined ? s.voucherPrefix : "WFI-";
+  // More retries because admins may pick a small keyspace (e.g. numeric+length 4),
+  // where collisions become likelier as more vouchers are issued.
+  for (let i = 0; i < 50; i++) {
+    let body = "";
+    for (let j = 0; j < length; j++) body += chars[crypto.randomInt(chars.length)];
+    const code = `${prefix}${body}`;
     const { rows } = await pool.query("SELECT 1 FROM transactions WHERE voucher_code = $1", [code]);
     if (rows.length === 0) return code;
   }
@@ -170,10 +187,23 @@ async function initDb() {
       ('merchantId', ''),
       ('telegramToken', ''),
       ('telegramChatId', ''),
-      ('qrisEnabled', 'true')
+      ('qrisEnabled', 'true'),
+      ('voucherCharset', 'alphanumeric'),
+      ('voucherLength', '8'),
+      ('voucherPrefix', 'WFI-')
       ON CONFLICT DO NOTHING;
     `);
   }
+
+  // Ensure voucher-format settings exist on pre-existing DBs (idempotent;
+  // never overwrites values the admin has already chosen).
+  await pool.query(`
+    INSERT INTO settings (config_key, config_value) VALUES
+      ('voucherCharset', 'alphanumeric'),
+      ('voucherLength', '8'),
+      ('voucherPrefix', 'WFI-')
+    ON CONFLICT (config_key) DO NOTHING;
+  `);
 
   // Ensure pin column can hold a bcrypt hash (~60 chars) on pre-existing DBs
   await pool.query(`ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255)`);
@@ -786,7 +816,10 @@ async function startServer() {
           merchantId: s.merchantId || '',
           telegramToken: s.telegramToken || '',
           telegramChatId: s.telegramChatId || '',
-          qrisEnabled: s.qrisEnabled !== 'false'
+          qrisEnabled: s.qrisEnabled !== 'false',
+          voucherCharset: s.voucherCharset || 'alphanumeric',
+          voucherLength: parseInt(s.voucherLength || '8', 10),
+          voucherPrefix: s.voucherPrefix !== undefined ? s.voucherPrefix : 'WFI-'
         }
       });
     } catch (err: any) {
@@ -796,13 +829,28 @@ async function startServer() {
 
   app.post("/api/settings", requireAdmin, async (req, res) => {
     try {
-      const { sanpayApiKey, merchantId, telegramToken, telegramChatId, qrisEnabled } = req.body;
+      const { sanpayApiKey, merchantId, telegramToken, telegramChatId, qrisEnabled,
+              voucherCharset, voucherLength, voucherPrefix } = req.body;
+
+      // Validate & sanitize voucher-format settings.
+      const charset = ['alphanumeric', 'numeric', 'alpha'].includes(voucherCharset)
+        ? voucherCharset : 'alphanumeric';
+      let vlen = parseInt(String(voucherLength), 10);
+      if (!Number.isFinite(vlen) || vlen < 4) vlen = 8;
+      if (vlen > 20) vlen = 20;
+      let vprefix = typeof voucherPrefix === 'string'
+        ? voucherPrefix.toUpperCase().replace(/[^A-Z0-9-]/g, '') : 'WFI-';
+      if (vprefix.length > 10) vprefix = vprefix.slice(0, 10);
+
       const updates = [
         ['sanpayApiKey', sanpayApiKey ?? ''],
         ['merchantId', merchantId ?? ''],
         ['telegramToken', telegramToken ?? ''],
         ['telegramChatId', telegramChatId ?? ''],
         ['qrisEnabled', String(qrisEnabled ?? true)],
+        ['voucherCharset', charset],
+        ['voucherLength', String(vlen)],
+        ['voucherPrefix', vprefix],
       ];
       for (const [key, val] of updates) {
         await pool.query(

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy } from 'lucide-react';
+import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy, Ticket } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
 
 export default function AdminSettings() {
@@ -11,6 +11,10 @@ export default function AdminSettings() {
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [qrisEnabled, setQrisEnabled] = useState(true);
+
+  const [voucherCharset, setVoucherCharset] = useState('alphanumeric');
+  const [voucherLength, setVoucherLength] = useState(8);
+  const [voucherPrefix, setVoucherPrefix] = useState('WFI-');
 
   const [adminPassword, setAdminPassword] = useState('');
   const [passwordSaved, setPasswordSaved] = useState(false);
@@ -35,6 +39,9 @@ export default function AdminSettings() {
           setTelegramToken(json.data.telegramToken || '');
           setTelegramChatId(json.data.telegramChatId || '');
           setQrisEnabled(json.data.qrisEnabled ?? true);
+          setVoucherCharset(json.data.voucherCharset || 'alphanumeric');
+          setVoucherLength(json.data.voucherLength || 8);
+          setVoucherPrefix(json.data.voucherPrefix ?? 'WFI-');
         }
       } catch (err) {
         console.error("Gagal memuat setting:", err);
@@ -56,7 +63,10 @@ export default function AdminSettings() {
                 merchantId: merchantId,
                 telegramToken: telegramToken,
                 telegramChatId: telegramChatId,
-                qrisEnabled: qrisEnabled
+                qrisEnabled: qrisEnabled,
+                voucherCharset: voucherCharset,
+                voucherLength: voucherLength,
+                voucherPrefix: voucherPrefix
             })
         });
         const json = await res.json();
@@ -197,6 +207,85 @@ export default function AdminSettings() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="bg-white/[0.03] backdrop-blur-2xl border border-white/5 rounded-[24px] p-5 shadow-sm"
+        >
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-[12px] bg-[#34C759]/20 text-[#34C759] flex items-center justify-center">
+              <Ticket className="w-5 h-5" />
+            </div>
+            <h2 className="font-semibold text-[15px] text-white">Format Kode Voucher</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Tipe Karakter</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { v: 'alphanumeric', l: 'Huruf + Angka' },
+                  { v: 'numeric', l: 'Angka Saja' },
+                  { v: 'alpha', l: 'Huruf Saja' },
+                ].map(opt => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setVoucherCharset(opt.v)}
+                    className={`py-3 rounded-[14px] text-[13px] font-semibold border transition-colors ${
+                      voucherCharset === opt.v
+                        ? 'bg-[#34C759]/15 border-[#34C759]/40 text-[#34C759]'
+                        : 'bg-white/[0.02] border-white/5 text-white/60 hover:text-white/80'
+                    }`}
+                  >
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Panjang Kode</label>
+                <input
+                  type="number"
+                  min={4}
+                  max={20}
+                  value={voucherLength}
+                  onChange={e => setVoucherLength(Number(e.target.value))}
+                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] focus:outline-none focus:border-[#34C759]/50 transition-colors"
+                />
+                <p className="text-[11px] text-white/35 mt-1.5">4–20 karakter (di luar prefix)</p>
+              </div>
+              <div>
+                <label className="block text-[13px] font-semibold tracking-wide uppercase text-white/50 mb-2">Prefix / Awalan</label>
+                <input
+                  type="text"
+                  value={voucherPrefix}
+                  onChange={e => setVoucherPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 10))}
+                  placeholder="(kosongkan jika tanpa awalan)"
+                  className="w-full bg-white/[0.02] border border-white/5 rounded-[16px] px-4 py-3.5 text-white text-[15px] font-mono focus:outline-none focus:border-[#34C759]/50 transition-colors"
+                />
+                <p className="text-[11px] text-white/35 mt-1.5">Mis. WFI- atau kosong</p>
+              </div>
+            </div>
+
+            <div className="bg-[#34C759]/8 border border-[#34C759]/20 rounded-[16px] p-4">
+              <p className="text-[11px] font-semibold tracking-wide uppercase text-white/40 mb-1.5">Contoh Hasil</p>
+              <code className="text-[16px] text-[#34C759] font-mono font-bold break-all">
+                {(() => {
+                  const NUM = '0123456789';
+                  const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                  const rep = voucherCharset === 'numeric' ? NUM : voucherCharset === 'alpha' ? ALPHA : 'A1B2C3D4E5F6G7H8J9K0';
+                  const n = Math.min(Math.max(Number(voucherLength) || 8, 4), 20);
+                  const body = Array.from({ length: n }, (_, i) => rep[i % rep.length]).join('');
+                  return `${voucherPrefix}${body}`;
+                })()}
+              </code>
+              <p className="text-[11px] text-white/35 mt-2">Username & password Mikrotik memakai kode yang sama.</p>
             </div>
           </div>
         </motion.div>
