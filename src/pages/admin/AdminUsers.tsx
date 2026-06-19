@@ -3,6 +3,7 @@ import { useAppContext } from '../../AppContext';
 import { useToast } from '../../components/Toast';
 import { Users, Search, UserCheck, UserX, Wallet, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { formatRupiah } from '../../lib/format';
@@ -216,7 +217,8 @@ export default function AdminUsers() {
       </div>
 
       {/* Topup Modal */}
-      <AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
         {topupModalUser && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm">
             <motion.div
@@ -270,7 +272,9 @@ export default function AdminUsers() {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

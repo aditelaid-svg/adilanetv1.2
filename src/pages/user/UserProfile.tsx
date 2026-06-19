@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../AppContext';
 import { User as UserIcon, LogOut, ChevronRight, Hash, Phone, Mail, KeyRound, ShieldAlert, X, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 
 export default function UserProfile() {
@@ -165,7 +166,8 @@ export default function UserProfile() {
       </div>
 
       {/* Modals */}
-      <AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
         {showPasswordModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/30 backdrop-blur-sm">
             <motion.div
@@ -232,7 +234,9 @@ export default function UserProfile() {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

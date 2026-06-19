@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../AppContext';
 import { Ticket, Plus, Printer, Settings2, RefreshCw, Wifi, Clock, AlertCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { formatRupiah } from '../../lib/format';
 
 interface MikrotikProfile {
@@ -203,7 +204,8 @@ export default function AdminVouchers() {
       </div>
 
       {/* Generate Modal */}
-      <AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
         {showGenerate && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -393,7 +395,9 @@ export default function AdminVouchers() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

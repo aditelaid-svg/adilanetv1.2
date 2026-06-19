@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext, Package, Promo } from '../../AppContext';
 import { Wifi, Zap, ShieldCheck, X, Check, Copy, Wallet, CheckCircle2, ChevronRight, Lock, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { formatRupiah } from '../../lib/format';
 
@@ -242,7 +243,8 @@ export default function UserBuy() {
       </div>
 
       {/* Purchase Modal */}
-      <AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
         {selectedPkg && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -450,7 +452,9 @@ export default function UserBuy() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
