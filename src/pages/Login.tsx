@@ -51,7 +51,6 @@ export default function Login() {
             <img src="/logo.png" alt="AdilaNet" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-[26px] font-bold text-slate-800 tracking-tight">AdilaNet Login</h1>
-          <p className="text-slate-500 text-[13px] font-medium mt-1 text-center">Keamanan Tinggi Diaktifkan</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
