@@ -3,6 +3,7 @@ import { useAppContext, MikrotikProfile, ActiveUser } from '../../AppContext';
 import { useToast } from '../../components/Toast';
 import { Router, Plus, X, Pencil, CheckCircle, XCircle, Loader2, Activity, Layers, Trash2, Gauge, Users, Clock, Wifi, RefreshCw, Smartphone, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { formatBytes } from '../../lib/format';
 import EmptyState from '../../components/ui/EmptyState';
 
@@ -353,7 +354,8 @@ export default function AdminRouters() {
       </div>
 
       {/* Add / Edit Modal */}
-      <AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
         {showAdd && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -416,10 +418,13 @@ export default function AdminRouters() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
 
       {/* Profile Manager Modal */}
-      <AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
         {profileRouterId !== null && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -555,10 +560,13 @@ export default function AdminRouters() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
 
       {/* Active (online) Users Modal */}
-      <AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
         {activeRouterId !== null && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -654,7 +662,9 @@ export default function AdminRouters() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
