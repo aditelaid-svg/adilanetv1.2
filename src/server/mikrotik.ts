@@ -264,6 +264,69 @@ export async function getActiveUsers(config: MikrotikConfig): Promise<ActiveUser
   }
 }
 
+export interface HotspotUser {
+  id: string;
+  name: string;
+  profile: string;
+  comment: string;
+  uptime: string;
+  bytesIn: number;
+  bytesOut: number;
+  online: boolean;
+  macAddress: string;
+  address: string;
+  disabled: boolean;
+  server: string;
+}
+
+// Read the FULL configured hotspot user list (RouterOS `/ip/hotspot/user`),
+// like Mikhmon's "Users" page — includes offline users too. Merged with the
+// live `/ip/hotspot/active` sessions so each row knows if it is currently online
+// and its MAC/address. Totals (uptime, bytes) come from the user table so they
+// persist after disconnect.
+export async function getHotspotUsers(config: MikrotikConfig): Promise<HotspotUser[]> {
+  const api = connect(config);
+  try {
+    await api.connect();
+    const usersRaw = await api.write('/ip/hotspot/user/print') as any[];
+    const activeRaw = await api.write('/ip/hotspot/active/print') as any[];
+    const users = Array.isArray(usersRaw) ? usersRaw : [];
+    const active = Array.isArray(activeRaw) ? activeRaw : [];
+    const activeByUser = new Map<string, any>();
+    for (const a of active) {
+      if (a && a.user) activeByUser.set(String(a.user), a);
+    }
+    return users
+      .filter((u: any) => u && u.name)
+      .map((u: any) => {
+        const a = activeByUser.get(String(u.name));
+        return {
+          id: u['.id'] || u.id || u.name,
+          name: u.name,
+          profile: u.profile || 'default',
+          comment: u.comment || '',
+          uptime: parseUptime(u.uptime || ''),
+          bytesIn: toNum(u['bytes-in'] ?? u.bytesIn),
+          bytesOut: toNum(u['bytes-out'] ?? u.bytesOut),
+          online: !!a,
+          macAddress: a ? (a['mac-address'] || a.macAddress || '') : (u['mac-address'] || ''),
+          address: a ? (a.address || '') : '',
+          disabled: String(u.disabled) === 'true' || u.disabled === true,
+          server: u.server || '',
+        };
+      })
+      // Online users first, then alphabetical — deterministic order for the UI.
+      .sort((x, y) =>
+        x.online === y.online ? x.name.localeCompare(y.name) : x.online ? -1 : 1
+      );
+  } catch (error: any) {
+    console.error('[Mikrotik] getHotspotUsers error:', error?.message || error);
+    throw error;
+  } finally {
+    try { api.close(); } catch {}
+  }
+}
+
 // RouterOS uptime is like "1d2h3m4s" / "2h15m" / "45s". Normalise to a short label.
 function parseUptime(up: string): string {
   if (!up) return '-';

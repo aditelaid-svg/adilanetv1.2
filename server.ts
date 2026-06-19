@@ -890,6 +890,28 @@ async function startServer() {
     }
   });
 
+  // Full configured hotspot user list (online + offline), like Mikhmon's Users page.
+  app.get("/api/routers/:id/hotspot-users", requireAdmin, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      const router = rows[0];
+      const { getHotspotUsers } = await import("./src/server/mikrotik");
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Mikrotik connection timeout")), 6000)
+      );
+      const users = await Promise.race([
+        getHotspotUsers({ host: router.ip_address, user: router.username, pass: router.password, port: router.api_port }),
+        timeoutPromise,
+      ]);
+      await pool.query(`UPDATE routers SET status='online' WHERE id=$1`, [router.id]).catch(() => {});
+      res.json({ success: true, data: users });
+    } catch (err: any) {
+      await pool.query(`UPDATE routers SET status='offline' WHERE id=$1`, [req.params.id]).catch(() => {});
+      res.status(502).json({ success: false, error: `Gagal membaca user hotspot: ${err.message}` });
+    }
+  });
+
   // ─── TRANSACTIONS ────────────────────────────────────────────────────────
   app.get("/api/transactions", requireAuth, async (req, res) => {
     try {

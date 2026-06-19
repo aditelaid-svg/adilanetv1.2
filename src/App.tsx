@@ -24,6 +24,7 @@ import AdminRouters from './pages/admin/AdminRouters';
 import AdminPackages from './pages/admin/AdminPackages';
 import AdminTransactions from './pages/admin/AdminTransactions';
 import AdminVouchers from './pages/admin/AdminVouchers';
+import AdminHotspotUsers from './pages/admin/AdminHotspotUsers';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminPromos from './pages/admin/AdminPromos';
@@ -48,6 +49,7 @@ function AppRoutes() {
           <Route path="topups" element={<AdminTopups />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="vouchers" element={<AdminVouchers />} />
+          <Route path="hotspot-users" element={<AdminHotspotUsers />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Route>

@@ -137,6 +137,7 @@ type AppContextType = {
   deletePackage: (packageId: number) => Promise<void>;
   generateVoucherReal: (routerId: number, profile: string, name: string, password: string) => Promise<any>;
   getRouterActiveUsers: (routerId: number) => Promise<ActiveUser[]>;
+  getRouterHotspotUsers: (routerId: number) => Promise<HotspotUser[]>;
   getRouterProfiles: (routerId: number) => Promise<{ data: MikrotikProfile[]; source: string; warning?: string }>;
   createRouterProfile: (routerId: number, p: ProfileInput) => Promise<void>;
   updateRouterProfile: (routerId: number, profileId: string, p: ProfileInput) => Promise<void>;
@@ -170,6 +171,21 @@ export type ActiveUser = {
   bytesIn: number;
   bytesOut: number;
   loginBy: string;
+};
+
+export type HotspotUser = {
+  id: string;
+  name: string;
+  profile: string;
+  comment: string;
+  uptime: string;
+  bytesIn: number;
+  bytesOut: number;
+  online: boolean;
+  macAddress: string;
+  address: string;
+  disabled: boolean;
+  server: string;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -504,6 +520,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return res.data as ActiveUser[];
   };
 
+  const getRouterHotspotUsers = async (routerId: number) => {
+    const res = await apiFetch(`/api/routers/${routerId}/hotspot-users`);
+    if (!res.success) throw new Error(res.error || "Gagal memuat user hotspot");
+    return res.data as HotspotUser[];
+  };
+
   const getRouterProfiles = async (routerId: number) => {
     const res = await apiFetch(`/api/routers/${routerId}/profiles`);
     if (!res.success) throw new Error(res.error || "Gagal memuat profil");
@@ -549,7 +571,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUsers(prev => prev.filter(u => u.id !== userId));
       },
       deleteVoucher, addPackage, updatePackage, deletePackage, generateVoucherReal,
-      getRouterActiveUsers, getRouterProfiles, createRouterProfile, updateRouterProfile, deleteRouterProfile,
+      getRouterActiveUsers, getRouterHotspotUsers, getRouterProfiles, createRouterProfile, updateRouterProfile, deleteRouterProfile,
     }}>
       {children}
     </AppContext.Provider>
