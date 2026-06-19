@@ -2,6 +2,7 @@
 - [Package schema](package-schema.md) — packages table has router_id and mikrotik_profile (nullable); AppContext has updatePackage via PATCH /api/packages/:id.
 - [SanPay QRIS](sanpay-qris.md) — real QRIS via create-qris + signed webhook fulfillment; vouchers only minted after verified+amount-matched payment. Replaces old insecure /api/transactions/public.
 - [Voucher format](voucher-format.md) — admin-configurable charset/length/prefix in settings table; generateUniqueVoucher reads them; username=password mode kept.
+- [Admin bulk vouchers](voucher-bulk-admin.md) — AdminVouchers now really provisions N codes to MikroTik via POST /api/router/create-vouchers-bulk + createVouchersBulk (one connection, partial-failure). Stateless (no DB), like single-create.
 - [WiFi auto-login](wifi-auto-login.md) — admin `hotspotLoginUrl` setting (gateway login page, not API host); UserBuy success shows one-tap "Login WiFi" via top-level POST form.
 - [Docker deploy](docker-deploy.md) — Dockge/compose builds from GitHub context; SESSION_SECRET is mandatory (server throws without it); tables auto-create on boot.
 - [Mikrotik API](mikrotik-api.md) — createVoucher uses array param format `=key=value`, port passed from router.api_port; getProfiles with port support.

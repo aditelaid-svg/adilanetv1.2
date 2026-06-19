@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { Pool } from "pg";
-import { createVoucher, createProfile, updateProfile, deleteProfile } from "./src/server/mikrotik";
+import { createVoucher, createVouchersBulk, createProfile, updateProfile, deleteProfile } from "./src/server/mikrotik";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -73,6 +73,19 @@ async function generateUniqueVoucher(): Promise<string> {
     if (rows.length === 0) return code;
   }
   throw new Error("Gagal menghasilkan kode voucher unik, coba lagi.");
+}
+
+// Random voucher code for admin bulk generation. Respects the per-batch format
+// chosen in the UI (alphanumeric vs digits-only). Uniqueness within a batch and
+// across the router is handled by the caller / MikroTik (duplicate usernames are
+// rejected), so this just needs decent entropy.
+function genBulkCode(format: string): string {
+  const NUM = "0123456789";
+  const ALNUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const chars = format === "numbers" ? NUM : ALNUM;
+  let s = "";
+  for (let i = 0; i < 6; i++) s += chars[crypto.randomInt(chars.length)];
+  return s;
 }
 
 // ─── AUTH MIDDLEWARE ────────────────────────────────────────────────────────
@@ -1650,6 +1663,56 @@ async function startServer() {
         name,
         password,
         buildVoucherIdentity({ admin: true })
+      );
+      res.json({ success: true, data: result });
+    } catch (err: any) {
+      console.error(err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Bulk-generate vouchers and provision them on the router in one batch.
+  app.post("/api/router/create-vouchers-bulk", requireAdmin, async (req, res) => {
+    try {
+      const { routerId, profile, quantity, codeFormat, loginMode } = req.body;
+      if (!routerId || !profile) {
+        return res.status(400).json({ success: false, error: "routerId dan profile wajib diisi." });
+      }
+      const qty = parseInt(String(quantity), 10);
+      if (!Number.isFinite(qty) || qty < 1 || qty > 200) {
+        return res.status(400).json({ success: false, error: "Jumlah voucher harus antara 1 dan 200." });
+      }
+      const fmt = codeFormat === "numbers" ? "numbers" : "alphanumeric";
+      const separate = loginMode === "separate";
+
+      const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [routerId]);
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      const router = rows[0];
+
+      // Generate unique codes within the batch (MikroTik enforces uniqueness too).
+      const seen = new Set<string>();
+      const vouchers: { name: string; password: string; comment?: string }[] = [];
+      const identity = buildVoucherIdentity({ admin: true });
+      let guard = 0;
+      while (vouchers.length < qty && guard < qty * 50) {
+        guard++;
+        const user = genBulkCode(fmt);
+        if (seen.has(user)) continue;
+        seen.add(user);
+        const pass = separate ? genBulkCode(fmt) : user;
+        vouchers.push({ name: user, password: pass, comment: identity });
+      }
+      if (vouchers.length < qty) {
+        return res.status(400).json({
+          success: false,
+          error: "Tidak bisa membuat kode unik sebanyak itu. Kurangi jumlah atau ganti format kode.",
+        });
+      }
+
+      const result = await createVouchersBulk(
+        { host: router.ip_address, user: router.username, pass: router.password, port: router.api_port },
+        profile,
+        vouchers
       );
       res.json({ success: true, data: result });
     } catch (err: any) {

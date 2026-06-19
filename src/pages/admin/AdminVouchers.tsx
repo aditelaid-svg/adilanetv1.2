@@ -4,6 +4,7 @@ import { Ticket, Plus, Printer, Settings2, RefreshCw, Wifi, Clock, AlertCircle, 
 import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { formatRupiah } from '../../lib/format';
+import { useToast } from '../../components/Toast';
 
 interface MikrotikProfile {
   id: string;
@@ -15,6 +16,7 @@ interface MikrotikProfile {
 
 export default function AdminVouchers() {
   const { routers } = useAppContext();
+  const toast = useToast();
   const [showGenerate, setShowGenerate] = useState(false);
 
   const [selectedRouter, setSelectedRouter] = useState('');
@@ -69,31 +71,46 @@ export default function AdminVouchers() {
     }
   };
 
-  const generateRandomCode = (format: string) => {
-    const chars = format === 'numbers' ? '0123456789' : 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  };
-
-  const handleGenerate = (e: React.FormEvent) => {
+  const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRouter || !mikrotikProfile || !price || !quantity) return;
     setIsGenerating(true);
-    setTimeout(() => {
-      const qty = parseInt(quantity);
-      const codes = [];
-      for (let i = 0; i < qty; i++) {
-        const user = generateRandomCode(codeFormat);
-        const pass = loginMode === 'user_is_pass' ? user : generateRandomCode(codeFormat);
-        codes.push({ user, pass });
+    try {
+      const res = await fetch('/api/router/create-vouchers-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          routerId: selectedRouter,
+          profile: mikrotikProfile,
+          quantity: parseInt(quantity),
+          codeFormat,
+          loginMode,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        toast.error('Gagal membuat voucher', data.error || 'Coba lagi.');
+        return;
       }
-      setGeneratedCodes(codes);
-      setIsGenerating(false);
+      const created: { name: string; password: string }[] = data.data?.created || [];
+      const failed: { name: string; error: string }[] = data.data?.failed || [];
+      setGeneratedCodes(created.map(c => ({ user: c.name, pass: c.password })));
       setShowGenerate(false);
-    }, 600);
+      if (created.length === 0) {
+        toast.error('Tidak ada voucher dibuat', failed[0]?.error || 'Semua kode gagal dibuat di router.');
+      } else if (failed.length > 0) {
+        toast.warning(
+          `${created.length} voucher dibuat`,
+          `${failed.length} gagal (kemungkinan kode bentrok). Sisanya berhasil masuk Mikrotik.`
+        );
+      } else {
+        toast.success(`${created.length} voucher dibuat!`, 'Semua kode sudah aktif di Mikrotik.');
+      }
+    } catch {
+      toast.error('Jaringan error', 'Tidak bisa terhubung ke server.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handlePrint = () => {

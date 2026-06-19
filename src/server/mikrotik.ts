@@ -351,6 +351,60 @@ export async function deleteProfile(config: MikrotikConfig, id: string) {
   }
 }
 
+// Create many vouchers over a SINGLE RouterOS connection. Far faster and gentler
+// on the router than calling createVoucher per code (which connects/closes each
+// time). Each voucher that fails (e.g. duplicate username) is reported in
+// `failed` instead of aborting the whole batch. The reaper self-heal runs once
+// at the end so fixed-validity batches still expire reliably.
+export async function createVouchersBulk(
+  config: MikrotikConfig,
+  profile: string,
+  vouchers: { name: string; password: string; comment?: string }[]
+): Promise<{
+  created: { name: string; password: string }[];
+  failed: { name: string; error: string }[];
+}> {
+  const port = config.port ? parseInt(String(config.port)) : 8728;
+  const api = new RouterOSAPI({
+    host: config.host,
+    user: config.user,
+    password: config.pass,
+    port,
+    timeout: 10000,
+  });
+  const created: { name: string; password: string }[] = [];
+  const failed: { name: string; error: string }[] = [];
+
+  try {
+    await api.connect();
+    for (const v of vouchers) {
+      try {
+        const params = [
+          `=name=${v.name}`,
+          `=password=${v.password}`,
+          `=profile=${profile}`,
+        ];
+        const c = sanitizeComment(v.comment ?? '');
+        if (c) params.push(`=comment=${c}`);
+        await api.write('/ip/hotspot/user/add', params);
+        created.push({ name: v.name, password: v.password });
+      } catch (e: any) {
+        failed.push({ name: v.name, error: e?.message || String(e) });
+      }
+    }
+    // Self-heal the validity reaper once for the whole batch (best-effort).
+    if (created.length > 0) {
+      await ensureValidityEnforcement(api, profile);
+    }
+    return { created, failed };
+  } catch (error: any) {
+    console.error('[Mikrotik] createVouchersBulk error:', error?.message || error);
+    throw error;
+  } finally {
+    try { api.close(); } catch {}
+  }
+}
+
 export async function createVoucher(
   config: MikrotikConfig,
   profile: string,
