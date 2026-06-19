@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Router as RouterIcon, Ticket, Receipt, Users, Settings, Menu, X, LogOut, ChevronLeft, Megaphone, Wallet } from 'lucide-react';
+import { LayoutDashboard, Router as RouterIcon, Ticket, TicketPlus, Receipt, Users, Settings, Menu, X, LogOut, ChevronLeft, Megaphone, Wallet } from 'lucide-react';
 import { cn } from './UserLayout';
 import { useAppContext } from '../AppContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -10,6 +10,7 @@ const adminNav = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/' },
   { icon: RouterIcon, label: 'Router MikroTik', path: '/admin/routers' },
   { icon: Ticket, label: 'Paket Voucher', path: '/admin/packages' },
+  { icon: TicketPlus, label: 'Generate Voucher', path: '/admin/vouchers' },
   { icon: Megaphone, label: 'Promo / Banner', path: '/admin/promos' },
   { icon: Receipt, label: 'Transaksi', path: '/admin/transactions' },
   { icon: Wallet, label: 'Riwayat Top Up', path: '/admin/topups' },
