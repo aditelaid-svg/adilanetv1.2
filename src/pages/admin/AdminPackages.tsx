@@ -3,6 +3,7 @@ import { useAppContext, Package } from '../../AppContext';
 import { useToast } from '../../components/Toast';
 import { Plus, Edit, Trash2, Clock, Zap, Wifi, Link as LinkIcon, Check, X, RefreshCw, AlertCircle, Router } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { formatRupiah } from '../../lib/format';
 import EmptyState from '../../components/ui/EmptyState';
 
@@ -266,7 +267,8 @@ export default function AdminPackages() {
         ))}
       </div>
 
-      <AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
         {showModal && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -453,7 +455,9 @@ export default function AdminPackages() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

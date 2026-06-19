@@ -3,6 +3,7 @@ import { useAppContext, Promo, PromoInput } from '../../AppContext';
 import { useToast } from '../../components/Toast';
 import { Plus, Edit, Trash2, X, RefreshCw, Image as ImageIcon, Megaphone, Eye, EyeOff, Calendar, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { PROMO_BG, PROMO_COLOR_OPTIONS, PROMO_ICON_OPTIONS, PromoIcon } from '../../lib/promoStyles';
 import EmptyState from '../../components/ui/EmptyState';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -332,7 +333,8 @@ export default function AdminPromos() {
         </div>
       )}
 
-      <AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
         {showModal && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -539,7 +541,9 @@ export default function AdminPromos() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

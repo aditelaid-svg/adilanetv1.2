@@ -21,3 +21,8 @@ description: Shared design tokens, format helpers, and UI primitives — prefer 
 
 ## Pre-existing type noise (not from UI work)
 `npx tsc --noEmit` reports errors in `src/pages/admin/AdminSettings.tsx` (`import.meta.env`) and `vite.config.ts` (`server.allowedHosts: boolean`). These predate the UI polish and don't break the dev/build runtime — don't chase them when validating UI changes.
+
+## Modals must use a portal (createPortal → document.body)
+Every route page is wrapped by `AnimatedOutlet` (a motion.div with transform + `will-change: transform`), which establishes a CSS containing block. Any `position: fixed` modal rendered inside a page is re-rooted to that box instead of the viewport — it appears trapped near the top, the backdrop doesn't cover the full screen, and `items-end` bottom-sheets float mid-screen.
+**Fix/convention:** wrap modal overlays in `createPortal(<AnimatePresence>…</AnimatePresence>, document.body)`.
+**Why:** transformed / will-change / filter ancestors re-root `position: fixed`. Any NEW modal in this app must be portaled or it will be trapped.
