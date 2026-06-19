@@ -149,6 +149,32 @@ async function ensureReaper(api: RouterOSAPI) {
   ]);
 }
 
+// Guarantee that a voucher's profile can actually enforce its masa-aktif window.
+// If the profile carries an on-login arming script (i.e. it is a fixed-validity
+// profile), make sure the global reaper scheduler EXISTS on this router so the
+// minute counter is really counted down — otherwise vouchers silently never
+// expire ("los") whenever the reaper was missing, deleted, or the profile was
+// created before reaper support. For non-validity profiles we only keep an
+// already-installed reaper's script current. Best-effort: never blocks voucher
+// creation.
+async function ensureValidityEnforcement(api: RouterOSAPI, profileName: string) {
+  try {
+    const rows = await api.write('/ip/hotspot/user/profile/print', [`?name=${profileName}`]) as any[];
+    const prof = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    const onLogin = prof ? (prof['on-login'] || prof.onLogin || '') : '';
+    if (onLogin) {
+      await ensureReaper(api);
+    } else {
+      await syncReaperIfPresent(api);
+    }
+  } catch (e: any) {
+    console.warn('[Mikrotik] ensureValidityEnforcement gagal:', e?.message || e);
+    // Profile lookup failed — preserve the original behaviour of keeping an
+    // already-installed reaper's script current. Still best-effort.
+    await syncReaperIfPresent(api);
+  }
+}
+
 export async function getProfiles(config: MikrotikConfig): Promise<MikrotikProfile[]> {
   const port = config.port ? parseInt(String(config.port)) : 8728;
   const api = new RouterOSAPI({
@@ -354,10 +380,13 @@ export async function createVoucher(
     const c = sanitizeComment(comment ?? '');
     if (c) params.push(`=comment=${c}`);
     const result = await api.write('/ip/hotspot/user/add', params);
-    // Push the latest reaper script to routers that already run one, so the new
-    // identifier-aware comment format is counted down correctly even before any
-    // profile is re-edited. Best-effort; never blocks voucher creation.
-    await syncReaperIfPresent(api);
+    // Guarantee this voucher can actually expire: if its profile is a
+    // fixed-validity (masa aktif) profile, make sure the global reaper
+    // scheduler exists and runs the latest script. This self-heals routers
+    // whose reaper was never installed or got deleted, which is the usual
+    // cause of vouchers never expiring ("los"). Best-effort; never blocks
+    // voucher creation.
+    await ensureValidityEnforcement(api, profile);
     return result;
   } catch (error: any) {
     console.error('[Mikrotik] createVoucher error:', error?.message || error);

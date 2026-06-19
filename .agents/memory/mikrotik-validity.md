@@ -20,8 +20,14 @@ and resets on reconnect, so total time exceeded the configured value.)
 - A SINGLE global scheduler `an-voucher-reaper` runs every 60s: finds users whose
   comment starts with a digit, decrements the LEADING number (up to first space),
   PRESERVES the trailing identifier text, removes the user at 0/1. Installed via
-  `ensureReaper` on validity-profile save AND kept current via `syncReaperIfPresent`
-  on every `createVoucher` (updates an existing reaper only; never adds one).
+  `ensureReaper` on validity-profile save AND self-healed on every `createVoucher`
+  via `ensureValidityEnforcement`: it reads the voucher's profile, and if that
+  profile has an `on-login` arming script (i.e. a fixed-validity profile) it calls
+  `ensureReaper` (CREATES the scheduler if missing); non-validity profiles only get
+  `syncReaperIfPresent`. **Why:** the main "los" (never-expiring) cause was the
+  reaper scheduler being absent/deleted on the router — the old code only synced an
+  existing reaper and never created one at voucher time. All best-effort: never
+  blocks voucher issuance (`/ip/hotspot/user/add` runs first; errors only logged).
 - Read-back: `parseOnLoginValidity` regex `/comment=\(?"?(\d+)/` recovers minutes from
   both legacy `comment=600` and current `comment=("600 " . $c)` scripts.
 
