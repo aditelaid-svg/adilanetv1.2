@@ -2,10 +2,21 @@
 #  AdilaNet — WiFi Voucher Mikrotik
 #  Deploy via Dockge / Docker Compose
 #
-#  SEBELUM RUNNING — edit bagian ini:
-#    1. Ganti GITHUB_REPO di service "app" dengan URL repo kamu
-#    2. Isi SANPAY_API_KEY dan SANPAY_MERCHANT_ID jika pakai payment
+#  ADA 2 MODE — pilih salah satu di bagian service "app":
+#
+#  MODE A (Direkomendasikan): Pakai image dari GitHub Actions
+#    → Ganti GITHUB_USERNAME/NAMA_REPO di bawah dengan repo kamu
+#    → Setiap push ke GitHub, image otomatis ter-build
+#    → Di Dockge: klik "Pull & Restart" untuk update ke versi terbaru
+#
+#  MODE B: Build langsung dari source di GitHub (lama, tapi tanpa setup)
+#    → Comment baris `image:` dan uncomment blok `build:`
+#
+#  SEBELUM RUNNING:
+#    1. Ganti placeholder GITHUB_USERNAME/NAMA_REPO
+#    2. Isi SESSION_SECRET dengan string acak panjang
 #    3. Ubah password DB sesuai kebutuhan
+#    4. Pastikan repo GitHub sudah Public (atau setup token untuk private)
 # ============================================================
 
 services:
@@ -31,15 +42,18 @@ services:
 
   # ── Aplikasi AdilaNet ───────────────────────────────────────
   app:
-    build:
-      # Ganti URL ini dengan repo GitHub kamu setelah push.
-      # WAJIB tambahkan #main di akhir (nama branch). Tanpa itu Docker mencari
-      # branch "master" dan gagal: "repository does not contain ref master".
-      # Kalau branch repo kamu bernama "master", ganti #main jadi #master.
-      # Contoh: https://github.com/namakamu/adilanet.git#main
-      context: https://github.com/GITHUB_USERNAME/NAMA_REPO.git#main
-      # Untuk build dari folder lokal (tanpa GitHub), ganti baris di atas dengan:
-      # context: .
+    # ── MODE A: Pakai image dari GitHub Container Registry ──
+    # Image di-build otomatis oleh GitHub Actions setiap kali ada push.
+    # Ganti GITHUB_USERNAME/NAMA_REPO sesuai repo kamu di GitHub.
+    # Contoh: ghcr.io/budi123/adilanet:latest
+    image: ghcr.io/GITHUB_USERNAME/NAMA_REPO:latest
+
+    # ── MODE B: Build dari source GitHub (uncomment jika pakai mode ini) ──
+    # build:
+    #   context: https://github.com/GITHUB_USERNAME/NAMA_REPO.git#main
+    #   # Untuk build dari folder lokal:
+    #   # context: .
+
     container_name: adilanet_app
     restart: unless-stopped
     ports:
@@ -55,11 +69,9 @@ services:
       SESSION_SECRET: "GANTI_DENGAN_STRING_ACAK_PANJANG_64_KARAKTER"
       # Biarkan "false" kalau akses lewat HTTP (mis. http://IP:5000).
       # Set "true" HANYA jika app sudah di belakang HTTPS (domain + TLS).
-      # Kalau salah set "true" di HTTP, login akan auto-logout terus.
       COOKIE_SECURE: "false"
       # Catatan: Merchant Code & API Key Sanpay TIDAK diisi di sini.
-      # Cukup masukkan lewat menu Pengaturan di panel admin setelah app jalan,
-      # lalu daftarkan URL callback yang tertera di sana ke dashboard Sanpay.
+      # Cukup masukkan lewat menu Pengaturan di panel admin setelah app jalan.
     depends_on:
       db:
         condition: service_healthy
@@ -71,12 +83,6 @@ services:
       retries: 3
     networks:
       - adilanet_net
-
-  # ── Cara update saat ada perubahan di GitHub ────────────────
-  # Karena image di-build langsung dari repo GitHub (bukan dari registry),
-  # update dilakukan dari Dockge: buka stack ini lalu klik "Update" / "Re-deploy".
-  # Dockge akan menarik ulang kode terbaru dari GitHub, build ulang, dan restart.
-  # (Watchtower tidak dipakai karena hanya bekerja untuk image dari registry.)
 
 networks:
   adilanet_net:
