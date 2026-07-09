@@ -13,6 +13,18 @@ interface MikrotikProfile {
   sessionTimeout: string;
   sharedUsers: string;
   rateLimit: string;
+  validityRaw?: string;
+}
+
+const STORAGE_KEY = 'adilanet_last_voucher_batch';
+interface SavedBatch {
+  codes: { user: string; pass: string }[];
+  profile: string;
+  duration: string;
+  price: string;
+  loginMode: string;
+  routerId: string;
+  ts: number;
 }
 
 export default function AdminVouchers() {
@@ -36,6 +48,63 @@ export default function AdminVouchers() {
 
   const [generatedCodes, setGeneratedCodes] = useState<{ user: string; pass: string }[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const [reaperOk, setReaperOk] = useState<boolean | null>(null);
+  const [reaperLoading, setReaperLoading] = useState(false);
+  const [repairingReaper, setRepairingReaper] = useState(false);
+
+  // Load last batch from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved: SavedBatch = JSON.parse(raw);
+      // Only restore if batch was created in the last 24 hours
+      if (Date.now() - saved.ts < 24 * 60 * 60 * 1000) {
+        setGeneratedCodes(saved.codes);
+        setMikrotikProfile(saved.profile);
+        setDuration(saved.duration);
+        setPrice(saved.price);
+        setLoginMode(saved.loginMode);
+        setSelectedRouter(saved.routerId);
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {}
+  }, []);
+
+  // Check reaper status when router + masa-aktif profile selected
+  useEffect(() => {
+    if (!selectedRouter || !mikrotikProfile) { setReaperOk(null); return; }
+    const prof = profiles.find(p => p.name === mikrotikProfile);
+    if (!prof?.validityRaw) { setReaperOk(null); return; }
+    setReaperLoading(true);
+    setReaperOk(null);
+    fetch(`/api/routers/${selectedRouter}/reaper-status`)
+      .then(r => r.json())
+      .then(d => setReaperOk(d.success && d.data?.present === true))
+      .catch(() => setReaperOk(null))
+      .finally(() => setReaperLoading(false));
+  }, [selectedRouter, mikrotikProfile, profiles]);
+
+  const handleRepairReaper = async () => {
+    if (!selectedRouter) return;
+    setRepairingReaper(true);
+    try {
+      const res = await fetch(`/api/routers/${selectedRouter}/repair-reaper`, { method: 'POST' });
+      const d = await res.json();
+      if (d.success) {
+        setReaperOk(true);
+        toast.success('Scheduler dipasang!', 'Voucher masa aktif akan kedaluwarsa otomatis.');
+      } else {
+        toast.error('Gagal pasang scheduler', d.error || 'Coba lagi dari halaman Router.');
+      }
+    } catch {
+      toast.error('Jaringan error', 'Tidak bisa terhubung ke server.');
+    } finally {
+      setRepairingReaper(false);
+    }
+  };
 
   // Fetch profiles from Mikrotik when router changes
   useEffect(() => {
@@ -96,7 +165,21 @@ export default function AdminVouchers() {
       }
       const created: { name: string; password: string }[] = data.data?.created || [];
       const failed: { name: string; error: string }[] = data.data?.failed || [];
-      setGeneratedCodes(created.map(c => ({ user: c.name, pass: c.password })));
+      const codes = created.map(c => ({ user: c.name, pass: c.password }));
+      setGeneratedCodes(codes);
+      // Persist to localStorage so codes survive page navigation/refresh
+      try {
+        const batch: SavedBatch = {
+          codes,
+          profile: mikrotikProfile,
+          duration,
+          price,
+          loginMode,
+          routerId: selectedRouter,
+          ts: Date.now(),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(batch));
+      } catch {}
       setShowGenerate(false);
       if (created.length === 0) {
         toast.error('Tidak ada voucher dibuat', failed[0]?.error || 'Semua kode gagal dibuat di router.');
@@ -234,7 +317,7 @@ export default function AdminVouchers() {
                 <Printer className="w-4 h-4" strokeWidth={1.8} />
               </button>
               <button
-                onClick={() => setGeneratedCodes([])}
+                onClick={() => { setGeneratedCodes([]); try { localStorage.removeItem(STORAGE_KEY); } catch {} }}
                 className="bg-white border border-slate-100 hover:bg-slate-50 p-2 rounded-[12px] text-slate-400 hover:text-slate-700 shadow-sm transition-colors"
               >
                 <X className="w-4 h-4" strokeWidth={1.8} />
@@ -399,15 +482,51 @@ export default function AdminVouchers() {
                     </select>
                     {selectedProfileInfo && (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        <span className="text-[11px] bg-sky-100 text-sky-700 px-2 py-1 rounded-[8px] font-semibold">
-                          ⏱ {selectedProfileInfo.sessionTimeout}
-                        </span>
+                        {selectedProfileInfo.validityRaw ? (
+                          <span className="text-[11px] bg-violet-100 text-violet-700 px-2 py-1 rounded-[8px] font-semibold">
+                            ⏳ Masa Aktif: {selectedProfileInfo.sessionTimeout}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] bg-sky-100 text-sky-700 px-2 py-1 rounded-[8px] font-semibold">
+                            ⏱ {selectedProfileInfo.sessionTimeout}
+                          </span>
+                        )}
                         <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-1 rounded-[8px] font-semibold">
                           ⚡ {selectedProfileInfo.rateLimit}
                         </span>
                         <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-1 rounded-[8px] font-semibold">
                           👤 ×{selectedProfileInfo.sharedUsers}
                         </span>
+                      </div>
+                    )}
+                    {/* Reaper status warning for masa-aktif profiles */}
+                    {selectedProfileInfo?.validityRaw && (
+                      <div className={`mt-2 flex items-center gap-2 rounded-[12px] px-3 py-2 text-[12px] border ${
+                        reaperLoading ? 'bg-slate-50 border-slate-200 text-slate-500' :
+                        reaperOk === true ? 'bg-teal-50 border-teal-100 text-teal-700' :
+                        reaperOk === false ? 'bg-rose-50 border-rose-100 text-rose-700' :
+                        'bg-amber-50 border-amber-100 text-amber-700'
+                      }`}>
+                        {reaperLoading ? (
+                          <><RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" /> Memeriksa scheduler kedaluwarsa...</>
+                        ) : reaperOk === true ? (
+                          <><Clock className="w-3.5 h-3.5 shrink-0" /> <span>Scheduler aktif — voucher akan kedaluwarsa otomatis ✓</span></>
+                        ) : reaperOk === false ? (
+                          <>
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span className="flex-1">Scheduler belum dipasang! Voucher tidak akan kedaluwarsa.</span>
+                            <button
+                              type="button"
+                              disabled={repairingReaper}
+                              onClick={handleRepairReaper}
+                              className="ml-auto shrink-0 bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 rounded-[8px] text-[11px] font-semibold disabled:opacity-60 transition-colors"
+                            >
+                              {repairingReaper ? 'Memasang...' : 'Pasang Sekarang'}
+                            </button>
+                          </>
+                        ) : (
+                          <><AlertCircle className="w-3.5 h-3.5 shrink-0" /> <span>Tidak bisa cek scheduler — pastikan router online</span></>
+                        )}
                       </div>
                     )}
                   </div>
