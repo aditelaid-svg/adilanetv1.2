@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../AppContext';
-import { Ticket, Plus, Printer, Settings2, RefreshCw, Wifi, Clock, AlertCircle, X } from 'lucide-react';
+import { Ticket, Plus, Printer, Settings2, RefreshCw, Wifi, Clock, AlertCircle, X, Bluetooth, BluetoothOff, BluetoothSearching } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { formatRupiah } from '../../lib/format';
 import { useToast } from '../../components/Toast';
+import { useThermalPrinter, buildVoucherESC } from '../../hooks/useThermalPrinter';
 
 interface MikrotikProfile {
   id: string;
@@ -17,6 +18,7 @@ interface MikrotikProfile {
 export default function AdminVouchers() {
   const { routers } = useAppContext();
   const toast = useToast();
+  const { status: printerStatus, deviceName, error: printerError, isSupported: btSupported, connect, disconnect, print } = useThermalPrinter();
   const [showGenerate, setShowGenerate] = useState(false);
 
   const [selectedRouter, setSelectedRouter] = useState('');
@@ -113,6 +115,20 @@ export default function AdminVouchers() {
     }
   };
 
+  const handleThermalPrint = async () => {
+    if (printerStatus === 'disconnected' || printerStatus === 'error') {
+      const ok = await connect();
+      if (!ok) return;
+    }
+    try {
+      const data = buildVoucherESC(generatedCodes, mikrotikProfile, duration, price, loginMode);
+      await print(data);
+      toast.success('Berhasil dicetak!', `${generatedCodes.length} voucher dikirim ke ${deviceName}.`);
+    } catch (err: any) {
+      toast.error('Gagal cetak', err?.message || 'Periksa koneksi printer.');
+    }
+  };
+
   const handlePrint = () => {
     const selectedProfileInfo = profiles.find(p => p.name === mikrotikProfile);
     const printContent = `
@@ -167,10 +183,53 @@ export default function AdminVouchers() {
                 Profil: {mikrotikProfile} • {duration} • {formatRupiah(parseInt(price || '0'))}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              {/* Bluetooth thermal print button */}
+              <button
+                onClick={handleThermalPrint}
+                disabled={printerStatus === 'printing' || printerStatus === 'connecting'}
+                title={
+                  !btSupported ? 'Browser tidak mendukung Bluetooth' :
+                  printerStatus === 'connected' ? `Cetak ke ${deviceName}` :
+                  printerStatus === 'connecting' ? 'Menghubungkan...' :
+                  printerStatus === 'printing' ? 'Mencetak...' :
+                  'Cetak ke printer thermal Bluetooth'
+                }
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-[12px] text-[12px] font-semibold shadow-sm transition-all disabled:opacity-60 ${
+                  printerStatus === 'connected' ? 'bg-teal-500 text-white hover:bg-teal-600' :
+                  printerStatus === 'printing' || printerStatus === 'connecting' ? 'bg-sky-100 text-sky-600' :
+                  'bg-white border border-slate-100 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {printerStatus === 'printing' || printerStatus === 'connecting'
+                  ? <RefreshCw className="w-4 h-4 animate-spin" strokeWidth={1.8} />
+                  : printerStatus === 'connected'
+                    ? <Bluetooth className="w-4 h-4" strokeWidth={1.8} />
+                    : <BluetoothSearching className="w-4 h-4" strokeWidth={1.8} />
+                }
+                <span className="hidden sm:inline">
+                  {printerStatus === 'connected' ? 'Cetak BT' :
+                   printerStatus === 'printing' ? 'Mencetak...' :
+                   printerStatus === 'connecting' ? 'Menghubungkan...' : 'Printer BT'}
+                </span>
+              </button>
+
+              {/* Disconnect button when connected */}
+              {printerStatus === 'connected' && (
+                <button
+                  onClick={disconnect}
+                  title="Putus koneksi printer"
+                  className="p-2 rounded-[12px] bg-white border border-slate-100 text-rose-400 hover:text-rose-600 hover:bg-rose-50 shadow-sm transition-colors"
+                >
+                  <BluetoothOff className="w-4 h-4" strokeWidth={1.8} />
+                </button>
+              )}
+
+              {/* Regular browser print */}
               <button
                 onClick={handlePrint}
-                className="bg-white border border-slate-100 hover:bg-slate-50 p-2 rounded-[12px] text-slate-700 shadow-sm transition-colors" title="Cetak"
+                className="bg-white border border-slate-100 hover:bg-slate-50 p-2 rounded-[12px] text-slate-700 shadow-sm transition-colors"
+                title="Cetak ke browser (PDF/kertas)"
               >
                 <Printer className="w-4 h-4" strokeWidth={1.8} />
               </button>
@@ -192,6 +251,40 @@ export default function AdminVouchers() {
               </div>
             ))}
           </div>
+
+          {/* Bluetooth printer status bar */}
+          <AnimatePresence>
+            {(printerStatus === 'connected' || printerStatus === 'error' || printerError) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className={`mt-3 flex items-center gap-2 rounded-[12px] px-3 py-2 text-[12px] font-medium ${
+                  printerStatus === 'connected' ? 'bg-teal-50 border border-teal-100 text-teal-700' :
+                  'bg-rose-50 border border-rose-100 text-rose-700'
+                }`}>
+                  {printerStatus === 'connected'
+                    ? <Bluetooth className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+                    : <BluetoothOff className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+                  }
+                  {printerStatus === 'connected'
+                    ? <span>Terhubung ke <strong>{deviceName}</strong> — tekan "Cetak BT" untuk mencetak</span>
+                    : <span>{printerError || 'Koneksi printer terputus.'}</span>
+                  }
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Browser Bluetooth not supported notice */}
+          {!btSupported && (
+            <div className="mt-3 flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-[12px] px-3 py-2 text-[12px] text-amber-700">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+              <span>Fitur printer Bluetooth butuh <strong>Chrome</strong> di Android atau Chrome/Edge di PC. Firefox/Safari belum didukung.</span>
+            </div>
+          )}
         </motion.div>
       )}
 
