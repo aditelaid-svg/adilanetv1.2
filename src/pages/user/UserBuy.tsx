@@ -148,7 +148,13 @@ export default function UserBuy() {
     if (!selectedPkg) return;
     const result = await buyPackage(selectedPkg, 'saldo', currentPin, promoFor(selectedPkg)?.id);
     if (result.success) {
-      setSuccessCode(result.voucher_code || `WFI-${Math.random().toString(36).substring(2,8).toUpperCase()}`);
+      if (!result.voucher_code) {
+        setError('Transaksi berhasil tapi voucher tidak diterima. Hubungi admin.');
+        setShowPinInput(false);
+        setPin('');
+        return;
+      }
+      setSuccessCode(result.voucher_code);
       setShowPinInput(false);
       setPin('');
     } else {

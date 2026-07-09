@@ -43,7 +43,7 @@ export type Transaction = {
   voucher_code: string;
   amount: number;
   payment_method: 'saldo' | 'qris';
-  status: 'pending' | 'success' | 'failed';
+  status: 'pending' | 'provisioning' | 'success' | 'failed';
   created_at: string;
   user_name?: string;
   package_name?: string;
@@ -422,8 +422,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deletePackage = async (packageId: number) => {
-    await apiFetch(`/api/packages/${packageId}`, { method: 'DELETE' });
-    setPackages(prev => prev.filter(p => p.id !== packageId));
+    const res = await apiFetch(`/api/packages/${packageId}`, { method: 'DELETE' });
+    if (res.success) setPackages(prev => prev.filter(p => p.id !== packageId));
+    else throw new Error(res.error || 'Gagal menghapus paket');
   };
 
   // ─── ROUTERS ──────────────────────────────────────────────────────────
@@ -455,8 +456,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteRouter = async (routerId: number) => {
-    await apiFetch(`/api/routers/${routerId}`, { method: 'DELETE' });
-    setRouters(prev => prev.filter(r => r.id !== routerId));
+    const res = await apiFetch(`/api/routers/${routerId}`, { method: 'DELETE' });
+    if (res.success) setRouters(prev => prev.filter(r => r.id !== routerId));
+    else throw new Error(res.error || 'Gagal menghapus router');
   };
 
   const testRouterConnection = async (routerId: number) => {
@@ -499,8 +501,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteVoucher = async (txId: number) => {
-    await apiFetch(`/api/transactions/${txId}`, { method: 'DELETE' });
-    setTransactions(prev => prev.filter(t => t.id !== txId));
+    const res = await apiFetch(`/api/transactions/${txId}`, { method: 'DELETE' });
+    if (res.success) setTransactions(prev => prev.filter(t => t.id !== txId));
+    else throw new Error(res.error || 'Gagal menghapus transaksi');
   };
 
   // ─── MIKROTIK ─────────────────────────────────────────────────────────
@@ -567,8 +570,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateUser, topupBalance, buyPackage,
       addRouter, updateRouter, syncRouter, deleteRouter, testRouterConnection,
       deleteUser: async (userId) => {
-        await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
-        setUsers(prev => prev.filter(u => u.id !== userId));
+        const res = await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });
+        if (res.success) setUsers(prev => prev.filter(u => u.id !== userId));
+        else throw new Error(res.error || 'Gagal menghapus pengguna');
       },
       deleteVoucher, addPackage, updatePackage, deletePackage, generateVoucherReal,
       getRouterActiveUsers, getRouterHotspotUsers, getRouterProfiles, createRouterProfile, updateRouterProfile, deleteRouterProfile,

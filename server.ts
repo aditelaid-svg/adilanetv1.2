@@ -736,9 +736,16 @@ async function startServer() {
   app.patch("/api/packages/:id", requireAdmin, async (req, res) => {
     try {
       const { name, speed, quota, duration, price, badge_color, router_id, mikrotik_profile } = req.body;
+      if (!name || !speed || !quota || !duration || price === undefined || price === null || price === '') {
+        return res.status(400).json({ success: false, error: "Nama, speed, quota, durasi, dan harga wajib diisi." });
+      }
+      const parsedPrice = parseFloat(price);
+      if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+        return res.status(400).json({ success: false, error: "Harga tidak valid." });
+      }
       const { rows } = await pool.query(
         `UPDATE packages SET name=$1, speed=$2, quota=$3, duration=$4, price=$5, badge_color=$6, router_id=$7, mikrotik_profile=$8 WHERE id=$9 RETURNING *`,
-        [name, speed, quota, duration, price, badge_color, router_id || null, mikrotik_profile || null, req.params.id]
+        [name, speed, quota, duration, parsedPrice, badge_color || 'blue', router_id || null, mikrotik_profile || null, req.params.id]
       );
       if (rows.length === 0) return res.status(404).json({ success: false, error: "Paket tidak ditemukan." });
       res.json({ success: true, data: { ...rows[0], price: parseFloat(rows[0].price) } });
@@ -931,7 +938,7 @@ async function startServer() {
         query += ` WHERE t.user_id = $1`;
         params.push(req.query.user_id);
       }
-      query += ` ORDER BY t.created_at DESC`;
+      query += ` ORDER BY t.created_at DESC LIMIT 500`;
       const { rows } = await pool.query(query, params);
       res.json({
         success: true,

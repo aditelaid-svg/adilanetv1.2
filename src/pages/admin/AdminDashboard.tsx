@@ -1,17 +1,20 @@
 import React from 'react';
 import { useAppContext } from '../../AppContext';
-import { Users, Router, Receipt, TrendingUp, CreditCard } from 'lucide-react';
+import { Users, Router, Receipt, TrendingUp } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
+import { formatRupiah } from '../../lib/format';
 
 export default function AdminDashboard() {
   const { users, routers, packages, transactions } = useAppContext();
+  const navigate = useNavigate();
 
   const totalRevenue = transactions.filter(t => t.status === 'success').reduce((acc, curr) => acc + curr.amount, 0);
   const activeUsers = users.filter(u => u.role === 'user' && u.status === 'active').length;
   const onlineRouters = routers.filter(r => r.status === 'online').length;
 
   const statCards = [
-    { label: 'Pendapatan', value: `Rp ${(totalRevenue / 1000).toLocaleString('id-ID')}k`, icon: TrendingUp, color: '#0ea5e9', bg: 'bg-sky-50', border: 'border-sky-100' },
+    { label: 'Pendapatan', value: formatRupiah(totalRevenue), icon: TrendingUp, color: '#0ea5e9', bg: 'bg-sky-50', border: 'border-sky-100' },
     { label: 'User Aktif', value: activeUsers.toString(), icon: Users, color: '#14b8a6', bg: 'bg-teal-50', border: 'border-teal-100' },
     { label: 'Router On', value: `${onlineRouters}/${routers.length}`, icon: Router, color: '#6366f1', bg: 'bg-indigo-50', border: 'border-indigo-100' },
     { label: 'Transaksi', value: transactions.length.toString(), icon: Receipt, color: '#f59e0b', bg: 'bg-amber-50', border: 'border-amber-100' },
@@ -81,12 +84,12 @@ export default function AdminDashboard() {
         <div className="glass rounded-[24px] p-5 mb-4">
            <div className="flex justify-between items-center mb-4">
              <h2 className="text-[15px] font-bold text-slate-800 tracking-tight">Transaksi Terbaru</h2>
-             <button className="text-[11px] text-sky-600 font-semibold bg-sky-50 px-2.5 py-1.5 rounded-lg active:scale-95 transition-transform">Lihat Semua</button>
+             <button onClick={() => navigate('/admin/transactions')} className="text-[11px] text-sky-600 font-semibold bg-sky-50 px-2.5 py-1.5 rounded-lg active:scale-95 transition-transform">Lihat Semua</button>
            </div>
            
            <div className="space-y-2">
               {transactions.slice(0, 4).map(tx => {
-                  const user = users.find(u => u.id === tx.user_id);
+                  const displayName = tx.user_name || users.find(u => u.id === tx.user_id)?.name || 'Publik';
                   return (
                     <div key={tx.id} className="flex items-center justify-between p-3 bg-white/60 hover:bg-white/80 transition-colors rounded-[16px] border border-slate-100">
                         <div className="flex items-center gap-3">
@@ -94,13 +97,13 @@ export default function AdminDashboard() {
                                 <Receipt className="w-5 h-5" strokeWidth={1.8} />
                             </div>
                             <div>
-                                <p className="text-[13px] font-semibold text-slate-800 leading-tight mb-1">{user?.name}</p>
-                                <span className="font-mono text-[10px] font-bold tracking-widest text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded">{tx.voucher_code}</span>
+                                <p className="text-[13px] font-semibold text-slate-800 leading-tight mb-1">{displayName}</p>
+                                <span className="font-mono text-[10px] font-bold tracking-widest text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded">{tx.voucher_code || '—'}</span>
                             </div>
                         </div>
                         <div className="text-right">
-                            <p className="text-[13px] font-bold text-slate-800 tracking-tight mb-1">Rp {(tx.amount/1000).toLocaleString('id-ID')}k</p>
-                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${tx.status === 'success' ? 'bg-teal-100 text-teal-700' : 'bg-amber-100 text-amber-700'}`}>
+                            <p className="text-[13px] font-bold text-slate-800 tracking-tight mb-1">{formatRupiah(tx.amount)}</p>
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${tx.status === 'success' ? 'bg-teal-100 text-teal-700' : tx.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                                 {tx.status}
                             </span>
                         </div>
