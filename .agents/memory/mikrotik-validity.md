@@ -46,11 +46,22 @@ so any identifier you ever write to a hotspot comment MUST start with a letter, 
 reaper will treat it as a counter and delete the user. The reaper filter is now
 `find where comment~"^[0-9]"` (leading digit; handles both `599` and `599 <id>`).
 
+**Double enforcement (added):** `buildExpiryScript` now has TWO branches: on FIRST login
+(comment no leading digit) it arms the countdown as before; on SUBSEQUENT logins it checks
+if the counter is ≤ 0 and removes the user immediately. This means even if the reaper was
+deleted for days, an expired user cannot reconnect — login itself enforces the expiry.
+
+**Admin diagnostics:** `checkReaper(config)` + `repairReaper(config)` exports added to
+mikrotik.ts. Server exposes `GET /api/routers/:id/reaper-status` and
+`POST /api/routers/:id/repair-reaper`. AdminRouters shows a status bar per router (✅/⚠️)
+with a "Perbaiki" button. The shield icon button in the router card triggers the check.
+
 **Migration gotcha:** `ensureReaper`/`syncReaperIfPresent` UPDATE an existing reaper's
 on-event, but RouterOS schedulers are NOT auto-updated just by upgrading the app — the
 update only happens when one of those functions runs (profile save, or any voucher
 creation via `createVoucher`→`syncReaperIfPresent`). A router whose reaper is never
-touched keeps its old script.
+touched keeps its old script. Use the "Update" button in AdminRouters to push the latest
+script to an already-installed reaper.
 
 **Untestable here:** there is no real MikroTik in the dev env (getProfiles has a demo
 fallback; writes hit the real router). The RouterOS scripts must be verified on the

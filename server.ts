@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { Pool } from "pg";
-import { createVoucher, createVouchersBulk, createProfile, updateProfile, deleteProfile } from "./src/server/mikrotik";
+import { createVoucher, createVouchersBulk, createProfile, updateProfile, deleteProfile, checkReaper, repairReaper } from "./src/server/mikrotik";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -843,6 +843,32 @@ async function startServer() {
         await pool.query(`UPDATE routers SET status='offline' WHERE id=$1`, [router.id]);
         return res.json({ success: true, connected: false, message: connErr.message });
       }
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Check whether the an-voucher-reaper scheduler is present on a router.
+  app.get("/api/routers/:id/reaper-status", requireAdmin, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      const r = rows[0];
+      const status = await checkReaper({ host: r.ip_address, user: r.username, pass: r.password, port: r.api_port });
+      res.json({ success: true, ...status });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Force-install (or update) the reaper scheduler on a router.
+  app.post("/api/routers/:id/repair-reaper", requireAdmin, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`SELECT * FROM routers WHERE id = $1`, [req.params.id]);
+      if (rows.length === 0) return res.status(404).json({ success: false, error: "Router tidak ditemukan." });
+      const r = rows[0];
+      await repairReaper({ host: r.ip_address, user: r.username, pass: r.password, port: r.api_port });
+      res.json({ success: true, message: "Scheduler berhasil dipasang/diperbarui." });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

@@ -85,16 +85,30 @@ export function sanitizeComment(raw: string): string {
   return s.slice(0, 60);
 }
 
-// on-login arming script: on the FIRST login only (comment still empty), stamp
-// the remaining validity in MINUTES into the hotspot user's comment. The global
-// reaper scheduler then counts that number down once per minute. Counting starts
-// at first login and runs on wall-clock time regardless of usage/reconnects.
+// on-login arming script: on the FIRST login only, stamp the remaining validity
+// in MINUTES into the hotspot user's comment. On SUBSEQUENT logins, if the
+// counter has already reached zero (reaper was down / scheduler deleted), remove
+// the user immediately so they cannot reconnect past their expiry.
+// This is the second line of defence: the reaper counts down every 60s, but if
+// it was absent for any period, this script enforces expiry at the next login.
 function buildExpiryScript(validityRaw: string): string {
   const minutes = validityToMinutes(validityRaw);
-  // Arm only if the comment isn't already counting down (a leading digit means
-  // armed). We PREPEND the minutes to whatever identifier comment is there, so
-  // the "dibuat oleh" tag set at creation survives alongside the countdown.
-  return `:local id [/ip hotspot user find name=$user]; :if ([:len $id]>0) do={:local c [/ip hotspot user get $id comment]; :if (!($c~"^[0-9]")) do={/ip hotspot user set comment=("${minutes} " . $c) $id}}`;
+  // Two branches keyed on whether the comment already starts with a digit:
+  //   digit  → already armed: enforce expiry if counter ≤ 0
+  //   letter → first login: prepend minute-counter to existing comment
+  return (
+    `:local id [/ip hotspot user find name=$user];` +
+    `:if ([:len $id]>0) do={` +
+      `:local c [/ip hotspot user get $id comment];` +
+      `:if ($c~"^[0-9]") do={` +
+        `:local sp [:find $c " "];:local n $c;` +
+        `:if ([:typeof $sp]="num") do={:set n [:pick $c 0 $sp]};` +
+        `:if ([:tonum $n]<=0) do={/ip hotspot user remove $id}` +
+      `} else={` +
+        `/ip hotspot user set comment=("${minutes} " . $c) $id` +
+      `}` +
+    `}`
+  );
 }
 
 // on-event for the single global reaper scheduler. Every minute it decrements the
@@ -463,6 +477,34 @@ export async function createVouchersBulk(
   } catch (error: any) {
     console.error('[Mikrotik] createVouchersBulk error:', error?.message || error);
     throw error;
+  } finally {
+    try { api.close(); } catch {}
+  }
+}
+
+// Check whether the global reaper scheduler exists on a router.
+// Returns { present, interval } — used by the admin diagnostics UI.
+export async function checkReaper(config: MikrotikConfig): Promise<{ present: boolean; interval?: string }> {
+  const api = connect(config);
+  try {
+    await api.connect();
+    const rows = await api.write('/system/scheduler/print', [`?name=${REAPER_NAME}`]) as any[];
+    if (Array.isArray(rows) && rows.length > 0) {
+      return { present: true, interval: rows[0].interval || '60s' };
+    }
+    return { present: false };
+  } finally {
+    try { api.close(); } catch {}
+  }
+}
+
+// Force-install (or update) the reaper scheduler on a router.
+// Safe to call multiple times — idempotent via ensureReaper.
+export async function repairReaper(config: MikrotikConfig): Promise<void> {
+  const api = connect(config);
+  try {
+    await api.connect();
+    await ensureReaper(api);
   } finally {
     try { api.close(); } catch {}
   }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext, MikrotikProfile, ActiveUser } from '../../AppContext';
 import { useToast } from '../../components/Toast';
-import { Router, Plus, X, Pencil, CheckCircle, XCircle, Loader2, Activity, Layers, Trash2, Gauge, Users, Clock, Wifi, RefreshCw, Smartphone, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import { Router, Plus, X, Pencil, CheckCircle, XCircle, Loader2, Activity, Layers, Trash2, Gauge, Users, Clock, Wifi, RefreshCw, Smartphone, ArrowDownToLine, ArrowUpFromLine, ShieldCheck, ShieldAlert, Wrench } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { formatBytes } from '../../lib/format';
@@ -43,6 +43,12 @@ export default function AdminRouters() {
   const [activeRouterId, setActiveRouterId] = useState<number | null>(null);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [activeLoading, setActiveLoading] = useState(false);
+
+  // ─── Reaper scheduler diagnostics state ───
+  type ReaperState = { present: boolean; interval?: string } | null;
+  const [reaperStatus, setReaperStatus] = useState<Record<number, ReaperState>>({});
+  const [reaperChecking, setReaperChecking] = useState<Record<number, boolean>>({});
+  const [reaperRepairing, setReaperRepairing] = useState<Record<number, boolean>>({});
 
   const openActiveUsers = async (routerId: number) => {
     setActiveRouterId(routerId);
@@ -213,6 +219,41 @@ export default function AdminRouters() {
     }
   };
 
+  const checkReaperStatus = async (routerId: number) => {
+    setReaperChecking(prev => ({ ...prev, [routerId]: true }));
+    try {
+      const res = await fetch(`/api/routers/${routerId}/reaper-status`);
+      const data = await res.json();
+      if (data.success) {
+        setReaperStatus(prev => ({ ...prev, [routerId]: { present: data.present, interval: data.interval } }));
+      } else {
+        toast.error('Gagal cek scheduler', data.error);
+      }
+    } catch {
+      toast.error('Gagal cek scheduler', 'Periksa koneksi ke router.');
+    } finally {
+      setReaperChecking(prev => ({ ...prev, [routerId]: false }));
+    }
+  };
+
+  const repairReaperScheduler = async (routerId: number) => {
+    setReaperRepairing(prev => ({ ...prev, [routerId]: true }));
+    try {
+      const res = await fetch(`/api/routers/${routerId}/repair-reaper`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setReaperStatus(prev => ({ ...prev, [routerId]: { present: true, interval: '60s' } }));
+        toast.success('Scheduler dipasang!', 'an-voucher-reaper aktif di router.');
+      } else {
+        toast.error('Gagal perbaiki scheduler', data.error);
+      }
+    } catch {
+      toast.error('Gagal perbaiki scheduler', 'Periksa koneksi ke router.');
+    } finally {
+      setReaperRepairing(prev => ({ ...prev, [routerId]: false }));
+    }
+  };
+
   const statusColor = (s: string) =>
     s === 'online' ? 'text-teal-600' : s === 'warning' ? 'text-amber-600' : 'text-rose-600';
   const dotColor = (s: string) =>
@@ -304,9 +345,7 @@ export default function AdminRouters() {
                     className="overflow-hidden mb-3"
                   >
                     <div className={`flex items-center gap-2 rounded-[12px] px-3 py-2 text-[12px] font-medium ${
-                      test.connected
-                        ? 'bg-teal-100 text-teal-700'
-                        : 'bg-rose-100 text-rose-700'
+                      test.connected ? 'bg-teal-100 text-teal-700' : 'bg-rose-100 text-rose-700'
                     }`}>
                       {test.connected
                         ? <CheckCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
@@ -321,6 +360,47 @@ export default function AdminRouters() {
                 )}
               </AnimatePresence>
 
+              {/* Reaper scheduler diagnostics bar */}
+              <AnimatePresence>
+                {reaperStatus[router.id] !== undefined && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden mb-3"
+                  >
+                    {reaperStatus[router.id]?.present ? (
+                      <div className="flex items-center gap-2 bg-teal-50 border border-teal-100 rounded-[12px] px-3 py-2 text-[12px] font-medium text-teal-700">
+                        <ShieldCheck className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+                        <span className="flex-1">Scheduler aktif — voucher masa aktif akan kedaluwarsa otomatis tiap {reaperStatus[router.id]?.interval || '60s'}</span>
+                        <button
+                          onClick={() => repairReaperScheduler(router.id)}
+                          disabled={reaperRepairing[router.id]}
+                          className="text-[11px] bg-teal-100 hover:bg-teal-200 px-2 py-0.5 rounded-[6px] transition-colors flex items-center gap-1 shrink-0"
+                          title="Perbarui script scheduler ke versi terbaru"
+                        >
+                          {reaperRepairing[router.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" strokeWidth={2} />}
+                          Update
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-[12px] px-3 py-2 text-[12px] font-medium text-amber-700">
+                        <ShieldAlert className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+                        <span className="flex-1">Scheduler tidak ada — voucher masa aktif <strong>tidak akan kedaluwarsa</strong> (los)</span>
+                        <button
+                          onClick={() => repairReaperScheduler(router.id)}
+                          disabled={reaperRepairing[router.id]}
+                          className="text-[11px] bg-amber-200 hover:bg-amber-300 text-amber-800 px-2 py-0.5 rounded-[6px] transition-colors flex items-center gap-1 shrink-0 font-semibold"
+                        >
+                          {reaperRepairing[router.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" strokeWidth={2} />}
+                          Perbaiki
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="flex gap-2">
                 <button
                   onClick={() => handleTest(router.id)}
@@ -330,6 +410,17 @@ export default function AdminRouters() {
                   {isTesting
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Testing...</>
                     : <><Activity className="w-4 h-4" strokeWidth={2} /> Test Koneksi</>
+                  }
+                </button>
+                <button
+                  onClick={() => checkReaperStatus(router.id)}
+                  disabled={reaperChecking[router.id]}
+                  className="bg-white border border-slate-100 hover:bg-slate-50 text-slate-600 text-[13px] font-semibold py-2.5 px-3 rounded-[14px] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 shadow-sm"
+                  title="Cek status scheduler masa aktif"
+                >
+                  {reaperChecking[router.id]
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <ShieldCheck className="w-4 h-4" strokeWidth={2} />
                   }
                 </button>
                 <button
