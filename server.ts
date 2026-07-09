@@ -203,6 +203,9 @@ async function initDb() {
       amount DECIMAL(10,2) NOT NULL,
       created_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE topups ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'topup';
+    ALTER TABLE topups ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS topups_idempotency_key_idx ON topups (idempotency_key) WHERE idempotency_key IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS notifications (
       id SERIAL PRIMARY KEY,
@@ -609,15 +612,23 @@ async function startServer() {
     try {
       const amount = Number(req.body?.amount);
       if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, error: "Nominal tidak valid." });
+      const idempotencyKey: string | null = req.body?.idempotency_key || null;
       const targetId = Number(req.params.id);
       const { rows: tgt } = await pool.query(`SELECT role FROM users WHERE id = $1`, [targetId]);
       if (tgt.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
       if (tgt[0].role === "superadmin" && targetId !== req.session.userId) {
         return res.status(403).json({ success: false, error: "Saldo superadmin tidak bisa diubah oleh admin lain." });
       }
+      // Idempotency check: if this key was already used, return current balance without re-crediting.
+      if (idempotencyKey) {
+        const { rows: dup } = await pool.query(`SELECT id FROM topups WHERE idempotency_key = $1 LIMIT 1`, [idempotencyKey]);
+        if (dup.length > 0) {
+          const { rows: usr } = await pool.query(`SELECT id, name, balance FROM users WHERE id = $1`, [targetId]);
+          return res.json({ success: true, duplicate: true, data: { ...usr[0], balance: parseFloat(usr[0].balance) } });
+        }
+      }
       // Balance, history, and notification must succeed or fail as one unit so
-      // a partial failure can never leave the saldo changed without a record
-      // (which would let an admin retry and double-credit).
+      // a partial failure can never leave the saldo changed without a record.
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -630,15 +641,67 @@ async function startServer() {
           return res.status(404).json({ success: false, error: "User tidak ditemukan." });
         }
         const newBalance = parseFloat(rows[0].balance);
-        // Record the top-up for history (who topped up whom, how much, when).
         await client.query(
-          `INSERT INTO topups (user_id, admin_id, amount) VALUES ($1, $2, $3)`,
-          [targetId, req.session.userId, amount]
+          `INSERT INTO topups (user_id, admin_id, amount, type, idempotency_key) VALUES ($1, $2, $3, 'topup', $4)`,
+          [targetId, req.session.userId, amount, idempotencyKey]
         );
-        // Notify the user whose balance was filled.
         await client.query(
           `INSERT INTO notifications (user_id, title, body, type) VALUES ($1, $2, $3, 'topup')`,
           [targetId, 'Saldo Ditambahkan', `Saldo Anda bertambah ${formatRupiah(amount)}. Saldo sekarang ${formatRupiah(newBalance)}.`]
+        );
+        await client.query("COMMIT");
+        res.json({ success: true, data: { ...rows[0], balance: newBalance } });
+      } catch (txErr: any) {
+        await client.query("ROLLBACK");
+        throw txErr;
+      } finally {
+        client.release();
+      }
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ─── DEDUCT BALANCE ───────────────────────────────────────────────────────
+  app.post("/api/users/:id/deduct", requireAdmin, async (req, res) => {
+    try {
+      const amount = Number(req.body?.amount);
+      if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, error: "Nominal tidak valid." });
+      const idempotencyKey: string | null = req.body?.idempotency_key || null;
+      const targetId = Number(req.params.id);
+      const { rows: tgt } = await pool.query(`SELECT role, balance FROM users WHERE id = $1`, [targetId]);
+      if (tgt.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
+      if (tgt[0].role === "superadmin" && targetId !== req.session.userId) {
+        return res.status(403).json({ success: false, error: "Saldo superadmin tidak bisa diubah oleh admin lain." });
+      }
+      // Idempotency check
+      if (idempotencyKey) {
+        const { rows: dup } = await pool.query(`SELECT id FROM topups WHERE idempotency_key = $1 LIMIT 1`, [idempotencyKey]);
+        if (dup.length > 0) {
+          const { rows: usr } = await pool.query(`SELECT id, name, balance FROM users WHERE id = $1`, [targetId]);
+          return res.json({ success: true, duplicate: true, data: { ...usr[0], balance: parseFloat(usr[0].balance) } });
+        }
+      }
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Atomic conditional deduction — only succeeds if balance >= amount (no negative balance).
+        const { rows } = await client.query(
+          `UPDATE users SET balance = balance - $1, updated_at = NOW() WHERE id = $2 AND balance >= $1 RETURNING id, name, balance`,
+          [amount, targetId]
+        );
+        if (rows.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ success: false, error: `Saldo tidak cukup. Saldo saat ini ${formatRupiah(parseFloat(tgt[0].balance))}.` });
+        }
+        const newBalance = parseFloat(rows[0].balance);
+        await client.query(
+          `INSERT INTO topups (user_id, admin_id, amount, type, idempotency_key) VALUES ($1, $2, $3, 'deduct', $4)`,
+          [targetId, req.session.userId, amount, idempotencyKey]
+        );
+        await client.query(
+          `INSERT INTO notifications (user_id, title, body, type) VALUES ($1, $2, $3, 'topup')`,
+          [targetId, 'Saldo Dikurangi', `Saldo Anda dikurangi ${formatRupiah(amount)}. Saldo sekarang ${formatRupiah(newBalance)}.`]
         );
         await client.query("COMMIT");
         res.json({ success: true, data: { ...rows[0], balance: newBalance } });

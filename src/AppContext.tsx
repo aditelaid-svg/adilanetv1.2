@@ -76,6 +76,8 @@ export type Topup = {
   user_id: number;
   admin_id: number | null;
   amount: number;
+  type: 'topup' | 'deduct';
+  idempotency_key?: string;
   created_at: string;
   user_name?: string;
   admin_name?: string;
@@ -123,7 +125,8 @@ type AppContextType = {
   logout: () => Promise<void>;
   registerUser: (name: string, email: string, phone_number: string, password: string) => Promise<{ success: boolean; error?: string }>;
   updateUser: (userId: number, data: Partial<User & { password?: string }>) => Promise<void>;
-  topupBalance: (userId: number, amount: number) => Promise<void>;
+  topupBalance: (userId: number, amount: number, idempotencyKey?: string) => Promise<void>;
+  deductBalance: (userId: number, amount: number, idempotencyKey?: string) => Promise<void>;
   buyPackage: (pkg: Package, method: 'saldo' | 'qris', pin?: string, promoId?: number) => Promise<{ success: boolean; error?: string; voucher_code?: string }>;
   addRouter: (router: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => Promise<void>;
   updateRouter: (routerId: number, data: Omit<RouterDevice, 'id' | 'status' | 'connected_users'>) => Promise<void>;
@@ -384,20 +387,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const topupBalance = async (userId: number, amount: number) => {
+  const topupBalance = async (userId: number, amount: number, idempotencyKey?: string) => {
     const res = await apiFetch(`/api/users/${userId}/topup`, {
       method: 'POST',
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amount, idempotency_key: idempotencyKey }),
     });
-    if (res.success) {
-      const newBalance = res.data.balance;
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, balance: newBalance } : u));
-      if (currentUser?.id === userId) {
-        setCurrentUser({ ...currentUser, balance: newBalance });
-      }
-      // Refresh top-up history so the new entry shows immediately.
-      fetchTopups();
+    if (!res.success) throw new Error(res.error || 'Gagal melakukan top up.');
+    const newBalance = res.data.balance;
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, balance: newBalance } : u));
+    if (currentUser?.id === userId) {
+      setCurrentUser({ ...currentUser, balance: newBalance });
     }
+    fetchTopups();
+  };
+
+  const deductBalance = async (userId: number, amount: number, idempotencyKey?: string) => {
+    const res = await apiFetch(`/api/users/${userId}/deduct`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, idempotency_key: idempotencyKey }),
+    });
+    if (!res.success) throw new Error(res.error || 'Gagal mengambil saldo.');
+    const newBalance = res.data.balance;
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, balance: newBalance } : u));
+    if (currentUser?.id === userId) {
+      setCurrentUser({ ...currentUser, balance: newBalance });
+    }
+    fetchTopups();
   };
 
   // ─── PACKAGES ─────────────────────────────────────────────────────────
@@ -567,7 +582,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       loading, refreshData, refreshPromos,
       fetchTopups, fetchNotifications, markNotificationRead, markAllNotificationsRead,
       login, logout, registerUser,
-      updateUser, topupBalance, buyPackage,
+      updateUser, topupBalance, deductBalance, buyPackage,
       addRouter, updateRouter, syncRouter, deleteRouter, testRouterConnection,
       deleteUser: async (userId) => {
         const res = await apiFetch(`/api/users/${userId}`, { method: 'DELETE' });

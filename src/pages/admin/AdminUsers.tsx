@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../AppContext';
 import { useToast } from '../../components/Toast';
-import { Users, Search, UserCheck, UserX, Wallet, X } from 'lucide-react';
+import { Users, Search, UserCheck, UserX, Wallet, X, ArrowUpRight, ArrowDownLeft, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 import EmptyState from '../../components/ui/EmptyState';
@@ -9,11 +9,14 @@ import { SkeletonList } from '../../components/ui/Skeleton';
 import { formatRupiah } from '../../lib/format';
 
 export default function AdminUsers() {
-  const { users, updateUser, deleteUser, topupBalance, currentUser, loading } = useAppContext();
+  const { users, updateUser, deleteUser, topupBalance, deductBalance, currentUser, loading } = useAppContext();
   const toast = useToast();
 
   const [topupModalUser, setTopupModalUser] = useState<number | null>(null);
   const [topupAmount, setTopupAmount] = useState<string>('');
+  const [topupMode, setTopupMode] = useState<'topup' | 'deduct'>('topup');
+  const [submitting, setSubmitting] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('Semua');
 
@@ -31,12 +34,59 @@ export default function AdminUsers() {
     return matchSearch && matchFilter;
   });
 
+  const openTopupModal = (userId: number) => {
+    setTopupModalUser(userId);
+    setTopupAmount('');
+    setTopupMode('topup');
+    setSubmitting(false);
+    setIdempotencyKey(crypto.randomUUID());
+  };
+
+  const closeTopupModal = () => {
+    if (submitting) return;
+    setTopupModalUser(null);
+    setTopupAmount('');
+  };
+
   const handleTopup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (topupModalUser && topupAmount) {
-      await topupBalance(topupModalUser, parseInt(topupAmount));
+    if (!topupModalUser || !topupAmount || submitting) return;
+    const amount = parseInt(topupAmount);
+    const userName = users.find(u => u.id === topupModalUser)?.name || '';
+    setSubmitting(true);
+    try {
+      await topupBalance(topupModalUser, amount, idempotencyKey);
+      toast.success('Top Up Berhasil', `Saldo ${userName} bertambah ${formatRupiah(amount)}.`);
       setTopupModalUser(null);
       setTopupAmount('');
+    } catch (err: any) {
+      toast.error('Gagal Top Up', err.message || 'Terjadi kesalahan.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!topupModalUser || !topupAmount || submitting) return;
+    const amount = parseInt(topupAmount);
+    const userName = users.find(u => u.id === topupModalUser)?.name || '';
+    const ok = await toast.confirm(
+      'Ambil Saldo?',
+      `Kurangi saldo ${userName} sebesar ${formatRupiah(amount)}?`,
+      { confirmText: 'Ya, Kurangi', danger: true }
+    );
+    if (!ok) return;
+    setSubmitting(true);
+    try {
+      await deductBalance(topupModalUser, amount, idempotencyKey);
+      toast.success('Saldo Dikurangi', `Saldo ${userName} berkurang ${formatRupiah(amount)}.`);
+      setTopupModalUser(null);
+      setTopupAmount('');
+    } catch (err: any) {
+      toast.error('Gagal Ambil Saldo', err.message || 'Terjadi kesalahan.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -55,6 +105,8 @@ export default function AdminUsers() {
   const toggleBlockStatus = async (userId: number, currentStatus: string) => {
     await updateUser(userId, { status: currentStatus === 'active' ? 'blocked' : 'active' });
   };
+
+  const modalUser = users.find(u => u.id === topupModalUser);
 
   return (
     <div className="space-y-6 pb-20">
@@ -172,10 +224,10 @@ export default function AdminUsers() {
               return (
                 <div className={`grid ${isProtected ? 'grid-cols-1' : 'grid-cols-3'} gap-2`}>
                   <button
-                    onClick={() => setTopupModalUser(user.id)}
+                    onClick={() => openTopupModal(user.id)}
                     className="flex items-center justify-center gap-1.5 bg-white border border-slate-100 hover:bg-slate-50 active:scale-95 text-slate-700 font-medium py-2 rounded-[12px] text-[12px] shadow-sm transition-all"
                   >
-                    <Wallet className="w-3.5 h-3.5" strokeWidth={1.8} /> Top Up
+                    <Wallet className="w-3.5 h-3.5" strokeWidth={1.8} /> Saldo
                   </button>
                   {!isProtected && (user.status === 'active' ? (
                     <button
@@ -216,7 +268,7 @@ export default function AdminUsers() {
         </>)}
       </div>
 
-      {/* Topup Modal */}
+      {/* Saldo Modal */}
       {createPortal(
         <AnimatePresence>
         {topupModalUser && (
@@ -228,25 +280,55 @@ export default function AdminUsers() {
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
               className="w-full max-w-md glass-strong rounded-t-[28px] sm:rounded-[28px] p-6 shadow-2xl relative"
             >
-              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sm:hidden" />
-              <button onClick={() => setTopupModalUser(null)} aria-label="Tutup" className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-400 hover:text-slate-700 transition-colors">
+              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-5 sm:hidden" />
+              <button
+                onClick={closeTopupModal}
+                disabled={submitting}
+                aria-label="Tutup"
+                className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-400 hover:text-slate-700 disabled:opacity-40 transition-colors"
+              >
                 <X className="w-4 h-4" strokeWidth={1.8} />
               </button>
-              <h3 className="text-[22px] font-bold text-slate-800 mb-2 tracking-tight">Top Up Saldo</h3>
-              <p className="text-[13px] text-slate-500 mb-6">
-                Tambahkan saldo ke: <span className="text-slate-800 font-semibold">{users.find(u => u.id === topupModalUser)?.name}</span>
+
+              <h3 className="text-[22px] font-bold text-slate-800 mb-1 tracking-tight">Kelola Saldo</h3>
+              <p className="text-[13px] text-slate-500 mb-4">
+                <span className="text-slate-800 font-semibold">{modalUser?.name}</span>
+                {' '}• Saldo: <span className="font-semibold text-sky-600">{formatRupiah(modalUser?.balance ?? 0)}</span>
               </p>
-              <form onSubmit={handleTopup} className="space-y-4">
+
+              {/* Tab */}
+              <div className="flex gap-2 mb-5 p-1 bg-slate-100 rounded-[16px]">
+                <button
+                  type="button"
+                  onClick={() => { setTopupMode('topup'); setTopupAmount(''); setIdempotencyKey(crypto.randomUUID()); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[12px] text-[13px] font-semibold transition-all ${topupMode === 'topup' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500'}`}
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" strokeWidth={2} /> Isi Saldo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTopupMode('deduct'); setTopupAmount(''); setIdempotencyKey(crypto.randomUUID()); }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-[12px] text-[13px] font-semibold transition-all ${topupMode === 'deduct' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-500'}`}
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5" strokeWidth={2} /> Ambil Saldo
+                </button>
+              </div>
+
+              <form onSubmit={topupMode === 'topup' ? handleTopup : handleDeduct} className="space-y-4">
                 <div>
-                  <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Nominal Saldo</label>
+                  <label className="block text-[13px] font-medium text-slate-600 mb-1.5">
+                    {topupMode === 'topup' ? 'Nominal Pengisian' : 'Nominal Pengambilan'}
+                  </label>
                   <input
                     type="number"
                     value={topupAmount}
                     onChange={(e) => setTopupAmount(e.target.value)}
                     placeholder="Contoh: 50000"
                     min="1000"
-                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 text-[15px]"
+                    disabled={submitting}
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 text-[15px] disabled:opacity-60"
                     required
+                    autoFocus
                   />
                 </div>
                 <div className="flex gap-2">
@@ -254,8 +336,11 @@ export default function AdminUsers() {
                     <button
                       key={a}
                       type="button"
+                      disabled={submitting}
                       onClick={() => setTopupAmount(String(a))}
-                      className={`flex-1 py-2 rounded-[12px] text-[11px] font-semibold transition-colors ${topupAmount === String(a) ? 'bg-sky-500 text-white' : 'bg-white border border-slate-100 text-slate-600 hover:bg-slate-50'}`}
+                      className={`flex-1 py-2 rounded-[12px] text-[11px] font-semibold transition-colors disabled:opacity-60 ${topupAmount === String(a)
+                        ? topupMode === 'topup' ? 'bg-sky-500 text-white' : 'bg-rose-500 text-white'
+                        : 'bg-white border border-slate-100 text-slate-600 hover:bg-slate-50'}`}
                     >
                       {(a/1000).toFixed(0)}rb
                     </button>
@@ -263,10 +348,18 @@ export default function AdminUsers() {
                 </div>
                 <button
                   type="submit"
-                  disabled={!topupAmount}
-                  className="w-full bg-sky-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none hover:bg-sky-600 active:scale-95 text-white font-semibold py-4 rounded-[16px] mt-2 shadow-[0_8px_20px_rgba(14,165,233,0.3)] transition-all text-[15px]"
+                  disabled={!topupAmount || submitting}
+                  className={`w-full disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none active:scale-95 text-white font-semibold py-4 rounded-[16px] mt-2 transition-all text-[15px] flex items-center justify-center gap-2 ${
+                    topupMode === 'topup'
+                      ? 'bg-sky-500 hover:bg-sky-600 shadow-[0_8px_20px_rgba(14,165,233,0.3)]'
+                      : 'bg-rose-500 hover:bg-rose-600 shadow-[0_8px_20px_rgba(239,68,68,0.25)]'
+                  }`}
                 >
-                  Konfirmasi Top Up
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {submitting
+                    ? 'Memproses...'
+                    : topupMode === 'topup' ? 'Konfirmasi Isi Saldo' : 'Konfirmasi Ambil Saldo'
+                  }
                 </button>
               </form>
             </motion.div>

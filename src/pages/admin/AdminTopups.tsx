@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../../AppContext';
-import { Wallet, Search, ArrowUpRight } from 'lucide-react';
+import { Wallet, Search, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonList } from '../../components/ui/Skeleton';
@@ -16,7 +16,8 @@ export default function AdminTopups() {
     (t.admin_name || '').toLowerCase().includes(search.toLowerCase())
   ), [topups, search]);
 
-  const total = useMemo(() => topups.reduce((acc, t) => acc + t.amount, 0), [topups]);
+  const totalIn = useMemo(() => topups.filter(t => t.type !== 'deduct').reduce((acc, t) => acc + t.amount, 0), [topups]);
+  const totalOut = useMemo(() => topups.filter(t => t.type === 'deduct').reduce((acc, t) => acc + t.amount, 0), [topups]);
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -28,8 +29,29 @@ export default function AdminTopups() {
   return (
     <div className="space-y-6 pb-20">
       <div>
-        <h1 className="text-[28px] font-bold tracking-tight text-slate-800 mb-1">Riwayat Top Up</h1>
-        <p className="text-slate-500 text-[13px] font-medium">{topups.length} pengisian • Total {formatRupiah(total)}</p>
+        <h1 className="text-[28px] font-bold tracking-tight text-slate-800 mb-1">Riwayat Saldo</h1>
+        <p className="text-slate-500 text-[13px] font-medium">{topups.length} transaksi saldo</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="glass rounded-[20px] p-3.5">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-[10px] bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600">
+              <ArrowUpRight className="w-4 h-4" strokeWidth={2} />
+            </div>
+            <span className="text-[11px] text-slate-500 font-medium">Total Masuk</span>
+          </div>
+          <span className="text-[16px] font-bold text-teal-600">{formatRupiah(totalIn)}</span>
+        </div>
+        <div className="glass rounded-[20px] p-3.5">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-[10px] bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500">
+              <ArrowDownLeft className="w-4 h-4" strokeWidth={2} />
+            </div>
+            <span className="text-[11px] text-slate-500 font-medium">Total Diambil</span>
+          </div>
+          <span className="text-[16px] font-bold text-rose-500">{formatRupiah(totalOut)}</span>
+        </div>
       </div>
 
       <div className="relative">
@@ -49,30 +71,38 @@ export default function AdminTopups() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Wallet}
-            title={search ? 'Tidak ada hasil' : 'Belum ada top up'}
-            description={search ? 'Coba ubah pencarian.' : 'Setiap pengisian saldo akan tercatat di sini.'}
+            title={search ? 'Tidak ada hasil' : 'Belum ada transaksi saldo'}
+            description={search ? 'Coba ubah pencarian.' : 'Setiap pengisian dan pengambilan saldo akan tercatat di sini.'}
           />
         ) : (
-          filtered.map((t, idx) => (
-            <motion.div
-              key={t.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.04 }}
-              className="glass-strong rounded-[20px] p-4 flex items-center gap-3"
-            >
-              <div className="w-10 h-10 rounded-[12px] bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0 text-teal-600">
-                <ArrowUpRight className="w-5 h-5" strokeWidth={2} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-slate-800 text-[15px] leading-tight truncate">{t.user_name || 'Pengguna dihapus'}</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  oleh {t.admin_name || 'Sistem'} • {formatDate(t.created_at)}
-                </p>
-              </div>
-              <span className="font-bold text-teal-600 tracking-tight text-[15px] shrink-0">+{formatRupiah(t.amount)}</span>
-            </motion.div>
-          ))
+          filtered.map((t, idx) => {
+            const isDeduct = t.type === 'deduct';
+            return (
+              <motion.div
+                key={t.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className="glass-strong rounded-[20px] p-4 flex items-center gap-3"
+              >
+                <div className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${isDeduct ? 'bg-rose-50 border border-rose-100 text-rose-500' : 'bg-teal-50 border border-teal-100 text-teal-600'}`}>
+                  {isDeduct
+                    ? <ArrowDownLeft className="w-5 h-5" strokeWidth={2} />
+                    : <ArrowUpRight className="w-5 h-5" strokeWidth={2} />
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-slate-800 text-[15px] leading-tight truncate">{t.user_name || 'Pengguna dihapus'}</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {isDeduct ? 'Diambil' : 'Diisi'} oleh {t.admin_name || 'Sistem'} • {formatDate(t.created_at)}
+                  </p>
+                </div>
+                <span className={`font-bold tracking-tight text-[15px] shrink-0 ${isDeduct ? 'text-rose-500' : 'text-teal-600'}`}>
+                  {isDeduct ? '-' : '+'}{formatRupiah(t.amount)}
+                </span>
+              </motion.div>
+            );
+          })
         )}
       </div>
     </div>
