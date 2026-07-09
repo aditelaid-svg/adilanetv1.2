@@ -119,7 +119,11 @@ function reaperScript(): string {
   // with a digit). The counter may be followed by a space + identifier text,
   // e.g. "599 User#5 Ahmad" — that trailing text is preserved on each tick.
   // Legacy pure-number comments ("599") have no space and still work.
-  return `:foreach u in=[/ip hotspot user find where comment~"^[0-9]"] do={:local c [/ip hotspot user get $u comment]; :local sp [:find $c " "]; :local n $c; :local rest ""; :if ([:typeof $sp]="num") do={:set n [:pick $c 0 $sp]; :set rest [:pick $c $sp [:len $c]]}; :local r [:tonum $n]; :if ($r<=1) do={/ip hotspot user remove $u} else={/ip hotspot user set comment=(($r-1) . $rest) $u}}`;
+  // When the countdown reaches zero: first kick the live session from
+  // /ip hotspot active (so the device is immediately disconnected), then
+  // remove the user record. Without the active-remove step the TCP session
+  // stays alive even after the user entry is gone.
+  return `:foreach u in=[/ip hotspot user find where comment~"^[0-9]"] do={:local c [/ip hotspot user get $u comment]; :local sp [:find $c " "]; :local n $c; :local rest ""; :if ([:typeof $sp]="num") do={:set n [:pick $c 0 $sp]; :set rest [:pick $c $sp [:len $c]]}; :local r [:tonum $n]; :if ($r<=1) do={:local uname [/ip hotspot user get $u name]; /ip hotspot active remove [find where user=$uname]; /ip hotspot user remove $u} else={/ip hotspot user set comment=(($r-1) . $rest) $u}}`;
 }
 
 // If a reaper scheduler already exists on this router, make sure it runs the
