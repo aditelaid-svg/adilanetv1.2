@@ -1,6 +1,8 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 import path from "path";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
@@ -364,6 +366,59 @@ async function startServer() {
   const isProd = process.env.NODE_ENV === "production";
   app.set("trust proxy", 1);
   app.use(cors({ origin: true, credentials: true }));
+
+  // ─── SECURITY HEADERS (Helmet) ───────────────────────────────────────────
+  // Adds X-Frame-Options, X-Content-Type-Options, Referrer-Policy, etc.
+  // CSP disabled — SPA loads inline scripts; tighten per-project if needed.
+  app.use(helmet({ contentSecurityPolicy: false }));
+
+  // ─── RATE LIMITERS ────────────────────────────────────────────────────────
+  // Brute-force & abuse protection per IP. Counts are generous enough for
+  // legitimate use but stop automated hammering.
+
+  // Login: maks 15 percobaan per 15 menit per IP
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 15,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: "Terlalu banyak percobaan login. Coba lagi dalam 15 menit." },
+    skipSuccessfulRequests: true,
+  });
+
+  // Registrasi: maks 10 akun per jam per IP
+  const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: "Terlalu banyak registrasi. Coba lagi nanti." },
+  });
+
+  // QRIS: maks 30 request per jam per IP (cegah QRIS spam)
+  const qrisLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: "Terlalu banyak permintaan QRIS. Coba lagi nanti." },
+  });
+
+  // General API: maks 300 request per 15 menit per IP (cegah DDoS ringan)
+  const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: "Terlalu banyak request. Coba lagi sebentar." },
+    skip: (req) => req.path === "/api/health",
+  });
+
+  app.use("/api/", generalLimiter);
+  app.use("/api/auth/login", loginLimiter);
+  app.use("/api/auth/register", registerLimiter);
+  app.use("/api/payment/create-qris", qrisLimiter);
+
   // Capture the raw request body so we can verify the SanPay webhook HMAC signature.
   app.use(express.json({
     limit: '3mb',
@@ -470,6 +525,20 @@ async function startServer() {
       const { name, email, phone_number, password } = req.body;
       if (!name || !email || !password) {
         return res.status(400).json({ success: false, error: "Nama, email, dan password wajib diisi." });
+      }
+      if (typeof name !== 'string' || name.trim().length < 2 || name.length > 100) {
+        return res.status(400).json({ success: false, error: "Nama harus 2–100 karakter." });
+      }
+      if (typeof email !== 'string' || email.length > 150 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ success: false, error: "Format email tidak valid." });
+      }
+      if (typeof password !== 'string' || password.length < 6 || password.length > 128) {
+        return res.status(400).json({ success: false, error: "Password harus 6–128 karakter." });
+      }
+      if (phone_number !== undefined && phone_number !== null && phone_number !== '') {
+        if (typeof phone_number !== 'string' || phone_number.length > 20 || !/^[0-9+\-\s()]{6,20}$/.test(phone_number)) {
+          return res.status(400).json({ success: false, error: "Format nomor HP tidak valid." });
+        }
       }
       const hashed = await hashSecret(password);
       const { rows } = await pool.query(
