@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../../AppContext';
 import { useToast } from '../../components/Toast';
-import { Search, CheckCircle2, Clock, XCircle, ArrowUpRight, Trash2, Receipt, RotateCw } from 'lucide-react';
+import { Search, CheckCircle2, Clock, XCircle, ChevronLeft, ChevronRight, Trash2, Receipt, RotateCw } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { formatRupiah, formatDateShort, formatTime } from '../../lib/format';
@@ -10,6 +10,7 @@ export default function AdminTransactions() {
   const { transactions, deleteVoucher, loading, refreshData } = useAppContext();
   const toast = useToast();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [retrying, setRetrying] = useState<string | null>(null);
 
   const handleDelete = async (txId: number) => {
@@ -69,6 +70,16 @@ export default function AdminTransactions() {
     (tx.package_name || '').toLowerCase().includes(search.toLowerCase()) ||
     (tx.voucher_code || '').toLowerCase().includes(search.toLowerCase())
   );
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const visibleTransactions = filtered.slice(startIndex, startIndex + pageSize);
+
+  // Keep the page valid when a deletion or refresh reduces the result count.
+  useEffect(() => {
+    setPage(previous => Math.min(previous, totalPages));
+  }, [totalPages]);
 
   const successCount = transactions.filter(t => t.status === 'success').length;
   const pendingCount = transactions.filter(t => t.status === 'pending').length;
@@ -89,7 +100,7 @@ export default function AdminTransactions() {
         <input
           type="text"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
           placeholder="Cari nama, paket, atau kode voucher..."
           className="w-full bg-white border border-slate-200 text-slate-800 placeholder-slate-400 rounded-2xl pl-9 pr-4 py-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors shadow-sm"
         />
@@ -123,9 +134,9 @@ export default function AdminTransactions() {
         <SkeletonList count={5} />
       ) : (
       <div className="glass-strong rounded-[24px] overflow-hidden">
-        <div className="overflow-x-auto hide-scrollbar">
+        <div className="max-h-[min(50dvh,420px)] overflow-auto overscroll-contain" role="region" aria-label="Daftar transaksi" tabIndex={0}>
           <table className="w-full text-left border-collapse min-w-[500px]">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-slate-50">
               <tr className="border-b border-slate-100">
                 <th className="px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">Tanggal</th>
                 <th className="px-4 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">Pengguna</th>
@@ -137,7 +148,7 @@ export default function AdminTransactions() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map((tx) => {
+              {visibleTransactions.map((tx) => {
                 const date = formatDateShort(tx.created_at);
                 const time = formatTime(tx.created_at);
                 return (
@@ -200,11 +211,32 @@ export default function AdminTransactions() {
             </tbody>
           </table>
         </div>
-        {filtered.length > 10 && (
-          <div className="p-3 border-t border-slate-100 flex justify-center">
-            <button className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1">
-              Muat Lebih Banyak <ArrowUpRight className="w-3 h-3" />
-            </button>
+        {filtered.length > 0 && (
+          <div className="p-3 border-t border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[11px] text-slate-500">
+              Menampilkan {startIndex + 1}–{Math.min(startIndex + pageSize, filtered.length)} dari {filtered.length} transaksi
+            </p>
+            <nav aria-label="Halaman transaksi" className="flex items-center justify-between gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" /> Sebelumnya
+              </button>
+              <span className="text-[11px] text-slate-500 whitespace-nowrap" aria-live="polite">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Berikutnya <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </nav>
           </div>
         )}
       </div>
