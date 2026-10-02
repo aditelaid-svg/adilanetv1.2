@@ -18,3 +18,9 @@ Self-hosted database upgrades must not depend on Replit-managed migrations or a 
 **Why:** A Docker image update does not update a persistent external PostgreSQL schema automatically. Saving newly introduced gateway settings can fail before storing credentials if its tables are missing.
 
 **How to apply:** Verify startup against both an existing schema and a runtime containing only production build assets. Do not reset database volumes to resolve a missing table.
+
+ARM64 support is required: the user said their server is ARM64, usually an STB. Do not simplify a failing multi-platform build to AMD64 only.
+
+**Why:** An AMD64-only image cannot run natively on the user's deployment hardware. QEMU crashed during the ARM64 dependency installation while the AMD64 application build succeeded.
+
+**How to apply:** Preserve ARM64 when modifying deployment or CI. Prefer native ARM64 builds for Node dependencies rather than assuming a successful AMD64 build validates the STB image.

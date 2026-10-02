@@ -61,6 +61,8 @@ Akses aplikasi di: `http://IP_SERVER:5000`
 
 Setelah push kode baru ke GitHub:
 
+Jika menggunakan image GHCR, tunggu GitHub Actions menyelesaikan build **AMD64** dan **ARM64**, lalu job **Publish combined AMD64 and ARM64 image**. ARM64 dibangun pada runner ARM asli, tanpa QEMU. Setelah semua job berhasil, gunakan **Pull & Restart** di Dockge untuk mengambil image baru; jangan hapus volume database.
+
 **Cara manual** — Di Dockge klik **Pull & Restart**:
 ```bash
 docker compose down

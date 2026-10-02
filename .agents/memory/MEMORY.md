@@ -5,7 +5,7 @@
 - [Admin bulk vouchers](voucher-bulk-admin.md) — AdminVouchers now really provisions N codes to MikroTik via POST /api/router/create-vouchers-bulk + createVouchersBulk (one connection, partial-failure). Stateless (no DB), like single-create.
 - [Hotspot user list](hotspot-user-list.md) — two reads: active-users (live, /active) vs hotspot-users (full /user/print incl offline, merged w/ active). AdminHotspotUsers page = Mikhmon-style list, no demo fallback.
 - [WiFi auto-login](wifi-auto-login.md) — admin `hotspotLoginUrl` setting (gateway login page, not API host); UserBuy success shows one-tap "Login WiFi" via top-level POST form.
-- [Docker deploy](docker-deploy.md) — Dockge/compose builds from GitHub context; SESSION_SECRET is mandatory (server throws without it); tables auto-create on boot.
+- [Docker deployment](docker-deploy.md) — ARM64/STB support is required; preserve native ARM builds and self-hosted database upgrades without resetting volumes.
 - [Mikrotik API](mikrotik-api.md) — createVoucher uses array param format `=key=value`, port passed from router.api_port; getProfiles with port support.
 - [Mikrotik profiles](mikrotik-profiles.md) — admin hotspot profile CRUD from UI; GET has demo fallback, writes never fall back; server-side field validation.
 - [Mikrotik validity](mikrotik-validity.md) — "masa aktif tetap" expiry = on-login stamps minutes into user comment; one global `an-voucher-reaper` scheduler counts down. Avoids scheduler immediate-fire + date math.
