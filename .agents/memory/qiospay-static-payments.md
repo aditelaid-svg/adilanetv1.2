@@ -19,4 +19,10 @@ Only a verified credit in the authenticated merchant mutation ledger can pay an 
 
 **Why:** The callback sample authenticates a URL secret, not a signed order-specific payload; its reference is not documented as an app order ID.
 
-**How to apply:** Maintain exact amount/time checks, credit deduplication, durable paid states, and stable router voucher candidates across retries. Use a dedicated merchant QR and warn about static-QR limitations.
+**How to apply:** Maintain exact amount/time checks, credit deduplication, durable paid states, and stable router voucher candidates across retries. Preserve buyer-facing disclosure of unique amounts and static-QR limitations.
+
+Untuk pengaturan admin, pengguna meminta: “buat simpel setingan QRIS Qiospay, tidak usah kasih keterangan atau Note.”
+
+**Why:** Pengguna menyatakan halaman terlihat berantakan karena keterangannya.
+
+**How to apply:** Keep the admin QRIS form compact, with field labels and essential save/error feedback rather than explanatory notes. This presentation preference does not remove payment safeguards or buyer-facing amount disclosure.

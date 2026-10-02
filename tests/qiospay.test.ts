@@ -1,10 +1,12 @@
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { transformSync } from "esbuild";
 import { Pool } from "pg";
 import { QiospayPayments } from "../src/server/qiospay-payments";
 import { ensureQiospaySchema } from "../src/server/qiospay-schema";
-import { crc16, validateStaticQr, validCallbackToken, normalizeCredits, parseMutationDate, fetchCredits, readQiospayConfig } from "../src/server/qiospay-client";
+import { PaymentError, crc16, validateStaticQr, validCallbackToken, normalizeCredits, parseMutationDate, fetchCredits, readQiospayConfig } from "../src/server/qiospay-client";
 import { readQrisRecovery, storeQrisRecovery, qrisRecoveryKey, clearQrisRecoveryForIdentity } from "../src/lib/qrisRecovery";
 
 // Fixtures only: never contact Qiospay or provision a live MikroTik voucher.
@@ -67,6 +69,59 @@ async function inWindow(reference: string) {
 }
 const credit = (amount: number, ref = "fixture-ref", date = new Date()) =>
   ({ amount: String(amount), type: "CR", date: jakartaDate(date), issuer_reff: ref, balance: "100000", brand_name: "TEST" });
+
+test("QRIS settings save repairs missing tables, preserves other settings and keeps a saved key", async () => {
+  // Exercise the actual monolithic server handler against this test's isolated
+  // schema, without starting a second server or touching development settings.
+  const source = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+  const start = source.indexOf('  app.post("/api/settings", requireAdmin,');
+  const end = source.indexOf('  app.get("/api/config/public"', start);
+  assert.ok(start >= 0 && end > start);
+  let handler: any;
+  const app = { post: (_path: string, _guard: unknown, callback: unknown) => { handler = callback; } };
+  const code = transformSync(source.slice(start, end), { loader: "ts", target: "es2022" }).code;
+  new Function("app", "requireAdmin", "pool", "ensureQiospaySchema", "crypto",
+    "PaymentError", "validateStaticQr", "readQiospayConfig", "qiospayReady", code)(
+      app, () => {}, pool, ensureQiospaySchema, crypto, PaymentError, validateStaticQr, readQiospayConfig,
+      (s: Record<string, string>) => { try { readQiospayConfig(s); return true; } catch { return false; } },
+    );
+  const previous = {
+    telegramToken: "fixture-telegram", telegramChatId: "fixture-chat",
+    hotspotLoginUrl: "legacy-url", whatsappNumber: "123", whatsappMessage: "Keep this",
+    voucherCharset: "numeric", voucherLength: "6", voucherPrefix: "legacy-prefix",
+  };
+  for (const [key, value] of Object.entries(previous)) {
+    await pool.query("INSERT INTO settings(config_key,config_value) VALUES($1,$2)", [key, value]);
+  }
+  // These tables belong only to the generated test schema and are empty.
+  await pool.query("DROP TABLE qiospay_invoices; DROP TABLE qiospay_events;");
+  await pool.query("INSERT INTO transactions(amount,status,reference_id) VALUES(5000,'success','fixture-history')");
+  const save = async (body: unknown) => {
+    const result = { status: 200, json: null as any };
+    const response = {
+      status: (status: number) => { result.status = status; return response; },
+      json: (json: unknown) => { result.json = json; return response; },
+    };
+    await handler({ body }, response);
+    return result;
+  };
+  const body = {
+    qiospayMerchantCode: "TEST-MERCHANT", qiospayQrString: staticQr,
+    qiospayApiKey: "fixture-only-not-a-real-key", qrisEnabled: true,
+  };
+  assert.deepEqual(await save(body), { status: 200, json: { success: true, message: "Pengaturan berhasil disimpan." } });
+  const read = async () => Object.fromEntries((await pool.query("SELECT config_key,config_value FROM settings")).rows.map(r => [r.config_key, r.config_value]));
+  const saved = await read();
+  for (const [key, value] of Object.entries(previous)) assert.equal(saved[key], value);
+  assert.equal(saved.qrisEnabled, "true");
+  assert.match(saved.qiospayCallbackToken, /^[a-f0-9]{64}$/);
+  assert.equal((await pool.query("SELECT COUNT(*)::int AS count FROM qiospay_invoices")).rows[0].count, 0);
+  assert.equal((await pool.query("SELECT status FROM transactions WHERE reference_id='fixture-history'")).rows[0].status, "success");
+  assert.equal((await save({ ...body, qiospayApiKey: "" })).status, 200);
+  assert.deepEqual(await read(), saved);
+  assert.equal((await save({ ...body, qiospayQrString: "invalid" })).status, 400);
+  assert.deepEqual(await read(), saved);
+});
 
 test("startup schema is repeatable and preserves existing transactions and permanent reservations", async () => {
   const invoice = await order();

@@ -1282,6 +1282,9 @@ async function startServer() {
       settingsDb = await pool.connect();
       await settingsDb.query("BEGIN");
       await settingsDb.query("SELECT pg_advisory_xact_lock(hashtext('qiospay-config'))");
+      // Retry initialization here as well: a previous startup may have failed.
+      // DDL and settings changes stay in the same transaction.
+      await ensureQiospaySchema(settingsDb);
       const { rows: previousRows } = await settingsDb.query("SELECT config_key,config_value FROM settings");
       const previous: Record<string, string> = Object.fromEntries(previousRows.map(r => [r.config_key, r.config_value]));
       if (req.body.qrisProvider !== undefined && req.body.qrisProvider !== 'qiospay') {
@@ -1312,14 +1315,22 @@ async function startServer() {
       if (qEnabled) {
         readQiospayConfig({ qiospayMerchantCode: qMerchant, qiospayQrString: qQr, qiospayApiKey: qKey, qiospayCallbackToken: qToken });
       }
-      const { telegramToken, telegramChatId,
-              voucherCharset, voucherLength, voucherPrefix, hotspotLoginUrl,
-              whatsappNumber, whatsappMessage } = req.body;
+      // QRIS-only saves must not clear or reset unrelated settings.
+      const {
+        telegramToken = previous.telegramToken,
+        telegramChatId = previous.telegramChatId,
+        voucherCharset = previous.voucherCharset,
+        voucherLength = previous.voucherLength,
+        voucherPrefix = previous.voucherPrefix,
+        hotspotLoginUrl = previous.hotspotLoginUrl,
+        whatsappNumber = previous.whatsappNumber,
+        whatsappMessage = previous.whatsappMessage,
+      } = req.body;
 
       // Validate & sanitize the hotspot login URL (used for one-tap WiFi login
       // after purchase). Must be empty or a valid http/https URL.
       let hsUrl = typeof hotspotLoginUrl === 'string' ? hotspotLoginUrl.trim() : '';
-      if (hsUrl.length > 0) {
+      if (hsUrl.length > 0 && req.body.hotspotLoginUrl !== undefined) {
         if (hsUrl.length > 255 || !/^https?:\/\/[^\s]+$/i.test(hsUrl)) {
           return res.status(400).json({ success: false, error: "URL Login Hotspot tidak valid. Contoh: http://10.5.50.1/login" });
         }
@@ -1340,7 +1351,7 @@ async function startServer() {
       let waNum = typeof whatsappNumber === 'string' ? whatsappNumber.replace(/[^0-9]/g, '') : '';
       if (waNum.startsWith('0')) waNum = '62' + waNum.slice(1);
       if (waNum.length > 20) waNum = waNum.slice(0, 20);
-      if (waNum.length > 0 && waNum.length < 8) {
+      if (waNum.length > 0 && waNum.length < 8 && req.body.whatsappNumber !== undefined) {
         return res.status(400).json({ success: false, error: "Nomor WhatsApp tidak valid. Contoh: 081234567890" });
       }
       let waMsg = typeof whatsappMessage === 'string' ? whatsappMessage.trim() : '';
@@ -1352,15 +1363,17 @@ async function startServer() {
         ['qiospayQrString', qQr],
         ['qiospayApiKey', qKey],
         ['qiospayCallbackToken', qToken],
-        ['telegramToken', telegramToken ?? ''],
-        ['telegramChatId', telegramChatId ?? ''],
         ['qrisEnabled', String(qEnabled)],
-        ['voucherCharset', charset],
-        ['voucherLength', String(vlen)],
-        ['voucherPrefix', vprefix],
-        ['hotspotLoginUrl', hsUrl],
-        ['whatsappNumber', waNum],
-        ['whatsappMessage', waMsg],
+        ...[
+          ['telegramToken', telegramToken ?? ''],
+          ['telegramChatId', telegramChatId ?? ''],
+          ['voucherCharset', charset],
+          ['voucherLength', String(vlen)],
+          ['voucherPrefix', vprefix],
+          ['hotspotLoginUrl', hsUrl],
+          ['whatsappNumber', waNum],
+          ['whatsappMessage', waMsg],
+        ].filter(([key]) => Object.prototype.hasOwnProperty.call(req.body, key)),
       ];
       if (qMerchant !== previous.qiospayMerchantCode || qQr !== previous.qiospayQrString || qKey !== previous.qiospayApiKey) {
         updates.push(['qiospaySyncError', '']);
@@ -1375,6 +1388,7 @@ async function startServer() {
       committed = true;
       res.json({ success: true, message: "Pengaturan berhasil disimpan." });
     } catch (err: any) {
+      console.error("[Settings] Gagal menyimpan:", err.code || err.name || "unknown");
       const databaseMessage = err.code === '42P01'
         ? "Tabel QRIS belum siap. Perbarui dan jalankan ulang aplikasi agar tabel Qiospay dibuat."
         : err.code === '53100'

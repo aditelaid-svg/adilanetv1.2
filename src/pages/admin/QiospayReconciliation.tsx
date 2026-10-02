@@ -72,7 +72,6 @@ export default function QiospayReconciliation({ refreshKey = 0, settingsPending 
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-[15px] text-slate-800">Rekonsiliasi Qiospay</h2>
-          <p className="text-[11px] text-slate-500">Status akun dan ledger pembayaran statis</p>
         </div>
         <button type="button" onClick={() => void refresh()} disabled={loading || syncing} aria-label="Muat ulang status Qiospay" className="w-9 h-9 rounded-[11px] bg-white border border-slate-100 text-slate-500 flex items-center justify-center disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -96,14 +95,13 @@ export default function QiospayReconciliation({ refreshKey = 0, settingsPending 
       {attention.length > 0 && (
         <div className="bg-amber-50 border border-amber-100 rounded-[14px] p-3 mb-3 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-[12px] text-amber-800 font-medium">{attention.length} mutasi belum cocok atau perlu ditinjau. Periksa manual; status pembayaran tidak dapat diubah dari daftar ini.</p>
+          <p className="text-[12px] text-amber-800 font-medium">{attention.length} mutasi perlu ditinjau.</p>
         </div>
       )}
 
-      {settingsPending && <p className="text-[12px] text-amber-700 mb-3">Simpan pengaturan QRIS terlebih dahulu. Status di sini membaca konfigurasi yang sudah tersimpan, bukan kolom yang sedang diisi.</p>}
       <button type="button" onClick={() => void sync()} disabled={syncing || loading || settingsPending || !overview?.configured} className="w-full mb-4 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold text-[13px] py-3 rounded-[14px] flex items-center justify-center gap-2">
         <RotateCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-        {syncing ? 'Menyinkronkan mutasi...' : 'Uji akun & sinkronkan mutasi'}
+        {syncing ? 'Menyinkronkan...' : settingsPending ? 'Simpan QRIS dahulu' : 'Sinkronkan mutasi'}
       </button>
 
       {loading && !overview ? (

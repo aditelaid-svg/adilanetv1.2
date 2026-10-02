@@ -31,6 +31,7 @@ export default function AdminSettings() {
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [savedSection, setSavedSection] = useState<'all' | 'qris' | null>(null);
   const [callbackCopied, setCallbackCopied] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -50,7 +51,7 @@ export default function AdminSettings() {
     ? `${window.location.origin}/api/webhook/qiospay/${qiospayCallbackToken}`
     : '';
 
-  const fetchSettings = async () => {
+  const fetchSettings = async (resetAll = true) => {
     setSettingsLoading(true);
     setSettingsLoadError(null);
     try {
@@ -64,15 +65,17 @@ export default function AdminSettings() {
       // Never populate the password field with a saved Qiospay API key.
       setQiospayApiKeyConfigured(Boolean(settings.qiospayApiKeyConfigured));
       setQiospayCallbackToken(settings.qiospayCallbackToken || '');
-      setTelegramToken(settings.telegramToken || '');
-      setTelegramChatId(settings.telegramChatId || '');
-      setQrisEnabled(settings.qrisEnabled ?? true);
-      setVoucherCharset(settings.voucherCharset || 'alphanumeric');
-      setVoucherLength(settings.voucherLength || 8);
-      setVoucherPrefix(settings.voucherPrefix ?? 'WFI-');
-      setHotspotLoginUrl(settings.hotspotLoginUrl || '');
-      setWhatsappNumber(settings.whatsappNumber || '');
-      setWhatsappMessage(settings.whatsappMessage ?? '');
+      setQrisEnabled(settings.qrisEnabled ?? false);
+      if (resetAll) {
+        setTelegramToken(settings.telegramToken || '');
+        setTelegramChatId(settings.telegramChatId || '');
+        setVoucherCharset(settings.voucherCharset || 'alphanumeric');
+        setVoucherLength(settings.voucherLength || 8);
+        setVoucherPrefix(settings.voucherPrefix ?? 'WFI-');
+        setHotspotLoginUrl(settings.hotspotLoginUrl || '');
+        setWhatsappNumber(settings.whatsappNumber || '');
+        setWhatsappMessage(settings.whatsappMessage ?? '');
+      }
       setSavedQiospay({
         merchant: settings.qiospayMerchantCode || '',
         qr: settings.qiospayQrString || '',
@@ -94,11 +97,12 @@ export default function AdminSettings() {
 
   useEffect(() => { void fetchSettings(); }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.SyntheticEvent, section: 'all' | 'qris' = 'all') => {
     e.preventDefault();
     if (!settingsLoaded || settingsLoading || isSaving) return;
     setIsSaving(true);
     setIsSaved(false);
+    setSavedSection(null);
     setSaveError(null);
     try {
         const baseUrl = import.meta.env.VITE_API_URL || '';
@@ -110,15 +114,17 @@ export default function AdminSettings() {
                 qiospayMerchantCode,
                 qiospayQrString,
                 qiospayApiKey,
+                qrisEnabled,
+                ...(section === 'all' ? {
                 telegramToken: telegramToken,
                 telegramChatId: telegramChatId,
-                qrisEnabled: qrisEnabled,
                 voucherCharset: voucherCharset,
                 voucherLength: voucherLength,
                 voucherPrefix: voucherPrefix,
                 hotspotLoginUrl: hotspotLoginUrl,
                 whatsappNumber: whatsappNumber,
                 whatsappMessage: whatsappMessage
+                } : {})
             })
         });
         const json = await res.json();
@@ -126,13 +132,14 @@ export default function AdminSettings() {
         if (json.success) {
             setQiospayApiKey('');
             setReconciliationVersion(version => version + 1);
-            const confirmed = await fetchSettings();
+            const confirmed = await fetchSettings(section === 'all');
             if (!confirmed) {
               setSaveError('Pengaturan sudah disimpan, tetapi belum dapat dimuat ulang. Tekan Muat ulang pengaturan untuk memastikan statusnya.');
               return;
             }
             setIsSaved(true);
-            toast.success('Pengaturan tersimpan', 'Status Qiospay sudah diperbarui. Uji akun untuk memeriksa koneksi ke Qiospay.');
+            setSavedSection(section);
+            toast.success(section === 'qris' ? 'QRIS tersimpan' : 'Pengaturan tersimpan');
             setTimeout(() => setIsSaved(false), 3000);
         }
     } catch (err) {
@@ -200,10 +207,10 @@ export default function AdminSettings() {
         </form>
       </motion.div>
 
-      <form onSubmit={handleSave} className="space-y-5">
+      <form onSubmit={e => void handleSave(e)} className="space-y-5">
         {settingsLoadError && (
           <div role="alert" className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-[12px] text-rose-700">
-            <p>{settingsLoadError} Pengaturan belum dapat dipastikan; penyimpanan dinonaktifkan agar data lama tidak tertimpa.</p>
+            <p>{settingsLoadError}</p>
             <button type="button" disabled={settingsLoading || isSaving} onClick={() => void fetchSettings()} className="mt-2 font-semibold underline disabled:opacity-50">
               Muat ulang pengaturan
             </button>
@@ -218,59 +225,40 @@ export default function AdminSettings() {
               <Shield className="w-5 h-5" strokeWidth={1.8} />
             </div>
             <div className="flex-1">
-                <h2 className="font-semibold text-[15px] text-slate-800">Payment Gateway (QRIS)</h2>
+                <h2 className="font-semibold text-[15px] text-slate-800">QRIS Qiospay</h2>
             </div>
             <div className="flex items-center">
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={qrisEnabled} disabled={!settingsLoaded || settingsLoading || isSaving} onChange={(e) => setQrisEnabled(e.target.checked)} className="sr-only peer" />
+                  <input type="checkbox" aria-label="Aktifkan QRIS" checked={qrisEnabled} disabled={!settingsLoaded || settingsLoading || isSaving} onChange={(e) => setQrisEnabled(e.target.checked)} className="sr-only peer" />
                   <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div>
                 </label>
             </div>
           </div>
           
           <fieldset disabled={!settingsLoaded || settingsLoading || isSaving} className="min-w-0 space-y-4 disabled:opacity-60">
-            <p className="text-[11px] text-slate-500">Isi dan simpan konfigurasi terlebih dahulu. Sakelar di atas mengaktifkan pembayaran QRIS untuk pembeli.</p>
-            <div>
-              <label className="block text-[13px] font-medium text-slate-600 mb-2">Penyedia QRIS aktif</label>
-              <div className="bg-sky-50 border border-sky-100 rounded-2xl px-4 py-3.5 text-sky-700 text-[15px] font-semibold">
-                Qiospay · QRIS statis + nominal unik
-              </div>
-            </div>
               <div>
-                <label className="block text-[13px] font-medium text-slate-600 mb-2">Merchant Code Qiospay</label>
+                <label className="block text-[13px] font-medium text-slate-600 mb-2">Merchant Code</label>
                 <input type="text" value={qiospayMerchantCode} onChange={e => setQiospayMerchantCode(e.target.value)} placeholder="Kode merchant Qiospay" className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200" />
               </div>
               <div>
-                <label className="block text-[13px] font-medium text-slate-600 mb-2">QRIS statis (payload/string QR)</label>
+                <label className="block text-[13px] font-medium text-slate-600 mb-2">String QRIS</label>
                 <textarea value={qiospayQrString} onChange={e => setQiospayQrString(e.target.value)} rows={3} placeholder="Tempel payload QRIS statis" className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-sky-200 resize-y" />
-                <p className="text-[11px] text-slate-400 mt-1.5">Gunakan QRIS statis dari akun khusus penerimaan pembayaran. Nominal harus dimasukkan manual oleh pembeli.</p>
               </div>
               <div>
-                <label className="block text-[13px] font-medium text-slate-600 mb-2">API Key Qiospay</label>
+                <label className="flex items-center justify-between text-[13px] font-medium text-slate-600 mb-2">
+                  API Key
+                  {qiospayApiKeyConfigured && <span className="text-[11px] text-teal-700">Tersimpan</span>}
+                </label>
                 <div className="relative">
-                  <input type="password" autoComplete="new-password" value={qiospayApiKey} onChange={e => setQiospayApiKey(e.target.value)} placeholder={qiospayApiKeyConfigured ? 'Tersimpan — kosongkan untuk mempertahankan' : 'Masukkan API Key Qiospay'} className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 pr-11 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200" />
+                  <input type="password" autoComplete="new-password" value={qiospayApiKey} onChange={e => setQiospayApiKey(e.target.value)} placeholder={qiospayApiKeyConfigured ? 'API Key tersimpan' : 'Masukkan API Key'} className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 pr-11 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200" />
                   <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 </div>
-                <p className={`text-[11px] mt-1.5 font-medium ${qiospayApiKeyConfigured ? 'text-teal-700' : 'text-amber-700'}`}>
-                  {qiospayApiKeyConfigured ? 'API Key sudah dikonfigurasi. Nilai rahasia tidak ditampilkan.' : 'API Key belum dikonfigurasi.'}
-                </p>
-              </div>
-              <div className="bg-amber-50 border border-amber-100 rounded-[16px] p-4 space-y-2">
-                <p className="text-[12px] font-semibold text-amber-800">Catatan penting QRIS statis</p>
-                <ul className="text-[11px] text-amber-900/80 space-y-1 list-disc list-inside">
-                  <li>Gunakan akun QRIS khusus agar mutasi mudah direkonsiliasi.</li>
-                  <li>Nominal unik Rp1–Rp999 ditambahkan ke total tagihan, bukan otomatis dikembalikan.</li>
-                  <li>Reservasi nominal tidak dipakai ulang; jika pool per harga habis, transaksi ditolak.</li>
-                  <li>QR statis tidak memiliki kedaluwarsa jarak jauh; batas waktu hanya untuk reservasi pembayaran.</li>
-                  <li>Ganti API Key yang pernah terpapar dan jangan membagikannya.</li>
-                  <li>Perubahan konfigurasi ditolak selama masih ada transaksi belum terselesaikan.</li>
-                </ul>
               </div>
               <div className="bg-sky-50 border border-sky-100 rounded-[16px] p-4">
-                <label className="block text-[11px] font-medium text-slate-500 mb-1.5">URL Callback resmi Qiospay</label>
+                <label className="block text-[13px] font-medium text-slate-600 mb-2">Callback</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 bg-white border border-slate-200 rounded-[10px] px-3 py-2 text-[11px] text-slate-600 font-mono break-all">
-                    {qiospayCallbackToken ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhook/qiospay/••••••••` : 'Tersedia setelah konfigurasi berhasil disimpan'}
+                    {qiospayCallbackToken ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhook/qiospay/••••••••` : 'Belum tersedia'}
                   </code>
                   <button type="button" disabled={!qiospayCallbackUrl} onClick={async () => {
                     try {
@@ -284,22 +272,24 @@ export default function AdminSettings() {
                     {callbackCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-2">Token callback disamarkan di layar. Tombol salin menyalin URL lengkap khusus admin.</p>
               </div>
           </fieldset>
-          {qiospayDirty && <p className="mt-4 text-[12px] text-amber-700">Ada perubahan QRIS yang belum disimpan. Simpan dahulu sebelum menguji akun.</p>}
           {saveError && <p role="alert" className="mt-4 rounded-xl border border-rose-100 bg-rose-50 p-3 text-[12px] text-rose-700">{saveError}</p>}
           <button
-            type="submit"
+            type="button"
+            onClick={e => void handleSave(e, 'qris')}
             disabled={!settingsLoaded || settingsLoading || isSaving}
             className="mt-4 w-full rounded-[14px] bg-sky-500 py-3 text-[13px] font-semibold text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Save className="w-4 h-4" />
-            {isSaving ? 'Menyimpan...' : isSaved && !qiospayDirty ? 'Pengaturan tersimpan' : 'Simpan Pengaturan'}
+            {isSaving ? 'Menyimpan...' : isSaved && !qiospayDirty ? 'QRIS tersimpan' : 'Simpan QRIS'}
           </button>
         </motion.div>
 
-        <QiospayReconciliation refreshKey={reconciliationVersion} settingsPending={!settingsLoaded || settingsLoading || isSaving || qiospayDirty} />
+        <details className="glass-strong rounded-[24px] overflow-hidden">
+          <summary className="px-5 py-4 cursor-pointer text-[13px] font-semibold text-slate-700">Mutasi Qiospay</summary>
+          <QiospayReconciliation refreshKey={reconciliationVersion} settingsPending={!settingsLoaded || settingsLoading || isSaving || qiospayDirty} />
+        </details>
 
         <motion.div
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
@@ -496,9 +486,9 @@ export default function AdminSettings() {
         <button 
           type="submit"
           disabled={!settingsLoaded || settingsLoading || isSaving}
-          className={`w-full ${isSaved && !qiospayDirty ? 'bg-teal-500 hover:bg-teal-500 shadow-[0_8px_20px_rgba(20,184,166,0.3)]' : 'bg-sky-500 hover:bg-sky-600 shadow-[0_8px_20px_rgba(14,165,233,0.3)]'} active:scale-95 text-white font-semibold flex items-center justify-center gap-2 transition-all text-[15px] py-4 rounded-[16px] disabled:opacity-50`}
+          className={`w-full ${isSaved && savedSection === 'all' && !qiospayDirty ? 'bg-teal-500 hover:bg-teal-500 shadow-[0_8px_20px_rgba(20,184,166,0.3)]' : 'bg-sky-500 hover:bg-sky-600 shadow-[0_8px_20px_rgba(14,165,233,0.3)]'} active:scale-95 text-white font-semibold flex items-center justify-center gap-2 transition-all text-[15px] py-4 rounded-[16px] disabled:opacity-50`}
         >
-          {isSaved && !qiospayDirty ? (
+          {isSaved && savedSection === 'all' && !qiospayDirty ? (
             <>
               <Check className="w-5 h-5" strokeWidth={1.8} /> Pengaturan Tersimpan
             </>
