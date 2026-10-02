@@ -3,7 +3,7 @@
 Aplikasi web PWA untuk manajemen voucher WiFi Mikrotik dengan fitur:
 - Beli & kelola voucher WiFi
 - Integrasi profil Hotspot Mikrotik secara langsung
-- Pembayaran QRIS via Sanpay
+- Pembayaran QRIS statis Qiospay dengan nominal unik
 - Dashboard admin lengkap
 - Bisa diinstall sebagai aplikasi (PWA)
 
@@ -85,9 +85,11 @@ Watchtower akan cek update setiap 5 menit dan restart app otomatis.
 
 ## 💳 Aktifkan QRIS / Payment
 
-1. Daftar di [sanpay.site](https://sanpay.site)
-2. Isi `SANPAY_API_KEY` dan `SANPAY_MERCHANT_ID` di `docker-compose.yml`
-3. Set `APP_URL` ke URL publik server (untuk menerima webhook)
+1. Buka **Admin → Setelan** untuk mengatur Qiospay, satu-satunya penyedia QRIS.
+2. Isi Merchant Code, API Key baru, dan String QRIS statis lengkap. Kredensial pembayaran diatur di aplikasi, bukan di `docker-compose.yml`.
+3. Aktifkan QRIS dan simpan, kemudian salin URL callback ke dashboard Qiospay. Nominal pembeli adalah harga paket ditambah kode unik Rp1–999.
+4. Pastikan paket terhubung ke router/profil MikroTik dan uji koneksi serta pembayaran kecil sebelum digunakan pembeli.
+5. Untuk PostgreSQL self-hosted, terapkan `src/server/qiospay-schema.sql` sebelum menjalankan versi aplikasi ini. Jangan hapus reservasi nominal atau riwayat transaksi.
 
 ---
 

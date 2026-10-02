@@ -17,5 +17,5 @@ description: How login/session/authz works server-side and what the frontend mus
 - `requireAuth` / `requireAdmin` guard routes; PATCH/GET users are self-or-admin. Regular users' transactions are session-scoped server-side — the frontend must NOT call `/api/users` or `/api/routers` for non-admins (they 403).
 - Balance deduction on purchase is an atomic conditional UPDATE (`balance >= amount`) to prevent overdraft/races; user_id comes from the session, never the request body.
 - Voucher codes use `generateUniqueVoucher()` (crypto + DB-uniqueness retry), not `Math.random`.
-- `SESSION_SECRET` is required (server throws without it). Webhook verifies `SANPAY_WEBHOOK_SECRET` via `x-webhook-secret` header when that env var is set.
-- `SECRET`/secret envs live as Replit secrets; `.env.example` documents SESSION_SECRET + SANPAY_WEBHOOK_SECRET.
+- `SESSION_SECRET` is required (server throws without it).
+- Secret envs live as Replit secrets; `.env.example` documents SESSION_SECRET.

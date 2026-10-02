@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { clearQrisRecoveryForIdentity } from './lib/qrisRecovery';
 
 // Types
 export type User = {
@@ -43,10 +44,15 @@ export type Transaction = {
   voucher_code: string;
   amount: number;
   payment_method: 'saldo' | 'qris';
-  status: 'pending' | 'provisioning' | 'success' | 'failed';
+  status: 'pending' | 'paid' | 'provisioning' | 'success' | 'expired' | 'review' | 'failed';
   created_at: string;
   user_name?: string;
   package_name?: string;
+  provider?: string;
+  reference_id?: string | null;
+  base_amount?: number;
+  unique_code?: number;
+  expires_at?: string | null;
 };
 
 export type Promo = {
@@ -221,6 +227,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [topups, setTopups] = useState<Topup[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const previousQrisIdentity = React.useRef<string | null>(currentUser ? `user-${currentUser.id}` : null);
+
+  useEffect(() => {
+    const nextIdentity = currentUser ? `user-${currentUser.id}` : null;
+    if (previousQrisIdentity.current && previousQrisIdentity.current !== nextIdentity) {
+      clearQrisRecoveryForIdentity(previousQrisIdentity.current);
+    }
+    previousQrisIdentity.current = nextIdentity;
+  }, [currentUser?.id]);
 
   const setCurrentUser = (user: User | null) => {
     _setCurrentUser(user);

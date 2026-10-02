@@ -1,6 +1,6 @@
 - [Toast system](toast-system.md) — Global toast+confirm in src/components/Toast.tsx (ToastProvider in App.tsx); replaces all window.confirm/alert across admin pages.
 - [Package schema](package-schema.md) — packages table has router_id and mikrotik_profile (nullable); AppContext has updatePackage via PATCH /api/packages/:id.
-- [SanPay QRIS](sanpay-qris.md) — real QRIS via create-qris + signed webhook fulfillment; vouchers only minted after verified+amount-matched payment. Replaces old insecure /api/transactions/public.
+- [Qiospay static payments](qiospay-static-payments.md) — User chose unique nominal additions; never recycle merchant totals; callbacks only wake authenticated ledger checks.
 - [Voucher format](voucher-format.md) — admin-configurable charset/length/prefix in settings table; generateUniqueVoucher reads them; username=password mode kept.
 - [Admin bulk vouchers](voucher-bulk-admin.md) — AdminVouchers now really provisions N codes to MikroTik via POST /api/router/create-vouchers-bulk + createVouchersBulk (one connection, partial-failure). Stateless (no DB), like single-create.
 - [Hotspot user list](hotspot-user-list.md) — two reads: active-users (live, /active) vs hotspot-users (full /user/print incl offline, merged w/ active). AdminHotspotUsers page = Mikhmon-style list, no demo fallback.
@@ -9,7 +9,7 @@
 - [Mikrotik API](mikrotik-api.md) — createVoucher uses array param format `=key=value`, port passed from router.api_port; getProfiles with port support.
 - [Mikrotik profiles](mikrotik-profiles.md) — admin hotspot profile CRUD from UI; GET has demo fallback, writes never fall back; server-side field validation.
 - [Mikrotik validity](mikrotik-validity.md) — "masa aktif tetap" expiry = on-login stamps minutes into user comment; one global `an-voucher-reaper` scheduler counts down. Avoids scheduler immediate-fire + date math.
-- [PWA SW](pwa-sw.md) — SW registered in ALL environments (not just PROD); cache name adilanet-v3; proper SPA navigation fallback.
+- [PWA cache freshness](pwa-sw.md) — Do not cache Vite development modules; stale service-worker code can hide shipped UI changes.
 - [UI conventions](ui-conventions.md) — color tokens in @theme, format.ts helpers, EmptyState/Skeleton primitives, AppContext.loading top-bar; prefer these over inline duplicates.
 - [Superadmin role](superadmin-role.md) — protected role; only self can edit/delete it; use isAdminRole() for ALL admin checks; always ≥1 superadmin.
 - [Auth & session](auth-session.md) — cookie sessions (pg store), bcrypt password+pin w/ idempotent boot migration, requireAuth/requireAdmin, session-scoped data, atomic balance deduction.

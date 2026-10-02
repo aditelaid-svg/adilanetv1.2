@@ -2,12 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy, Ticket, Wifi, MessageCircle } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
+import { useToast } from '../../components/Toast';
+import QiospayReconciliation from './QiospayReconciliation';
 
 export default function AdminSettings() {
   const { currentUser, updateUser } = useAppContext();
+  const toast = useToast();
 
-  const [qrisKey, setQrisKey] = useState('');
-  const [merchantId, setMerchantId] = useState('');
+  const [qiospayMerchantCode, setQiospayMerchantCode] = useState('');
+  const [qiospayQrString, setQiospayQrString] = useState('');
+  const [qiospayApiKey, setQiospayApiKey] = useState('');
+  const [qiospayApiKeyConfigured, setQiospayApiKeyConfigured] = useState(false);
+  const [qiospayCallbackToken, setQiospayCallbackToken] = useState('');
   const [telegramToken, setTelegramToken] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [qrisEnabled, setQrisEnabled] = useState(true);
@@ -27,36 +33,37 @@ export default function AdminSettings() {
   const [isSaved, setIsSaved] = useState(false);
   const [callbackCopied, setCallbackCopied] = useState(false);
 
-  const callbackUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/webhook/sanpay`
-    : '/api/webhook/sanpay';
+  const qiospayCallbackUrl = typeof window !== 'undefined' && qiospayCallbackToken
+    ? `${window.location.origin}/api/webhook/qiospay/${qiospayCallbackToken}`
+    : '';
 
-  useEffect(() => {
-    // Fetch settings from Database via Backend API
-    const fetchSettings = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_URL || '';
-        const res = await fetch(`${baseUrl}/api/settings`);
-        const json = await res.json();
-        if (json.success && json.data) {
-          setQrisKey(json.data.sanpayApiKey || '');
-          setMerchantId(json.data.merchantId || '');
-          setTelegramToken(json.data.telegramToken || '');
-          setTelegramChatId(json.data.telegramChatId || '');
-          setQrisEnabled(json.data.qrisEnabled ?? true);
-          setVoucherCharset(json.data.voucherCharset || 'alphanumeric');
-          setVoucherLength(json.data.voucherLength || 8);
-          setVoucherPrefix(json.data.voucherPrefix ?? 'WFI-');
-          setHotspotLoginUrl(json.data.hotspotLoginUrl || '');
-          setWhatsappNumber(json.data.whatsappNumber || '');
-          setWhatsappMessage(json.data.whatsappMessage ?? '');
-        }
-      } catch (err) {
-        console.error("Gagal memuat setting:", err);
-      }
-    };
-    fetchSettings();
-  }, []);
+  const fetchSettings = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${baseUrl}/api/settings`, { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json.success || !json.data) throw new Error(json.error || 'Gagal memuat pengaturan.');
+      const settings = json.data;
+      setQiospayMerchantCode(settings.qiospayMerchantCode || '');
+      setQiospayQrString(settings.qiospayQrString || '');
+      // Never populate the password field with a saved Qiospay API key.
+      setQiospayApiKeyConfigured(Boolean(settings.qiospayApiKeyConfigured));
+      setQiospayCallbackToken(settings.qiospayCallbackToken || '');
+      setTelegramToken(settings.telegramToken || '');
+      setTelegramChatId(settings.telegramChatId || '');
+      setQrisEnabled(settings.qrisEnabled ?? true);
+      setVoucherCharset(settings.voucherCharset || 'alphanumeric');
+      setVoucherLength(settings.voucherLength || 8);
+      setVoucherPrefix(settings.voucherPrefix ?? 'WFI-');
+      setHotspotLoginUrl(settings.hotspotLoginUrl || '');
+      setWhatsappNumber(settings.whatsappNumber || '');
+      setWhatsappMessage(settings.whatsappMessage ?? '');
+    } catch (err) {
+      toast.error('Gagal memuat pengaturan', err instanceof Error ? err.message : 'Periksa koneksi server.');
+    }
+  };
+
+  useEffect(() => { void fetchSettings(); }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,8 +74,9 @@ export default function AdminSettings() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                sanpayApiKey: qrisKey,
-                merchantId: merchantId,
+                qiospayMerchantCode,
+                qiospayQrString,
+                qiospayApiKey,
                 telegramToken: telegramToken,
                 telegramChatId: telegramChatId,
                 qrisEnabled: qrisEnabled,
@@ -81,13 +89,15 @@ export default function AdminSettings() {
             })
         });
         const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.error || 'Gagal menyimpan pengaturan.');
         if (json.success) {
+            setQiospayApiKey('');
+            await fetchSettings();
             setIsSaved(true);
             setTimeout(() => setIsSaved(false), 3000);
         }
     } catch (err) {
-        console.error(err);
-        alert("Gagal menyimpan ke server");
+        toast.error('Gagal menyimpan pengaturan', err instanceof Error ? err.message : 'Periksa koneksi server.');
     } finally {
         setIsSaving(false);
     }
@@ -171,56 +181,65 @@ export default function AdminSettings() {
           
           <div className={`space-y-4 transition-opacity ${!qrisEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div>
-              <label className="block text-[13px] font-medium text-slate-600 mb-2">Merchant Code (SanPay)</label>
-              <input
-                type="text"
-                value={merchantId}
-                onChange={e => setMerchantId(e.target.value)}
-                placeholder="MC-xxxxxxxx"
-                className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-[13px] font-medium text-slate-600 mb-2">API Key (SanPay)</label>
-              <div className="relative">
-                <input
-                  type="password"
-                  value={qrisKey}
-                  onChange={e => setQrisKey(e.target.value)}
-                  placeholder="API Key dari dashboard SanPay"
-                  className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 transition-colors"
-                />
-                <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={1.8} />
+              <label className="block text-[13px] font-medium text-slate-600 mb-2">Penyedia QRIS aktif</label>
+              <div className="bg-sky-50 border border-sky-100 rounded-2xl px-4 py-3.5 text-sky-700 text-[15px] font-semibold">
+                Qiospay · QRIS statis + nominal unik
               </div>
             </div>
-
-            <div className="bg-sky-50 border border-sky-100 rounded-[16px] p-4 space-y-2.5">
-              <p className="text-[12px] font-semibold text-sky-600">Cara mengaktifkan QRIS produksi</p>
-              <ol className="text-[12px] text-slate-500 space-y-1.5 list-decimal list-inside">
-                <li>Login ke dashboard SanPay, buka menu <b>Setting API</b>.</li>
-                <li>Salin <b>Merchant Code</b> &amp; <b>API Key</b> ke kolom di atas, lalu simpan.</li>
-                <li>Isi <b>URL Callback</b> di SanPay dengan alamat di bawah ini, lalu klik <b>Validasi URL</b>.</li>
-                <li>Whitelist IP server SanPay: <span className="font-mono text-slate-700">103.127.137.140</span>.</li>
-                <li>Aktifkan toggle QRIS di atas. Setelah ini pembayaran QRIS langsung berjalan nyata.</li>
-              </ol>
-              <div className="pt-1">
-                <label className="block text-[11px] font-medium text-slate-500 mb-1.5">URL Callback</label>
+              <div>
+                <label className="block text-[13px] font-medium text-slate-600 mb-2">Merchant Code Qiospay</label>
+                <input type="text" value={qiospayMerchantCode} onChange={e => setQiospayMerchantCode(e.target.value)} placeholder="Kode merchant Qiospay" className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200" />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-slate-600 mb-2">QRIS statis (payload/string QR)</label>
+                <textarea value={qiospayQrString} onChange={e => setQiospayQrString(e.target.value)} rows={3} placeholder="Tempel payload QRIS statis" className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-sky-200 resize-y" />
+                <p className="text-[11px] text-slate-400 mt-1.5">Gunakan QRIS statis dari akun khusus penerimaan pembayaran. Nominal harus dimasukkan manual oleh pembeli.</p>
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-slate-600 mb-2">API Key Qiospay</label>
+                <div className="relative">
+                  <input type="password" autoComplete="new-password" value={qiospayApiKey} onChange={e => setQiospayApiKey(e.target.value)} placeholder={qiospayApiKeyConfigured ? 'Tersimpan — kosongkan untuk mempertahankan' : 'Masukkan API Key Qiospay'} className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 pr-11 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200" />
+                  <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                </div>
+                <p className={`text-[11px] mt-1.5 font-medium ${qiospayApiKeyConfigured ? 'text-teal-700' : 'text-amber-700'}`}>
+                  {qiospayApiKeyConfigured ? 'API Key sudah dikonfigurasi. Nilai rahasia tidak ditampilkan.' : 'API Key belum dikonfigurasi.'}
+                </p>
+              </div>
+              <div className="bg-amber-50 border border-amber-100 rounded-[16px] p-4 space-y-2">
+                <p className="text-[12px] font-semibold text-amber-800">Catatan penting QRIS statis</p>
+                <ul className="text-[11px] text-amber-900/80 space-y-1 list-disc list-inside">
+                  <li>Gunakan akun QRIS khusus agar mutasi mudah direkonsiliasi.</li>
+                  <li>Nominal unik Rp1–Rp999 ditambahkan ke total tagihan, bukan otomatis dikembalikan.</li>
+                  <li>Reservasi nominal tidak dipakai ulang; jika pool per harga habis, transaksi ditolak.</li>
+                  <li>QR statis tidak memiliki kedaluwarsa jarak jauh; batas waktu hanya untuk reservasi pembayaran.</li>
+                  <li>Ganti API Key yang pernah terpapar dan jangan membagikannya.</li>
+                  <li>Perubahan konfigurasi ditolak selama masih ada transaksi belum terselesaikan.</li>
+                </ul>
+              </div>
+              <div className="bg-sky-50 border border-sky-100 rounded-[16px] p-4">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1.5">URL Callback resmi Qiospay</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 bg-white border border-slate-200 rounded-[10px] px-3 py-2 text-[11px] text-slate-600 font-mono break-all">
-                    {callbackUrl}
+                    {qiospayCallbackToken ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhook/qiospay/••••••••` : 'Tersedia setelah konfigurasi berhasil disimpan'}
                   </code>
-                  <button
-                    type="button"
-                    onClick={() => { navigator.clipboard.writeText(callbackUrl); setCallbackCopied(true); setTimeout(() => setCallbackCopied(false), 2000); }}
-                    className="shrink-0 w-9 h-9 bg-sky-100 hover:bg-sky-200 rounded-[10px] flex items-center justify-center text-sky-600 transition-colors"
-                  >
-                    {callbackCopied ? <Check className="w-4 h-4" strokeWidth={1.8} /> : <Copy className="w-4 h-4" strokeWidth={1.8} />}
+                  <button type="button" disabled={!qiospayCallbackUrl} onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(qiospayCallbackUrl);
+                      setCallbackCopied(true);
+                      window.setTimeout(() => setCallbackCopied(false), 2000);
+                    } catch {
+                      toast.error('Gagal menyalin URL callback', 'Salin URL dengan aman dari browser.');
+                    }
+                  }} aria-label="Salin URL callback Qiospay" className="shrink-0 w-9 h-9 bg-sky-100 hover:bg-sky-200 disabled:opacity-40 rounded-[10px] flex items-center justify-center text-sky-600">
+                    {callbackCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
+                <p className="text-[10px] text-slate-500 mt-2">Token callback disamarkan di layar. Tombol salin menyalin URL lengkap khusus admin.</p>
               </div>
-            </div>
           </div>
         </motion.div>
+
+        <QiospayReconciliation />
 
         <motion.div
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../AppContext';
 import { useToast } from '../../components/Toast';
-import { Search, CheckCircle2, Clock, XCircle, ArrowUpRight, Trash2, Receipt } from 'lucide-react';
+import { Search, CheckCircle2, Clock, XCircle, ArrowUpRight, Trash2, Receipt, RotateCw } from 'lucide-react';
 import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { formatRupiah, formatDateShort, formatTime } from '../../lib/format';
 
 export default function AdminTransactions() {
-  const { transactions, deleteVoucher, loading } = useAppContext();
+  const { transactions, deleteVoucher, loading, refreshData } = useAppContext();
   const toast = useToast();
   const [search, setSearch] = useState('');
+  const [retrying, setRetrying] = useState<string | null>(null);
 
   const handleDelete = async (txId: number) => {
     const ok = await toast.confirm(
@@ -18,10 +19,43 @@ export default function AdminTransactions() {
       { confirmText: 'Ya, Hapus', danger: true }
     );
     if (ok) {
-      await deleteVoucher(txId);
-      toast.success('Transaksi dihapus');
+      try {
+        await deleteVoucher(txId);
+        toast.success('Transaksi dihapus');
+      } catch (err) {
+        toast.error('Gagal menghapus transaksi', err instanceof Error ? err.message : 'Terjadi kesalahan server.');
+      }
     }
   };
+
+  const retryProvisioning = async (referenceId: string) => {
+    setRetrying(referenceId);
+    try {
+      const response = await fetch(`/api/payment/qiospay/retry/${encodeURIComponent(referenceId)}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.error || 'Gagal meminta retry voucher.');
+      toast.success('Retry diminta', 'Permintaan sudah diterima; proses penerbitan belum tentu langsung berhasil.');
+      await refreshData();
+    } catch (err) {
+      toast.error('Retry gagal', err instanceof Error ? err.message : 'Terjadi kesalahan server.');
+    } finally {
+      setRetrying(null);
+    }
+  };
+
+  const statusLabel = (status: string) => ({
+    success: 'Berhasil',
+    pending: 'Menunggu bayar',
+    paid: 'Lunas · menunggu voucher',
+    provisioning: 'Voucher diproses',
+    review: 'Perlu ditinjau',
+    expired: 'Kedaluwarsa',
+    failed: 'Gagal',
+  }[status] || status);
 
   const copyCode = (code: string) => {
     if (!code) return;
@@ -128,18 +162,26 @@ export default function AdminTransactions() {
                       <span className="text-[13px] font-bold text-slate-800 tracking-tight">{formatRupiah(tx.amount)}</span>
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap text-center">
-                      <div className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${tx.status === 'success' ? 'bg-teal-100 text-teal-700' : tx.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
-                        {tx.status === 'success' ? <CheckCircle2 className="w-3 h-3" /> : tx.status === 'pending' ? <Clock className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      <div className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${tx.status === 'success' ? 'bg-teal-100 text-teal-700' : ['pending', 'paid', 'provisioning'].includes(tx.status) ? 'bg-amber-100 text-amber-700' : tx.status === 'review' || tx.status === 'expired' ? 'bg-orange-100 text-orange-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {tx.status === 'success' ? <CheckCircle2 className="w-3 h-3" /> : ['pending', 'paid', 'provisioning'].includes(tx.status) ? <Clock className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                       </div>
+                      <p className="text-[9px] text-slate-500 mt-1">{statusLabel(tx.status)}</p>
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap text-center">
-                      <button
-                        onClick={() => handleDelete(tx.id)}
-                        aria-label="Hapus transaksi"
-                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors mx-auto"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        {tx.provider === 'qiospay' && ['paid', 'provisioning'].includes(tx.status) && (
+                          <button type="button" onClick={() => void retryProvisioning(tx.reference_id || '')} disabled={!tx.reference_id || retrying === tx.reference_id} aria-label="Coba ulang penerbitan voucher" title="Coba ulang penerbitan voucher" className="w-7 h-7 flex items-center justify-center rounded-lg bg-sky-50 border border-sky-100 text-sky-600 hover:bg-sky-100 disabled:opacity-40">
+                            <RotateCw className={`w-3.5 h-3.5 ${retrying === tx.reference_id ? 'animate-spin' : ''}`} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(tx.id)}
+                          aria-label="Hapus transaksi"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

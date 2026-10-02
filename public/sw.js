@@ -1,4 +1,4 @@
-const CACHE_NAME = 'adilanet-v4';
+const CACHE_NAME = 'adilanet-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -31,6 +31,10 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/')) return;
+  // Development modules must never be stale-while-revalidated: cached source
+  // can resurrect removed UI even when the server and API are up to date.
+  if (['/src/', '/@vite/', '/@fs/', '/@id/', '/node_modules/'].some(prefix => url.pathname.startsWith(prefix)) ||
+      url.pathname === '/@react-refresh') return;
 
   if (request.mode === 'navigate') {
     event.respondWith(

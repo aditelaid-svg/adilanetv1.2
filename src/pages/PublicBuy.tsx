@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../AppContext';
-import { ShieldCheck, ArrowRight, Phone, Wallet, Copy, Check, Info, Wifi, Clock, Zap, AlertCircle } from 'lucide-react';
+import { ArrowRight, Phone, Wallet, Copy, Check, Info, Wifi, Clock, Zap, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatRupiah } from '../lib/format';
+import { QrisCheckoutDetails, useQrisPayment } from '../components/QrisCheckout';
+import { qrisRecoveryKey } from '../lib/qrisRecovery';
 
 export default function PublicBuy() {
   const { packageId } = useParams<{ packageId: string }>();
@@ -16,10 +18,11 @@ export default function PublicBuy() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [qrisUrl, setQrisUrl] = useState<string | null>(null);
-  const [refId, setRefId] = useState<string | null>(null);
+  const qrisPayment = useQrisPayment(packageId ? qrisRecoveryKey('public', packageId) : null, 'public');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [qrisEnabled, setQrisEnabled] = useState(true);
+  const [qrisEnabled, setQrisEnabled] = useState(false);
+  const [qrisConfigLoading, setQrisConfigLoading] = useState(true);
+  const [qrisConfigError, setQrisConfigError] = useState<string | null>(null);
 
   const pkg = packages.find(p => p.id === Number(packageId));
 
@@ -29,30 +32,27 @@ export default function PublicBuy() {
 
   useEffect(() => {
     fetch('/api/config/public')
-      .then(r => r.json())
-      .then(d => { if (d.success) setQrisEnabled(d.data.qrisEnabled ?? true); })
-      .catch(() => {});
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || 'Gagal memuat status QRIS.');
+        return d;
+      })
+      .then(d => setQrisEnabled(d.data.qrisEnabled ?? true))
+      .catch(err => {
+        setQrisConfigError(err instanceof Error ? err.message : 'Status QRIS tidak dapat dimuat.');
+        setQrisEnabled(false);
+      })
+      .finally(() => setQrisConfigLoading(false));
   }, []);
 
-  // Poll payment status while the QRIS is shown. The voucher is only issued
-  // server-side after SanPay confirms the payment via its signed webhook.
+  // Voucher issuance remains server-confirmed; the shared QRIS hook only reads status.
   useEffect(() => {
-    if (step !== 'qris' || !refId) return;
-    let active = true;
-    const poll = async () => {
-      try {
-        const r = await fetch(`/api/payment/status/${refId}`);
-        const d = await r.json();
-        if (active && d.success && d.data.status === 'success' && d.data.voucher_code) {
-          setSuccessCode(d.data.voucher_code);
-          setStep('success');
-        }
-      } catch { /* ignore transient network errors while polling */ }
-    };
-    const id = setInterval(poll, 4000);
-    poll();
-    return () => { active = false; clearInterval(id); };
-  }, [step, refId]);
+    if (qrisPayment.payment) setStep('qris');
+    if (qrisPayment.voucherCode) {
+      setSuccessCode(qrisPayment.voucherCode);
+      setStep('success');
+    }
+  }, [qrisPayment.payment, qrisPayment.voucherCode]);
 
   if (!pkg) return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
@@ -74,19 +74,8 @@ export default function PublicBuy() {
     }
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/payment/create-qris', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packageId: pkg.id, phone }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setQrisUrl(data.data.qr_url);
-        setRefId(data.data.reference_id);
-        setStep('qris');
-      } else {
-        setError(data.error || 'Gagal membuat transaksi. Coba lagi.');
-      }
+      const created = await qrisPayment.createPayment({ packageId: pkg.id, phone });
+      if (created) setStep('qris');
     } catch {
       setError('Terjadi kesalahan jaringan. Coba lagi.');
     } finally {
@@ -174,14 +163,14 @@ export default function PublicBuy() {
                     />
                     <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={1.8} />
                   </div>
-                  {error && (
+                  {(error || qrisPayment.error) && (
                     <motion.div
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="flex items-center gap-2 mt-2 text-[12px] text-rose-500 bg-rose-50 rounded-[10px] px-3 py-2 border border-rose-100"
                     >
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={1.8} />
-                      {error}
+                      {error || qrisPayment.error}
                     </motion.div>
                   )}
                   <p className="text-[11px] text-slate-400 mt-2 flex items-start gap-1.5">
@@ -193,19 +182,19 @@ export default function PublicBuy() {
                 {qrisEnabled ? (
                   <button
                     type="submit"
-                    disabled={isProcessing}
+                    disabled={isProcessing || qrisConfigLoading}
                     className="w-full bg-sky-500 disabled:opacity-50 text-white font-semibold rounded-[18px] px-4 py-4 flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(14,165,233,0.3)] active:scale-95 transition-transform text-[15px]"
                   >
                     {isProcessing ? (
                       <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Memproses...</>
                     ) : (
-                      <><ArrowRight className="w-4 h-4" strokeWidth={1.8} /> Bayar dengan QRIS</>
+                      <><ArrowRight className="w-4 h-4" strokeWidth={1.8} /> {qrisConfigLoading ? 'Memuat QRIS...' : 'Bayar dengan QRIS'}</>
                     )}
                   </button>
                 ) : (
                   <div className="p-4 bg-rose-50 border border-rose-100 rounded-[16px] text-center">
                     <p className="font-semibold text-[13px] text-rose-500">Pembayaran Sedang Maintenance</p>
-                    <p className="text-[11px] text-slate-400 mt-1">Hubungi admin untuk pembelian.</p>
+                    <p className="text-[11px] text-slate-400 mt-1">{qrisConfigLoading ? 'Memuat status pembayaran...' : qrisConfigError || 'Hubungi admin untuk pembelian.'}</p>
                   </div>
                 )}
 
@@ -230,39 +219,23 @@ export default function PublicBuy() {
               >
                 <p className="text-[11px] font-bold tracking-widest uppercase text-slate-400 mb-4">Scan QRIS untuk Bayar</p>
 
-                <div className="bg-white p-4 rounded-[20px] inline-block mb-4 shadow-[0_8px_20px_rgba(14,165,233,0.15)] border border-slate-100">
-                  <div className="w-[180px] h-[180px] rounded-lg overflow-hidden relative bg-slate-50">
-                    {qrisUrl && <img src={qrisUrl} alt="QRIS" className="w-full h-full object-contain" />}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-10 h-10 bg-white rounded-xl shadow border-2 border-slate-200 flex items-center justify-center">
-                        <ShieldCheck className="w-5 h-5 text-sky-500" strokeWidth={1.8} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {qrisPayment.payment && <QrisCheckoutDetails payment={qrisPayment.payment} status={qrisPayment.status} message={qrisPayment.statusMessage} />}
+                <p className="text-[12px] text-slate-500 mb-4">DANA · OVO · GoPay · ShopeePay · M-Banking</p>
 
-                <p className="text-[12px] text-slate-400 font-mono mb-1">{refId}</p>
-                <p className="text-[12px] text-slate-500 mb-5">DANA · OVO · GoPay · ShopeePay · M-Banking</p>
-
-                {error && (
+                {(error || qrisPayment.error) && (
                   <div className="flex items-center gap-2 text-[12px] text-rose-500 bg-rose-50 rounded-[12px] px-3 py-2.5 mb-4 border border-rose-100">
-                    <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.8} /> {error}
+                    <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.8} /> {error || qrisPayment.error}
                   </div>
                 )}
+                {qrisPayment.statusError && <p className="text-[11px] text-rose-600 bg-rose-50 rounded-[10px] p-2 mb-3">{qrisPayment.statusError}</p>}
 
-                <div className="w-full flex items-center justify-center gap-2 bg-sky-50 border border-sky-100 text-sky-600 font-semibold py-4 rounded-[16px] text-[14px] mb-2.5">
+                {['pending', 'paid', 'provisioning'].includes(qrisPayment.status) && <div className="w-full flex items-center justify-center gap-2 bg-sky-50 border border-sky-100 text-sky-600 font-semibold py-4 rounded-[16px] text-[14px] mb-2.5">
                   <div className="w-4 h-4 border-2 border-sky-300 border-t-sky-600 rounded-full animate-spin" />
-                  Menunggu pembayaran...
-                </div>
-                <p className="text-[11px] text-slate-400 mb-2.5">
-                  Voucher muncul otomatis setelah pembayaran terverifikasi. Jangan tutup halaman ini.
+                  {qrisPayment.status === 'pending' ? 'Menunggu pembayaran...' : 'Pembayaran diterima, memproses voucher...'}
+                </div>}
+                <p className="text-[11px] text-slate-400 mt-3 mb-2.5">
+                  Jangan membuat invoice lain untuk pembayaran ini. Voucher hanya ditampilkan setelah server memverifikasi pembayaran.
                 </p>
-                <button
-                  onClick={() => { setStep('input_phone'); setError(null); setRefId(null); setQrisUrl(null); }}
-                  className="w-full text-slate-400 font-medium py-2.5 rounded-[14px] transition-all text-[13px] hover:text-slate-600"
-                >
-                  Batal
-                </button>
               </motion.div>
             )}
 
@@ -308,7 +281,7 @@ export default function PublicBuy() {
                 </div>
 
                 <button
-                  onClick={() => navigate('/login')}
+                  onClick={() => { qrisPayment.clearPayment(); navigate('/login'); }}
                   className="w-full bg-white border border-slate-100 shadow-sm active:scale-95 text-slate-700 font-medium py-3.5 rounded-[16px] transition-transform text-[13px]"
                 >
                   Ke Halaman Utama

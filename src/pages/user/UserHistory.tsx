@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../AppContext';
-import { Clock, Check, Copy } from 'lucide-react';
+import { Clock, Check, Copy, AlertTriangle, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonList } from '../../components/ui/Skeleton';
@@ -34,6 +34,10 @@ export default function UserHistory() {
   const statusColor = {
     success: { bg: 'bg-teal-50', border: 'border-teal-100', text: 'text-teal-600', label: 'Berhasil' },
     pending: { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-600', label: 'Pending' },
+    paid: { bg: 'bg-sky-50', border: 'border-sky-100', text: 'text-sky-600', label: 'Lunas · menunggu voucher' },
+    provisioning: { bg: 'bg-sky-50', border: 'border-sky-100', text: 'text-sky-600', label: 'Voucher sedang diproses' },
+    review: { bg: 'bg-orange-50', border: 'border-orange-100', text: 'text-orange-700', label: 'Perlu ditinjau' },
+    expired: { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-500', label: 'Kedaluwarsa' },
     failed: { bg: 'bg-rose-50', border: 'border-rose-100', text: 'text-rose-600', label: 'Gagal' },
   };
 
@@ -78,7 +82,7 @@ export default function UserHistory() {
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-start gap-4">
                     <div className={`w-10 h-10 rounded-[12px] ${st.bg} border ${st.border} flex items-center justify-center shrink-0 mt-0.5`}>
-                      <Check className={`w-5 h-5 ${st.text}`} strokeWidth={1.8} />
+                      {tx.status === 'success' ? <Check className={`w-5 h-5 ${st.text}`} strokeWidth={1.8} /> : ['paid', 'pending', 'provisioning'].includes(tx.status) ? <Clock className={`w-5 h-5 ${st.text}`} strokeWidth={1.8} /> : tx.status === 'review' ? <AlertTriangle className={`w-5 h-5 ${st.text}`} strokeWidth={1.8} /> : <X className={`w-5 h-5 ${st.text}`} strokeWidth={1.8} />}
                     </div>
                     <div>
                       <h4 className="font-semibold text-[15px] text-slate-800 leading-tight mb-1">

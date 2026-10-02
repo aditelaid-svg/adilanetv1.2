@@ -8,9 +8,11 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { createVoucher, createVouchersBulk, createProfile, updateProfile, deleteProfile, checkReaper, repairReaper } from "./src/server/mikrotik";
 import dotenv from "dotenv";
+import { QiospayPayments } from "./src/server/qiospay-payments";
+import { PaymentError, validateStaticQr, validCallbackToken, readQiospayConfig } from "./src/server/qiospay-client";
 
 dotenv.config();
 
@@ -71,7 +73,10 @@ async function generateUniqueVoucher(): Promise<string> {
     let body = "";
     for (let j = 0; j < length; j++) body += chars[crypto.randomInt(chars.length)];
     const code = `${prefix}${body}`;
-    const { rows } = await pool.query("SELECT 1 FROM transactions WHERE voucher_code = $1", [code]);
+    const { rows } = await pool.query(
+      `SELECT 1 FROM transactions WHERE voucher_code = $1
+       UNION ALL SELECT 1 FROM qiospay_invoices WHERE voucher_candidate = $1`, [code],
+    );
     if (rows.length === 0) return code;
   }
   throw new Error("Gagal menghasilkan kode voucher unik, coba lagi.");
@@ -259,11 +264,10 @@ async function initDb() {
   if (parseInt(setRows[0].cnt) === 0) {
     await pool.query(`
       INSERT INTO settings (config_key, config_value) VALUES
-      ('sanpayApiKey', ''),
-      ('merchantId', ''),
+      ('qrisProvider', 'qiospay'),
       ('telegramToken', ''),
       ('telegramChatId', ''),
-      ('qrisEnabled', 'true'),
+      ('qrisEnabled', 'false'),
       ('voucherCharset', 'alphanumeric'),
       ('voucherLength', '8'),
       ('voucherPrefix', 'WFI-'),
@@ -285,6 +289,13 @@ async function initDb() {
       ('whatsappNumber', ''),
       ('whatsappMessage', 'Halo Admin AdilaNet, saya butuh bantuan.')
     ON CONFLICT (config_key) DO NOTHING;
+  `);
+
+  // Retire the unused gateway configuration; financial history is preserved.
+  await pool.query(`
+    DELETE FROM settings WHERE config_key IN ('sanpayApiKey','merchantId');
+    INSERT INTO settings(config_key,config_value) VALUES('qrisProvider','qiospay')
+    ON CONFLICT(config_key) DO UPDATE SET config_value='qiospay';
   `);
 
   // Seed a starter promo banner so the home screen isn't empty
@@ -348,10 +359,9 @@ async function getSettings() {
   return s;
 }
 
-// SanPay signs/verifies payloads with HMAC-SHA256 over the raw JSON body,
-// using the merchant's API Key as the secret. Same algorithm both directions.
-function sanpaySignature(rawBody: string, apiKey: string): string {
-  return crypto.createHmac("sha256", apiKey).update(rawBody, "utf8").digest("hex");
+function qiospayReady(settings: Record<string, string>): boolean {
+  try { readQiospayConfig(settings); return true; }
+  catch { return false; }
 }
 
 async function startServer() {
@@ -419,11 +429,7 @@ async function startServer() {
   app.use("/api/auth/register", registerLimiter);
   app.use("/api/payment/create-qris", qrisLimiter);
 
-  // Capture the raw request body so we can verify the SanPay webhook HMAC signature.
-  app.use(express.json({
-    limit: '3mb',
-    verify: (req: any, _res, buf) => { req.rawBody = buf; },
-  }));
+  app.use(express.json({ limit: '3mb' }));
 
   const PgSession = connectPgSimple(session);
   app.use(
@@ -451,6 +457,19 @@ async function startServer() {
   } catch (err) {
     console.error("[DB] Gagal inisialisasi database:", err);
   }
+
+  const qiospay = new QiospayPayments(pool, getSettings, generateUniqueVoucher, async (invoice, code) => {
+    const { rows } = await pool.query("SELECT * FROM routers WHERE id=$1", [invoice.router_id]);
+    if (!rows.length) throw new Error("Router tidak tersedia.");
+    const r = rows[0];
+    const tag = `QPay:${invoice.reference_id}`;
+    const identity = buildVoucherIdentity({ userId: invoice.user_id, name: invoice.user_name, phone: invoice.phone });
+    await createVoucher(
+      { host: r.ip_address, user: r.username, pass: r.password, port: r.api_port },
+      invoice.mikrotik_profile, code, code, `${tag} ${identity}`, tag,
+    );
+  });
+  qiospay.start();
 
   // ─── HEALTH ─────────────────────────────────────────────────────────────
   app.get("/api/health", async (req, res) => {
@@ -1082,10 +1101,14 @@ async function startServer() {
     try {
       const isAdmin = isAdminRole(req.session.role);
       let query = `
-        SELECT t.*, u.name as user_name, p.name as package_name
+        SELECT t.*, u.name as user_name, p.name as package_name,
+          CASE WHEN qi.transaction_id IS NOT NULL THEN 'qiospay'
+               WHEN t.payment_method='qris' THEN 'qris_legacy' ELSE 'saldo' END AS provider,
+          qi.base_amount,qi.unique_code,qi.expires_at,qi.last_error
         FROM transactions t
         LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN packages p ON t.package_id = p.id
+        LEFT JOIN qiospay_invoices qi ON qi.transaction_id=t.id
       `;
       const params: any[] = [];
       if (!isAdmin) {
@@ -1209,6 +1232,10 @@ async function startServer() {
 
   app.delete("/api/transactions/:id", requireAdmin, async (req, res) => {
     try {
+      const { rows } = await pool.query("SELECT 1 FROM qiospay_invoices WHERE transaction_id=$1", [req.params.id]);
+      if (rows.length) {
+        return res.status(409).json({ success: false, error: "Transaksi Qiospay tidak boleh dihapus: catatan pembayaran dan nominal unik harus tetap tersimpan untuk mencegah salah pencocokan." });
+      }
       await pool.query(`DELETE FROM transactions WHERE id = $1`, [req.params.id]);
       res.json({ success: true });
     } catch (err: any) {
@@ -1223,11 +1250,15 @@ async function startServer() {
       res.json({
         success: true,
         data: {
-          sanpayApiKey: s.sanpayApiKey || '',
-          merchantId: s.merchantId || '',
           telegramToken: s.telegramToken || '',
           telegramChatId: s.telegramChatId || '',
-          qrisEnabled: s.qrisEnabled !== 'false',
+          qrisEnabled: s.qrisEnabled !== 'false' && qiospayReady(s),
+          qrisProvider: 'qiospay',
+          qiospayMerchantCode: s.qiospayMerchantCode || '',
+          qiospayQrString: s.qiospayQrString || '',
+          qiospayApiKeyConfigured: !!s.qiospayApiKey,
+          qiospayCallbackToken: s.qiospayCallbackToken || '',
+          qiospaySync: { last_sync_at: s.qiospayLastSyncAt || null, error: s.qiospaySyncError || null },
           voucherCharset: s.voucherCharset || 'alphanumeric',
           voucherLength: parseInt(s.voucherLength || '8', 10),
           voucherPrefix: s.voucherPrefix !== undefined ? s.voucherPrefix : 'WFI-',
@@ -1242,8 +1273,43 @@ async function startServer() {
   });
 
   app.post("/api/settings", requireAdmin, async (req, res) => {
+    let settingsDb: PoolClient | undefined;
+    let committed = false;
     try {
-      const { sanpayApiKey, merchantId, telegramToken, telegramChatId, qrisEnabled,
+      settingsDb = await pool.connect();
+      await settingsDb.query("BEGIN");
+      await settingsDb.query("SELECT pg_advisory_xact_lock(hashtext('qiospay-config'))");
+      const { rows: previousRows } = await settingsDb.query("SELECT config_key,config_value FROM settings");
+      const previous: Record<string, string> = Object.fromEntries(previousRows.map(r => [r.config_key, r.config_value]));
+      if (req.body.qrisProvider !== undefined && req.body.qrisProvider !== 'qiospay') {
+        return res.status(400).json({ success: false, error: "QRIS hanya mendukung Qiospay." });
+      }
+      const qMerchant = String(req.body.qiospayMerchantCode ?? previous.qiospayMerchantCode ?? '').trim();
+      const qQr = String(req.body.qiospayQrString ?? previous.qiospayQrString ?? '').trim();
+      const qKey = String(req.body.qiospayApiKey ?? '').trim() || (previous.qiospayApiKey || '').trim();
+      if (qMerchant && !/^[A-Za-z0-9_-]{1,64}$/.test(qMerchant)) {
+        return res.status(400).json({ success: false, error: "Merchant Code Qiospay tidak valid." });
+      }
+      if (qKey && (qKey.length < 16 || qKey.length > 512 || /[\x00-\x20\x7f]/.test(qKey))) {
+        return res.status(400).json({ success: false, error: "API Key Qiospay tidak valid." });
+      }
+      if (qQr) validateStaticQr(qQr);
+      if (qMerchant !== (previous.qiospayMerchantCode || '') || qQr !== (previous.qiospayQrString || '')) {
+        const { rows } = await settingsDb.query(
+          `SELECT 1 FROM qiospay_invoices i JOIN transactions t ON t.id=i.transaction_id
+           WHERE t.status IN ('pending','paid','provisioning','review') LIMIT 1`,
+        );
+        if (rows.length) return res.status(409).json({ success: false, error: "Merchant/QR Qiospay tidak dapat diganti selama ada transaksi yang belum selesai. API Key masih bisa diperbarui untuk akun yang sama." });
+      }
+      const qToken = previous.qiospayCallbackToken || (qMerchant ? crypto.randomBytes(32).toString('hex') : '');
+      const qEnabled = req.body.qrisEnabled ?? (previous.qrisEnabled !== 'false' && qiospayReady(previous));
+      if (typeof qEnabled !== 'boolean') {
+        return res.status(400).json({ success: false, error: "Status QRIS tidak valid." });
+      }
+      if (qEnabled) {
+        readQiospayConfig({ qiospayMerchantCode: qMerchant, qiospayQrString: qQr, qiospayApiKey: qKey, qiospayCallbackToken: qToken });
+      }
+      const { telegramToken, telegramChatId,
               voucherCharset, voucherLength, voucherPrefix, hotspotLoginUrl,
               whatsappNumber, whatsappMessage } = req.body;
 
@@ -1278,11 +1344,14 @@ async function startServer() {
       if (waMsg.length > 300) waMsg = waMsg.slice(0, 300);
 
       const updates = [
-        ['sanpayApiKey', sanpayApiKey ?? ''],
-        ['merchantId', merchantId ?? ''],
+        ['qrisProvider', 'qiospay'],
+        ['qiospayMerchantCode', qMerchant],
+        ['qiospayQrString', qQr],
+        ['qiospayApiKey', qKey],
+        ['qiospayCallbackToken', qToken],
         ['telegramToken', telegramToken ?? ''],
         ['telegramChatId', telegramChatId ?? ''],
-        ['qrisEnabled', String(qrisEnabled ?? true)],
+        ['qrisEnabled', String(qEnabled)],
         ['voucherCharset', charset],
         ['voucherLength', String(vlen)],
         ['voucherPrefix', vprefix],
@@ -1291,14 +1360,22 @@ async function startServer() {
         ['whatsappMessage', waMsg],
       ];
       for (const [key, val] of updates) {
-        await pool.query(
+        await settingsDb.query(
           `INSERT INTO settings (config_key, config_value) VALUES ($1,$2) ON CONFLICT (config_key) DO UPDATE SET config_value=$2, updated_at=NOW()`,
           [key, val]
         );
       }
+      await settingsDb.query("COMMIT");
+      committed = true;
       res.json({ success: true, message: "Pengaturan berhasil disimpan." });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      res.status(err instanceof PaymentError ? err.status : 500).json({ success: false,
+        error: err instanceof PaymentError ? err.message : "Pengaturan tidak dapat disimpan. Coba lagi." });
+    } finally {
+      if (settingsDb) {
+        try { if (!committed) await settingsDb.query("ROLLBACK"); }
+        finally { settingsDb.release(); }
+      }
     }
   });
 
@@ -1306,7 +1383,7 @@ async function startServer() {
     try {
       const s = await getSettings();
       res.json({ success: true, data: {
-        qrisEnabled: s.qrisEnabled !== 'false',
+        qrisEnabled: s.qrisEnabled !== 'false' && qiospayReady(s),
         hotspotLoginUrl: s.hotspotLoginUrl || '',
         whatsappNumber: s.whatsappNumber || '',
         whatsappMessage: s.whatsappMessage !== undefined ? s.whatsappMessage : 'Halo Admin AdilaNet, saya butuh bantuan.'
@@ -1467,28 +1544,59 @@ async function startServer() {
     }
   });
 
-  // ─── PAYMENT (QRIS via SanPay) ────────────────────────────────────────────
-  // Generates a real dynamic QRIS through SanPay (sanpay.site). The voucher is
-  // NEVER issued here — it is only issued after SanPay confirms payment via the
-  // signed webhook below. The client polls /api/payment/status/:refId.
+  // ─── QIOSPAY ADMIN / CALLBACK ─────────────────────────────────────────────
+  const qiospaySyncLimiter = rateLimit({
+    windowMs: 60_000, max: 4, standardHeaders: true, legacyHeaders: false,
+    message: { success: false, error: "Tunggu sebentar sebelum sinkronisasi Qiospay lagi." },
+  });
+  app.get("/api/payment/qiospay/overview", requireAdmin, async (_req, res) => {
+    try { res.json({ success: true, data: await qiospay.overview() }); }
+    catch { res.status(503).json({ success: false, error: "Data Qiospay belum tersedia. Periksa skema database." }); }
+  });
+  app.post("/api/payment/qiospay/sync", requireAdmin, qiospaySyncLimiter, async (_req, res) => {
+    try { res.json({ success: true, data: await qiospay.sync() }); }
+    catch (e) { res.status(e instanceof PaymentError ? e.status : 503).json({
+      success: false, error: e instanceof PaymentError ? e.message : "Sinkronisasi Qiospay gagal.",
+    }); }
+  });
+  app.post("/api/payment/qiospay/retry/:refId", requireAdmin, async (req, res) => {
+    try {
+      await qiospay.provision(String(req.params.refId), true);
+      res.json({ success: true, data: await qiospay.status(String(req.params.refId)) });
+    } catch (e) { res.status(e instanceof PaymentError ? e.status : 503).json({
+      success: false, error: e instanceof PaymentError ? e.message : "Pemulihan voucher belum berhasil.",
+    }); }
+  });
+  app.post("/api/webhook/qiospay/:token", async (req, res) => {
+    try {
+      const s = await getSettings();
+      if (!validCallbackToken(req.params.token, s.qiospayCallbackToken || '')) {
+        return res.status(403).json({ status: "reject", message: "Invalid secret key" });
+      }
+      readQiospayConfig(s);
+      if (req.body?.status !== 'success' || req.body?.data?.type !== 'CR') {
+        return res.json({ status: "accept", message: "Tidak ada kredit untuk diproses." });
+      }
+      // Wake a throttled ledger sync. Even authenticated callback contents
+      // cannot mint vouchers: only real GET-mutasi credits are authoritative.
+      qiospay.requestSync();
+      res.json({ status: "accept", message: "Notifikasi diterima; pembayaran diperiksa melalui mutasi." });
+    } catch {
+      res.status(503).json({ status: "reject", message: "Qiospay belum siap; hubungi admin." });
+    }
+  });
+
+  // ─── PAYMENT (Qiospay static QRIS + unique amount) ─────────────────────────
+  // Voucher fulfillment requires an authenticated merchant-ledger credit.
   app.post("/api/payment/create-qris", async (req, res) => {
     try {
       const s = await getSettings();
       if (s.qrisEnabled === 'false') {
         return res.status(403).json({ success: false, error: "Pembayaran via QRIS sedang dinonaktifkan." });
       }
-
-      const apiKey = (s.sanpayApiKey || '').trim();
-      const merchantCode = (s.merchantId || '').trim();
-      if (!apiKey || !merchantCode) {
-        return res.status(503).json({
-          success: false,
-          error: "QRIS belum dikonfigurasi. Admin perlu mengisi Merchant Code & API Key SanPay di Setelan.",
-        });
-      }
-
       const { packageId } = req.body;
       if (!packageId) return res.status(400).json({ success: false, error: "packageId wajib diisi." });
+      readQiospayConfig(s);
       const { rows: pkgRows } = await pool.query(`SELECT * FROM packages WHERE id = $1`, [packageId]);
       if (pkgRows.length === 0) return res.status(404).json({ success: false, error: "Paket tidak ditemukan." });
       const pkg = pkgRows[0];
@@ -1499,65 +1607,19 @@ async function startServer() {
       const phone = typeof req.body.phone === 'string' ? req.body.phone.slice(0, 30) : null;
       const userId = req.session?.userId || null;
 
-      // Unique partner reference (SanPay limit: 64 chars).
-      const refId = `WFI-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-
-      // Record a pending transaction up-front keyed by reference_id. SanPay's
-      // callback only echoes this reference, so we must persist who/what it is for.
-      await pool.query(
-        `INSERT INTO transactions (user_id, package_id, voucher_code, amount, payment_method, status, reference_id, phone)
-         VALUES ($1, $2, NULL, $3, 'qris', 'pending', $4, $5)
-         ON CONFLICT (reference_id) DO NOTHING`,
-        [userId, packageId, amount, refId, phone]
-      );
-
-      // Ask SanPay to generate the dynamic QRIS.
-      const payload = JSON.stringify({ amount, partnerReferenceNo: refId, expirySeconds: 600 });
-      const signature = sanpaySignature(payload, apiKey);
-      let sanpayJson: any;
-      try {
-        const resp = await fetch("https://sanpay.site/api/v1/topup_qris", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Merchant-Code": merchantCode,
-            "X-Signature": signature,
-          },
-          body: payload,
-        });
-        sanpayJson = await resp.json().catch(() => ({}));
-        if (!resp.ok || sanpayJson.status !== "success" || !sanpayJson.qrContent) {
-          throw new Error(sanpayJson?.message || `SanPay HTTP ${resp.status}`);
-        }
-      } catch (apiErr: any) {
-        await pool.query(`DELETE FROM transactions WHERE reference_id = $1 AND status = 'pending'`, [refId]);
-        console.error(`[QRIS] Gagal membuat QRIS SanPay: ${apiErr.message}`);
-        return res.status(502).json({ success: false, error: `Gagal membuat QRIS: ${apiErr.message}` });
-      }
-
-      const qrContent = sanpayJson.qrContent;
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrContent)}`;
-      res.json({
-        success: true,
-        data: {
-          reference_id: refId,
-          qr_string: qrContent,
-          qr_url: qrUrl,
-          amount,
-          expires_at: sanpayJson.expiresAt || null,
-          status: "pending",
-        },
-      });
+      res.json({ success: true, data: await qiospay.create(pkg, amount, userId, phone) });
     } catch (err: any) {
-      console.error(err);
-      res.status(500).json({ success: false, error: err.message });
+      res.status(err instanceof PaymentError ? err.status : 500).json({
+        success: false, error: err instanceof PaymentError ? err.message : "Transaksi QRIS tidak dapat dibuat. Hubungi admin.",
+      });
     }
   });
 
-  // Client polls this to learn when SanPay has confirmed the payment and the
-  // voucher has been provisioned. The reference is unguessable (timestamp+random).
+  // Poll Qiospay status; historical receipts remain readable without fulfillment.
   app.get("/api/payment/status/:refId", async (req, res) => {
     try {
+      const qiospayStatus = await qiospay.status(String(req.params.refId));
+      if (qiospayStatus) return res.json({ success: true, data: qiospayStatus });
       const { rows } = await pool.query(
         `SELECT status, voucher_code FROM transactions WHERE reference_id = $1`,
         [req.params.refId]
@@ -1575,118 +1637,6 @@ async function startServer() {
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // SanPay calls this when a payment succeeds. Authenticated via X-Merchant-Code
-  // + X-Signature (HMAC-SHA256 of the raw body with our API Key).
-  app.post("/api/webhook/sanpay", async (req: any, res) => {
-    try {
-      const s = await getSettings();
-      const apiKey = (s.sanpayApiKey || '').trim();
-      const merchantCode = (s.merchantId || '').trim();
-
-      // Verify authenticity. Only enforced once credentials are configured so the
-      // SanPay dashboard "Validasi URL" test can still reach us during setup.
-      if (apiKey && merchantCode) {
-        const sigHeader = req.get("x-signature") || "";
-        const mcHeader = req.get("x-merchant-code") || "";
-        const raw = req.rawBody ? req.rawBody.toString("utf8") : JSON.stringify(req.body || {});
-        const expected = sanpaySignature(raw, apiKey);
-        const sigOk =
-          sigHeader.length === expected.length &&
-          crypto.timingSafeEqual(Buffer.from(sigHeader), Buffer.from(expected));
-        if (mcHeader !== merchantCode || !sigOk) {
-          return res.status(401).json({ status: "error", message: "Invalid signature" });
-        }
-      }
-
-      const body = req.body || {};
-
-      // Validation ping from the SanPay dashboard — just acknowledge.
-      if (body.isValidationTest) {
-        return res.status(200).json({ status: "success" });
-      }
-
-      // Only act on a successful payment. QRIS success callbacks carry no status
-      // field (SanPay only calls on success), but VA/Retail send status='success'
-      // and payment_status='PAID'. Reject anything that explicitly says otherwise.
-      if (body.status && body.status !== "success") {
-        return res.status(200).json({ status: "success" });
-      }
-      if (body.payment_status && body.payment_status !== "PAID") {
-        return res.status(200).json({ status: "success" });
-      }
-
-      // QRIS callback echoes our partnerReferenceNo as `referenceNo`.
-      // VA/Retail callback uses `partnerReferenceNo`.
-      const ref = body.referenceNo || body.partnerReferenceNo;
-      if (!ref) {
-        return res.status(200).json({ status: "success" });
-      }
-
-      // Atomically claim the pending transaction so concurrent/duplicate
-      // callbacks can never double-provision.
-      const { rows: claim } = await pool.query(
-        `UPDATE transactions SET status = 'provisioning'
-         WHERE reference_id = $1 AND status = 'pending'
-         RETURNING id, package_id, amount, user_id, phone`,
-        [ref]
-      );
-      if (claim.length === 0) {
-        // Unknown reference, or already handled/in-flight — acknowledge idempotently.
-        return res.status(200).json({ status: "success" });
-      }
-
-      const txId = claim[0].id;
-
-      // Verify the paid amount matches what we charged for this reference.
-      if (body.amount !== undefined) {
-        const expected = Math.round(parseFloat(claim[0].amount));
-        const paid = Math.round(Number(body.amount));
-        if (!Number.isFinite(paid) || paid !== expected) {
-          await pool.query(`UPDATE transactions SET status = 'pending' WHERE id = $1`, [txId]);
-          console.error(`[Webhook] Nominal tidak cocok untuk ${ref}: diharapkan ${expected}, diterima ${body.amount}`);
-          return res.status(400).json({ status: "error", message: "amount mismatch" });
-        }
-      }
-
-      const { rows: pkgRows } = await pool.query(`SELECT * FROM packages WHERE id = $1`, [claim[0].package_id]);
-      if (pkgRows.length === 0) {
-        await pool.query(`UPDATE transactions SET status = 'pending' WHERE id = $1`, [txId]);
-        return res.status(200).json({ status: "success" });
-      }
-
-      try {
-        const code = await generateUniqueVoucher();
-        // Tag the voucher with who bought it: a registered user (look up name) or
-        // a public/guest QRIS purchase (fall back to the phone they entered).
-        let identity: string;
-        if (claim[0].user_id) {
-          const { rows: bu } = await pool.query(`SELECT name FROM users WHERE id = $1`, [claim[0].user_id]);
-          identity = buildVoucherIdentity({ userId: claim[0].user_id, name: bu[0]?.name });
-        } else {
-          identity = buildVoucherIdentity({ phone: claim[0].phone });
-        }
-        await provisionVoucher(pkgRows[0], code, identity);
-        await pool.query(
-          `UPDATE transactions SET voucher_code = $1, status = 'success' WHERE id = $2`,
-          [code, txId]
-        );
-        console.log(`[Webhook] Pembayaran ${ref} sukses — voucher ${code} dibuat.`);
-      } catch (provErr: any) {
-        // Roll back to 'pending' and return a non-2xx so SanPay retries the
-        // callback later (e.g. once a transiently-offline router is back). The
-        // buyer has paid, so the transaction stays recoverable for reconciliation.
-        await pool.query(`UPDATE transactions SET status = 'pending' WHERE id = $1`, [txId]);
-        console.error(`[Webhook] Gagal provision voucher untuk ${ref}: ${provErr.message}`);
-        return res.status(500).json({ status: "error", message: "provisioning failed, will retry" });
-      }
-
-      res.status(200).json({ status: "success" });
-    } catch (err) {
-      console.error("Webhook error:", err);
-      res.status(500).json({ status: "error" });
     }
   });
 

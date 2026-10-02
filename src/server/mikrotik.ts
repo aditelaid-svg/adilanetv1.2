@@ -519,7 +519,8 @@ export async function createVoucher(
   profile: string,
   name: string,
   password: string,
-  comment?: string
+  comment?: string,
+  idempotencyTag?: string
 ) {
   const port = config.port ? parseInt(String(config.port)) : 8728;
   const api = new RouterOSAPI({
@@ -532,6 +533,18 @@ export async function createVoucher(
 
   try {
     await api.connect();
+    if (idempotencyTag) {
+      const existing = await api.write('/ip/hotspot/user/print', [`?name=${name}`]) as any[];
+      if (Array.isArray(existing) && existing.length > 0) {
+        const user = existing[0];
+        if (user.profile !== profile || user.password !== password ||
+            !String(user.comment || '').includes(idempotencyTag)) {
+          throw new Error('Kode voucher sudah dipakai pengguna lain; perlu pemeriksaan admin.');
+        }
+        await ensureValidityEnforcement(api, profile);
+        return existing;
+      }
+    }
     const params = [
       `=name=${name}`,
       `=password=${password}`,

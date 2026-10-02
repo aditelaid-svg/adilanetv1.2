@@ -6,3 +6,5 @@ coverage/
 *.log
 .env*
 !.env.example
+# Uploaded screenshot contains a payment API credential; do not commit it.
+attached_assets/Screenshot_20261002-220008_1790953235746.jpg
