@@ -114,7 +114,9 @@ export async function fetchCredits(config: QiospayConfig, fetcher: typeof fetch 
     throw new PaymentError("Tidak dapat menghubungi Qiospay. Periksa koneksi dan API Key di Setelan.", 502);
   }
   let body: any;
-  try { body = await response.json(); } catch { throw new PaymentError("Qiospay mengirim respons yang bukan JSON.", 502); }
+  try { body = await response.json(); } catch {
+    throw new PaymentError(`Qiospay mengirim respons bukan JSON (HTTP ${response.status}). Periksa akses API akun Qiospay.`, 502);
+  }
   if (!response.ok || body?.status !== "success") {
     throw new PaymentError(`Qiospay menolak permintaan mutasi (HTTP ${response.status}). Periksa Merchant Code dan API Key.`, 502);
   }

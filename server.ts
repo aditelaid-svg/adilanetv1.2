@@ -1884,6 +1884,11 @@ async function startServer() {
   });
 
   // ─── VITE / STATIC ────────────────────────────────────────────────────────
+  // Missing API routes must not fall through to the SPA's HTML response.
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ success: false, error: "Endpoint API tidak ditemukan." });
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({

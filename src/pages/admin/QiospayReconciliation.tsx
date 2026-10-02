@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, RefreshCw, RotateCw, Activity } from 'lucide-react';
 import { formatRupiah } from '../../lib/format';
+import { apiErrorMessage, readApiResponse } from '../../lib/apiResponse';
 
 type QiospayEvent = {
   event_key: string;
@@ -29,12 +30,14 @@ export default function QiospayReconciliation({ refreshKey = 0, settingsPending 
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/payment/qiospay/overview', { credentials: 'include' });
-      const json = await response.json();
+      const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/api/payment/qiospay/overview`, { credentials: 'include', headers: { Accept: 'application/json' } });
+      const json = await readApiResponse<{ success: boolean; error?: string; data: Overview }>(response);
       if (!response.ok || !json.success) throw new Error(json.error || 'Gagal memuat status Qiospay.');
+      if (!json.data || !Array.isArray(json.data.events)) throw new Error('Data mutasi Qiospay tidak lengkap.');
       setOverview(json.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat status Qiospay.');
+      setError(apiErrorMessage(err instanceof Error ? err.message : 'Gagal memuat status Qiospay.'));
     } finally {
       setLoading(false);
     }
@@ -47,16 +50,18 @@ export default function QiospayReconciliation({ refreshKey = 0, settingsPending 
     setSyncing(true);
     setError(null);
     try {
-      const response = await fetch('/api/payment/qiospay/sync', {
+      const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/api/payment/qiospay/sync`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       });
-      const json = await response.json();
+      const json = await readApiResponse<{ success: boolean; error?: string; data: Overview }>(response);
       if (!response.ok || !json.success) throw new Error(json.error || 'Sinkronisasi Qiospay gagal.');
+      if (!json.data || !Array.isArray(json.data.events)) throw new Error('Data mutasi Qiospay tidak lengkap.');
       setOverview(json.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sinkronisasi Qiospay gagal.');
+      setError(apiErrorMessage(err instanceof Error ? err.message : 'Sinkronisasi Qiospay gagal.'));
     } finally {
       setSyncing(false);
     }
@@ -90,7 +95,7 @@ export default function QiospayReconciliation({ refreshKey = 0, settingsPending 
         </span>
       </div>
 
-      {overview?.error && <p className="text-[12px] text-rose-600 bg-rose-50 border border-rose-100 rounded-[12px] p-3 mb-3">{overview.error}</p>}
+      {overview?.error && <p className="text-[12px] text-rose-600 bg-rose-50 border border-rose-100 rounded-[12px] p-3 mb-3">{apiErrorMessage(overview.error)}</p>}
       {error && <p role="alert" className="text-[12px] text-rose-600 bg-rose-50 border border-rose-100 rounded-[12px] p-3 mb-3">{error}</p>}
       {attention.length > 0 && (
         <div className="bg-amber-50 border border-amber-100 rounded-[14px] p-3 mb-3 flex items-start gap-2">

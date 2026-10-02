@@ -4,6 +4,7 @@ import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy, Ticket, Wifi,
 import { useAppContext } from '../../AppContext';
 import { useToast } from '../../components/Toast';
 import QiospayReconciliation from './QiospayReconciliation';
+import { readApiResponse } from '../../lib/apiResponse';
 
 export default function AdminSettings() {
   const { currentUser, updateUser } = useAppContext();
@@ -55,9 +56,9 @@ export default function AdminSettings() {
     setSettingsLoading(true);
     setSettingsLoadError(null);
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
       const res = await fetch(`${baseUrl}/api/settings`, { credentials: 'include' });
-      const json = await res.json();
+      const json = await readApiResponse<{ success: boolean; error?: string; data?: Record<string, any> }>(res);
       if (!res.ok || !json.success || !json.data) throw new Error(json.error || 'Gagal memuat pengaturan.');
       const settings = json.data;
       setQiospayMerchantCode(settings.qiospayMerchantCode || '');
@@ -105,7 +106,7 @@ export default function AdminSettings() {
     setSavedSection(null);
     setSaveError(null);
     try {
-        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
         const res = await fetch(`${baseUrl}/api/settings`, {
             method: "POST",
              credentials: 'include',
@@ -127,7 +128,7 @@ export default function AdminSettings() {
                 } : {})
             })
         });
-        const json = await res.json();
+        const json = await readApiResponse<{ success: boolean; error?: string }>(res);
         if (!res.ok || !json.success) throw new Error(json.error || 'Gagal menyimpan pengaturan.');
         if (json.success) {
             setQiospayApiKey('');

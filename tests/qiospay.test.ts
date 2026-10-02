@@ -8,6 +8,7 @@ import { QiospayPayments } from "../src/server/qiospay-payments";
 import { ensureQiospaySchema } from "../src/server/qiospay-schema";
 import { PaymentError, crc16, validateStaticQr, validCallbackToken, normalizeCredits, parseMutationDate, fetchCredits, readQiospayConfig } from "../src/server/qiospay-client";
 import { readQrisRecovery, storeQrisRecovery, qrisRecoveryKey, clearQrisRecoveryForIdentity } from "../src/lib/qrisRecovery";
+import { readApiResponse, apiErrorMessage } from "../src/lib/apiResponse";
 
 // Fixtures only: never contact Qiospay or provision a live MikroTik voucher.
 const qrBody = "0002010102115204000053033605802ID5908TESTSHOP6007JAKARTA6304";
@@ -141,6 +142,33 @@ test("QR validator accepts full static IDR QR and rejects corrupted/dynamic/amou
   const fixed = qrBody.replace("6304", "540450006304");
   assert.throws(() => validateStaticQr(fixed + crc16(fixed)));
   assert.throws(() => validateStaticQr("https://example.com/qr.png"));
+});
+
+test("API responses distinguish HTML, unavailable routes, proxy failures and real JSON errors", async () => {
+  for (const [status, pattern] of [[200, /Respons API bukan JSON/], [404, /Endpoint API/], [502, /Server\/proxy/]] as const) {
+    await assert.rejects(
+      readApiResponse(new Response("<!DOCTYPE html><html>fixture</html>", { status, headers: { "Content-Type": "text/html" } })),
+      pattern,
+    );
+  }
+  await assert.rejects(readApiResponse(new Response("<html>invalid</html>", { headers: { "Content-Type": "application/json" } })), /bukan JSON/);
+  await assert.rejects(readApiResponse(new Response('{"data":[]}', { headers: { "Content-Type": "application/json" } })), /Format respons/);
+  const envelope = { success: false, error: "Fixture invalid key" };
+  assert.deepEqual(await readApiResponse(new Response(JSON.stringify(envelope), { status: 400, headers: { "Content-Type": "application/json" } })), envelope);
+  assert.equal(apiErrorMessage("Unexpected token '<', '<!DOCTYPE' is not valid JSON").includes("DOCTYPE"), false);
+});
+
+test("upstream HTML cannot verify a payment or provision any voucher", async () => {
+  const invoice = await order();
+  const htmlPayments = new QiospayPayments(pool, async () => config, async () => "UNUSED", async () => {
+    assert.fail("An HTML response must never provision a voucher");
+  }, async () => new Response("<!DOCTYPE html>fixture proxy page", { headers: { "Content-Type": "text/html" } }));
+  await assert.rejects(htmlPayments.sync(), /Qiospay mengirim respons bukan JSON/);
+  assert.equal((await payments.status(invoice.reference_id))?.status, "pending");
+  assert.equal(fulfillCalls.length, 0);
+  const { rows } = await pool.query("SELECT config_value FROM settings WHERE config_key='qiospaySyncError'");
+  assert.match(rows[0].config_value, /HTTP 200/);
+  assert.equal(rows[0].config_value.includes("DOCTYPE"), false);
 });
 test("callback secret check rejects missing/wrong/multibyte/unconfigured values", () => {
   assert.equal(validCallbackToken("a".repeat(64), "a".repeat(64)), true);
