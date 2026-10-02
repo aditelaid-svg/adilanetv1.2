@@ -1,9 +1,9 @@
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { QiospayPayments } from "../src/server/qiospay-payments";
+import { ensureQiospaySchema } from "../src/server/qiospay-schema";
 import { crc16, validateStaticQr, validCallbackToken, normalizeCredits, parseMutationDate, fetchCredits, readQiospayConfig } from "../src/server/qiospay-client";
 import { readQrisRecovery, storeQrisRecovery, qrisRecoveryKey, clearQrisRecoveryForIdentity } from "../src/lib/qrisRecovery";
 
@@ -44,7 +44,7 @@ before(async () => {
     INSERT INTO routers VALUES(1);
     INSERT INTO packages VALUES(1),(2);
   `);
-  await pool.query(await readFile(new URL("../src/server/qiospay-schema.sql", import.meta.url), "utf8"));
+  await ensureQiospaySchema(pool);
 });
 after(async () => {
   await pool?.end();
@@ -67,6 +67,16 @@ async function inWindow(reference: string) {
 }
 const credit = (amount: number, ref = "fixture-ref", date = new Date()) =>
   ({ amount: String(amount), type: "CR", date: jakartaDate(date), issuer_reff: ref, balance: "100000", brand_name: "TEST" });
+
+test("startup schema is repeatable and preserves existing transactions and permanent reservations", async () => {
+  const invoice = await order();
+  const before = await pool.query("SELECT id,status,amount,reference_id FROM transactions ORDER BY id");
+  await ensureQiospaySchema(pool);
+  await ensureQiospaySchema(pool);
+  assert.deepEqual((await pool.query("SELECT id,status,amount,reference_id FROM transactions ORDER BY id")).rows, before.rows);
+  assert.equal((await pool.query("SELECT COUNT(*)::int AS count FROM qiospay_invoices")).rows[0].count, 1);
+  assert.equal((await payments.status(invoice.reference_id))?.status, "pending");
+});
 
 test("QR validator accepts full static IDR QR and rejects corrupted/dynamic/amount-bearing QR", () => {
   assert.doesNotThrow(() => validateStaticQr(staticQr));

@@ -12,6 +12,7 @@ import { Pool, type PoolClient } from "pg";
 import { createVoucher, createVouchersBulk, createProfile, updateProfile, deleteProfile, checkReaper, repairReaper } from "./src/server/mikrotik";
 import dotenv from "dotenv";
 import { QiospayPayments } from "./src/server/qiospay-payments";
+import { ensureQiospaySchema } from "./src/server/qiospay-schema";
 import { PaymentError, validateStaticQr, validCallbackToken, readQiospayConfig } from "./src/server/qiospay-client";
 
 dotenv.config();
@@ -225,6 +226,8 @@ async function initDb() {
     );
     CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, read);
   `);
+
+  await ensureQiospaySchema(pool);
 
   // Seed demo data if empty
   const { rows: userRows } = await pool.query("SELECT COUNT(*) as cnt FROM users");
@@ -1359,6 +1362,9 @@ async function startServer() {
         ['whatsappNumber', waNum],
         ['whatsappMessage', waMsg],
       ];
+      if (qMerchant !== previous.qiospayMerchantCode || qQr !== previous.qiospayQrString || qKey !== previous.qiospayApiKey) {
+        updates.push(['qiospaySyncError', '']);
+      }
       for (const [key, val] of updates) {
         await settingsDb.query(
           `INSERT INTO settings (config_key, config_value) VALUES ($1,$2) ON CONFLICT (config_key) DO UPDATE SET config_value=$2, updated_at=NOW()`,
@@ -1369,8 +1375,13 @@ async function startServer() {
       committed = true;
       res.json({ success: true, message: "Pengaturan berhasil disimpan." });
     } catch (err: any) {
+      const databaseMessage = err.code === '42P01'
+        ? "Tabel QRIS belum siap. Perbarui dan jalankan ulang aplikasi agar tabel Qiospay dibuat."
+        : err.code === '53100'
+        ? "Penyimpanan database penuh. Kosongkan ruang server tanpa menghapus volume database, lalu coba simpan lagi."
+        : "Pengaturan tidak dapat disimpan. Periksa koneksi dan log database.";
       res.status(err instanceof PaymentError ? err.status : 500).json({ success: false,
-        error: err instanceof PaymentError ? err.message : "Pengaturan tidak dapat disimpan. Coba lagi." });
+        error: err instanceof PaymentError ? err.message : databaseMessage });
     } finally {
       if (settingsDb) {
         try { if (!committed) await settingsDb.query("ROLLBACK"); }

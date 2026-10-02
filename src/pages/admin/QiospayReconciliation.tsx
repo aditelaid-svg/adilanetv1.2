@@ -19,7 +19,7 @@ type Overview = {
   events: QiospayEvent[];
 };
 
-export default function QiospayReconciliation() {
+export default function QiospayReconciliation({ refreshKey = 0, settingsPending = false }: { refreshKey?: number; settingsPending?: boolean }) {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -40,9 +40,10 @@ export default function QiospayReconciliation() {
     }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void refresh(); }, [refresh, refreshKey]);
 
   const sync = async () => {
+    if (settingsPending || syncing || loading) return;
     setSyncing(true);
     setError(null);
     try {
@@ -80,7 +81,7 @@ export default function QiospayReconciliation() {
 
       <div className="flex flex-wrap gap-2 mb-4">
         <span className={`text-[11px] font-semibold rounded-full px-2.5 py-1 ${overview?.configured ? 'bg-teal-50 text-teal-700' : 'bg-amber-50 text-amber-700'}`}>
-          {overview?.configured ? 'Akun terkonfigurasi' : 'Akun belum siap'}
+          {!overview ? loading ? 'Memuat status...' : 'Status belum tersedia' : overview.configured ? 'Akun terkonfigurasi' : 'Akun belum siap'}
         </span>
         <span className="text-[11px] font-medium text-slate-500 rounded-full bg-white px-2.5 py-1">
           Nominal pernah dipakai: {overview?.reservations_count ?? '—'}
@@ -99,7 +100,8 @@ export default function QiospayReconciliation() {
         </div>
       )}
 
-      <button type="button" onClick={() => void sync()} disabled={syncing || loading} className="w-full mb-4 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold text-[13px] py-3 rounded-[14px] flex items-center justify-center gap-2">
+      {settingsPending && <p className="text-[12px] text-amber-700 mb-3">Simpan pengaturan QRIS terlebih dahulu. Status di sini membaca konfigurasi yang sudah tersimpan, bukan kolom yang sedang diisi.</p>}
+      <button type="button" onClick={() => void sync()} disabled={syncing || loading || settingsPending || !overview?.configured} className="w-full mb-4 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-semibold text-[13px] py-3 rounded-[14px] flex items-center justify-center gap-2">
         <RotateCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
         {syncing ? 'Menyinkronkan mutasi...' : 'Uji akun & sinkronkan mutasi'}
       </button>

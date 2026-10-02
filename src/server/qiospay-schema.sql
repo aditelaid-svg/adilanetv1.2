@@ -1,5 +1,5 @@
--- Apply to the development database. Replit Publish manages production schema.
--- External/self-hosted PostgreSQL: apply this file before running the updated app.
+-- Applied idempotently at application startup, including self-hosted PostgreSQL.
+-- Existing transactions, ledger events, and nominal reservations are preserved.
 CREATE TABLE IF NOT EXISTS qiospay_events (
   event_key VARCHAR(64) PRIMARY KEY,
   merchant_code VARCHAR(64) NOT NULL,
