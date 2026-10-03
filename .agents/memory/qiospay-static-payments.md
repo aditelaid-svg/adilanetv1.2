@@ -50,3 +50,9 @@ Voucher purchases and wallet top-ups must share one merchant-wide payment-total 
 **Why:** The mutation ledger does not identify an app invoice or its purpose. Separate reservations could allocate the same total to a voucher buyer and a wallet top-up.
 
 **How to apply:** Reserve totals permanently across both purposes, retain exact amount/time matching, and never treat a callback alone as proof of wallet funding.
+
+Pengguna meminta: “tidak menyebutkan atau membawa qiospay” dan “Buat Qiris Adilanet Saja.” Nama yang terlihat di antarmuka pembayaran adalah **QRIS AdilaNet**.
+
+**Why:** Pengguna ingin pembayaran memakai identitas AdilaNet setelah mengonfirmasi semua sudah normal.
+
+**How to apply:** Use QRIS AdilaNet in customer/admin labels, history and user-facing errors. Keep the working provider integration, internal identifiers and callback compatibility unchanged; this is a branding change, not a payment-provider migration.

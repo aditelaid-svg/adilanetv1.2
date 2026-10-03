@@ -21,5 +21,5 @@ export async function readApiResponse<T extends { success: boolean; error?: stri
 export function apiErrorMessage(message: string): string {
   return /unexpected token|not valid json|unexpected end of json|json\.parse/i.test(message)
     ? 'Respons API bukan JSON. Periksa alamat backend atau perbarui image aplikasi.'
-    : message;
+    : message.replace(/\b(?:QRIS\s+)?Qiospay\b/gi, 'QRIS AdilaNet');
 }

@@ -190,6 +190,8 @@ test("API responses distinguish HTML, unavailable routes, proxy failures and rea
   const envelope = { success: false, error: "Fixture invalid key" };
   assert.deepEqual(await readApiResponse(new Response(JSON.stringify(envelope), { status: 400, headers: { "Content-Type": "application/json" } })), envelope);
   assert.equal(apiErrorMessage("Unexpected token '<', '<!DOCTYPE' is not valid JSON").includes("DOCTYPE"), false);
+  assert.equal(apiErrorMessage("QRIS Qiospay belum tersedia."), "QRIS AdilaNet belum tersedia.");
+  assert.equal(apiErrorMessage("Sinkronisasi Qiospay gagal."), "Sinkronisasi QRIS AdilaNet gagal.");
 });
 
 test("upstream HTML cannot verify a payment or provision any voucher", async () => {
@@ -197,7 +199,7 @@ test("upstream HTML cannot verify a payment or provision any voucher", async () 
   const htmlPayments = new QiospayPayments(pool, async () => config, async () => "UNUSED", async () => {
     assert.fail("An HTML response must never provision a voucher");
   }, async () => new Response("<!DOCTYPE html>fixture proxy page", { headers: { "Content-Type": "text/html" } }));
-  await assert.rejects(htmlPayments.sync(), /Qiospay mengirim respons bukan JSON/);
+  await assert.rejects(htmlPayments.sync(), /QRIS AdilaNet mengirim respons bukan JSON/);
   assert.equal((await payments.status(invoice.reference_id))?.status, "pending");
   assert.equal(fulfillCalls.length, 0);
   const { rows } = await pool.query("SELECT config_value FROM settings WHERE config_key='qiospaySyncError'");
@@ -249,10 +251,10 @@ test("only the known HTTP 200 empty-ledger response normalizes to zero credits",
   ]) {
     const fetcher: typeof fetch = async () => new Response(JSON.stringify(body));
     await assert.rejects(fetchCredits(c, fetcher), (e: Error) =>
-      e.message.includes("Periksa Merchant Code") && !e.message.includes(c.apiKey));
+      e.message.includes("Periksa kode merchant") && !e.message.includes(c.apiKey));
   }
   const failedHttp: typeof fetch = async () => new Response(JSON.stringify({ status: "error", messages: "Data not found" }), { status: 403 });
-  await assert.rejects(fetchCredits(c, failedHttp), /Periksa Merchant Code/);
+  await assert.rejects(fetchCredits(c, failedHttp), /Periksa kode merchant/);
   const emptySuccess: typeof fetch = async () => new Response(JSON.stringify({ status: "success", data: [] }));
   assert.deepEqual(await fetchCredits(c, emptySuccess), []);
 });
@@ -289,7 +291,7 @@ test("HTTP 401 cannot create a QRIS invoice or provision a voucher even with an 
   const rejectedPayments = new QiospayPayments(pool, async () => config, async () => "UNUSED", async () => {
     assert.fail("Rejected credentials must never provision a voucher");
   }, async () => new Response(JSON.stringify({ status: "error", messages: "Data not found" }), { status: 401 }));
-  await assert.rejects(rejectedPayments.create(pkg, 5000, 1, "081234567891"), /Periksa Merchant Code/);
+  await assert.rejects(rejectedPayments.create(pkg, 5000, 1, "081234567891"), /Periksa kode merchant/);
   const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM qiospay_invoices");
   assert.equal(rows[0].count, 0);
 });
@@ -571,7 +573,7 @@ test("top-up HTTP routes require auth, ignore body identity, validate input and 
   assert.equal(own.json.data.length, 1);
   assert.equal(own.json.data[0].amount, 10000);
   assert.equal(own.json.data[0].reference_id, a.reference_id);
-  assert.equal(own.json.data[0].payment_method, "QRIS Qiospay");
+  assert.equal(own.json.data[0].payment_method, "QRIS AdilaNet");
   const status = await invoke("GET /api/payment/topup-status/:refId", 1, {}, { refId: a.reference_id });
   assert.equal(status.json.data.credited_amount, 10000);
 });

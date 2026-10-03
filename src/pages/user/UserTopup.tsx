@@ -2,7 +2,7 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } f
 import { ArrowDownLeft, ArrowUpRight, Check, ChevronLeft, CircleAlert, Clock3, CreditCard, History, LoaderCircle, RefreshCw, ShieldCheck, Wifi } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../AppContext';
-import { QrisCheckoutDetails, useQrisPayment } from '../../components/QrisCheckout';
+import { QrisCheckoutDetails, qrisDisplayText, useQrisPayment } from '../../components/QrisCheckout';
 import { formatRupiah } from '../../lib/format';
 import { qrisTopupRecoveryKey } from '../../lib/qrisRecovery';
 import { readApiResponse } from '../../lib/apiResponse';
@@ -229,7 +229,7 @@ export default function UserTopup() {
                 <span className="text-[11px] font-semibold text-slate-400">RUPIAH</span>
               </div>
               <p id="topup-amount-hint" className="mt-2 text-[11px] leading-relaxed text-slate-500">Nominal bulat Rp1–Rp99.998.999. Biaya unik QRIS, jika ada, tidak masuk ke saldo.</p>
-              <p id="topup-amount-error" role="alert" className="mt-1 min-h-4 text-xs font-medium text-rose-700">{validationError || error || ''}</p>
+              <p id="topup-amount-error" role="alert" className="mt-1 min-h-4 text-xs font-medium text-rose-700">{validationError || qrisDisplayText(error || '')}</p>
               <button
                 type="submit"
                 disabled={!qrisEnabled || configLoading || creating || hasReceipt || !amountInput}
@@ -266,7 +266,7 @@ export default function UserTopup() {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"><CircleAlert size={20} /></div>
                 <div>
                   <h2 className="font-bold text-slate-800">Top up QRIS belum tersedia</h2>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{configError || 'Layanan QRIS sedang dinonaktifkan. Coba periksa kembali nanti.'}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{qrisDisplayText(configError || 'Layanan QRIS sedang dinonaktifkan. Coba periksa kembali nanti.')}</p>
                   <button type="button" onClick={() => void loadConfig()} data-testid="button-retry-config" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-white px-3.5 py-2 text-xs font-bold text-sky-700 hover:bg-sky-50">
                     <RefreshCw size={14} /> Coba lagi
                   </button>
@@ -278,14 +278,14 @@ export default function UserTopup() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500">Pembayaran Anda</p>
-                  <h2 className="mt-1 text-lg font-extrabold text-slate-800">QRIS Qiospay</h2>
+                  <h2 className="mt-1 text-lg font-extrabold text-slate-800">QRIS AdilaNet</h2>
                 </div>
                 <span className={`rounded-full border px-3 py-1.5 text-[10px] font-bold ${toneClasses[presentation.tone]}`}>
                   {presentation.title}
                 </span>
               </div>
               <QrisCheckoutDetails payment={payment} status={status} message={statusMessage} />
-              {statusError && <p role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">{statusError}</p>}
+              {statusError && <p role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">{qrisDisplayText(statusError)}</p>}
               {(status === 'paid' || status === 'provisioning') && (
                 <p className="mt-4 rounded-[15px] border border-sky-100 bg-sky-50 p-3 text-center text-xs leading-relaxed text-sky-800">{presentation.detail}</p>
               )}

@@ -812,7 +812,7 @@ async function startServer() {
     try {
       const { rows } = await pool.query(`
         SELECT t.*, u.name AS user_name,
-          COALESCE(a.name, CASE WHEN t.idempotency_key LIKE 'qris:%' THEN 'QRIS Qiospay' ELSE 'Sistem' END) AS admin_name
+          COALESCE(a.name, CASE WHEN t.idempotency_key LIKE 'qris:%' THEN 'QRIS AdilaNet' ELSE 'Sistem' END) AS admin_name
         FROM topups t
         LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN users a ON t.admin_id = a.id
@@ -1239,7 +1239,7 @@ async function startServer() {
     try {
       const { rows } = await pool.query("SELECT 1 FROM qiospay_invoices WHERE transaction_id=$1", [req.params.id]);
       if (rows.length) {
-        return res.status(409).json({ success: false, error: "Transaksi Qiospay tidak boleh dihapus: catatan pembayaran dan nominal unik harus tetap tersimpan untuk mencegah salah pencocokan." });
+        return res.status(409).json({ success: false, error: "Transaksi QRIS AdilaNet tidak boleh dihapus: catatan pembayaran dan nominal unik harus tetap tersimpan untuk mencegah salah pencocokan." });
       }
       await pool.query(`DELETE FROM transactions WHERE id = $1`, [req.params.id]);
       res.json({ success: true });
@@ -1290,16 +1290,16 @@ async function startServer() {
       const { rows: previousRows } = await settingsDb.query("SELECT config_key,config_value FROM settings");
       const previous: Record<string, string> = Object.fromEntries(previousRows.map(r => [r.config_key, r.config_value]));
       if (req.body.qrisProvider !== undefined && req.body.qrisProvider !== 'qiospay') {
-        return res.status(400).json({ success: false, error: "QRIS hanya mendukung Qiospay." });
+        return res.status(400).json({ success: false, error: "Penyedia QRIS AdilaNet tidak valid." });
       }
       const qMerchant = String(req.body.qiospayMerchantCode ?? previous.qiospayMerchantCode ?? '').trim();
       const qQr = String(req.body.qiospayQrString ?? previous.qiospayQrString ?? '').trim();
       const qKey = String(req.body.qiospayApiKey ?? '').trim() || (previous.qiospayApiKey || '').trim();
       if (qMerchant && !/^[A-Za-z0-9_-]{1,64}$/.test(qMerchant)) {
-        return res.status(400).json({ success: false, error: "Merchant Code Qiospay tidak valid." });
+        return res.status(400).json({ success: false, error: "Kode merchant QRIS AdilaNet tidak valid." });
       }
       if (qKey && (qKey.length < 16 || qKey.length > 512 || /[\x00-\x20\x7f]/.test(qKey))) {
-        return res.status(400).json({ success: false, error: "API Key Qiospay tidak valid." });
+        return res.status(400).json({ success: false, error: "API Key QRIS AdilaNet tidak valid." });
       }
       if (qQr) validateStaticQr(qQr);
       if (qMerchant !== (previous.qiospayMerchantCode || '') || qQr !== (previous.qiospayQrString || '')) {
@@ -1307,7 +1307,7 @@ async function startServer() {
           `SELECT 1 FROM qiospay_invoices i JOIN transactions t ON t.id=i.transaction_id
            WHERE t.status IN ('pending','paid','provisioning','review') LIMIT 1`,
         );
-        if (rows.length) return res.status(409).json({ success: false, error: "Merchant/QR Qiospay tidak dapat diganti selama ada transaksi yang belum selesai. API Key masih bisa diperbarui untuk akun yang sama." });
+        if (rows.length) return res.status(409).json({ success: false, error: "Merchant/QR AdilaNet tidak dapat diganti selama ada transaksi yang belum selesai. API Key masih bisa diperbarui untuk akun yang sama." });
       }
       const qToken = previous.qiospayCallbackToken || (qMerchant ? crypto.randomBytes(32).toString('hex') : '');
       const qEnabled = req.body.qrisEnabled ?? (previous.qrisEnabled !== 'false' && qiospayReady(previous));
@@ -1392,7 +1392,7 @@ async function startServer() {
     } catch (err: any) {
       console.error("[Settings] Gagal menyimpan:", err.code || err.name || "unknown");
       const databaseMessage = err.code === '42P01'
-        ? "Tabel QRIS belum siap. Perbarui dan jalankan ulang aplikasi agar tabel Qiospay dibuat."
+        ? "Tabel QRIS belum siap. Perbarui dan jalankan ulang aplikasi agar tabel pembayaran dibuat."
         : err.code === '53100'
         ? "Penyimpanan database penuh. Kosongkan ruang server tanpa menghapus volume database, lalu coba simpan lagi."
         : "Pengaturan tidak dapat disimpan. Periksa koneksi dan log database.";
@@ -1574,16 +1574,16 @@ async function startServer() {
   // ─── QIOSPAY ADMIN / CALLBACK ─────────────────────────────────────────────
   const qiospaySyncLimiter = rateLimit({
     windowMs: 60_000, max: 4, standardHeaders: true, legacyHeaders: false,
-    message: { success: false, error: "Tunggu sebentar sebelum sinkronisasi Qiospay lagi." },
+    message: { success: false, error: "Tunggu sebentar sebelum sinkronisasi QRIS AdilaNet lagi." },
   });
   app.get("/api/payment/qiospay/overview", requireAdmin, async (_req, res) => {
     try { res.json({ success: true, data: await qiospay.overview() }); }
-    catch { res.status(503).json({ success: false, error: "Data Qiospay belum tersedia. Periksa skema database." }); }
+    catch { res.status(503).json({ success: false, error: "Data QRIS AdilaNet belum tersedia. Periksa skema database." }); }
   });
   app.post("/api/payment/qiospay/sync", requireAdmin, qiospaySyncLimiter, async (_req, res) => {
     try { res.json({ success: true, data: await qiospay.sync() }); }
     catch (e) { res.status(e instanceof PaymentError ? e.status : 503).json({
-      success: false, error: e instanceof PaymentError ? e.message : "Sinkronisasi Qiospay gagal.",
+      success: false, error: e instanceof PaymentError ? e.message : "Sinkronisasi QRIS AdilaNet gagal.",
     }); }
   });
   app.post("/api/payment/qiospay/retry/:refId", requireAdmin, async (req, res) => {
@@ -1609,7 +1609,7 @@ async function startServer() {
       qiospay.requestSync();
       res.json({ status: "accept", message: "Notifikasi diterima; pembayaran diperiksa melalui mutasi." });
     } catch {
-      res.status(503).json({ status: "reject", message: "Qiospay belum siap; hubungi admin." });
+      res.status(503).json({ status: "reject", message: "QRIS AdilaNet belum siap; hubungi admin." });
     }
   });
 
@@ -1647,7 +1647,7 @@ async function startServer() {
       const { rows } = await pool.query(
         `SELECT t.id,t.amount,t.type,t.created_at,
           COALESCE(a.name,'Sistem') AS admin_name,
-          CASE WHEN t.idempotency_key LIKE 'qris:%' THEN 'QRIS Qiospay' ELSE 'Admin' END AS payment_method,
+          CASE WHEN t.idempotency_key LIKE 'qris:%' THEN 'QRIS AdilaNet' ELSE 'Admin' END AS payment_method,
           CASE WHEN t.idempotency_key LIKE 'qris:%' THEN substring(t.idempotency_key from 6) ELSE NULL END AS reference_id
          FROM topups t LEFT JOIN users a ON t.admin_id=a.id WHERE t.user_id=$1 ORDER BY t.created_at DESC,t.id DESC LIMIT 100`,
         [req.session.userId],

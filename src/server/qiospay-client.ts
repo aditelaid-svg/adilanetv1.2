@@ -15,7 +15,7 @@ export function readQiospayConfig(s: Record<string, string>): QiospayConfig {
     callbackToken: s.qiospayCallbackToken || "",
   };
   if (!config.merchantCode || !config.apiKey || !config.qrString || !config.callbackToken) {
-    throw new PaymentError("Qiospay belum lengkap. Isi Merchant Code, API Key baru, dan String QR di Setelan.", 503);
+    throw new PaymentError("QRIS AdilaNet belum lengkap. Isi kode merchant, API Key baru, dan String QR di Setelan.", 503);
   }
   validateStaticQr(config.qrString);
   return config;
@@ -101,23 +101,23 @@ export function parseMutationDate(value: unknown): Date | null {
 }
 
 export function normalizeCredits(merchantCode: string, rows: unknown): Credit[] {
-  if (!Array.isArray(rows)) throw new PaymentError("Format mutasi Qiospay tidak sesuai dokumentasi.", 502);
+  if (!Array.isArray(rows)) throw new PaymentError("Format mutasi QRIS AdilaNet tidak sesuai dokumentasi.", 502);
   return rows.flatMap((row: any) => {
     if (!row || row.type !== "CR") return [];
     const amount = typeof row.amount === "number" ? row.amount : /^\d+$/.test(row.amount || "") ? Number(row.amount) : NaN;
     const paidAt = parseMutationDate(row.date);
     if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 99_999_999 || !paidAt) {
-      throw new PaymentError("Mutasi kredit Qiospay memiliki nominal atau tanggal tidak valid. Perlu pemeriksaan admin.", 502);
+      throw new PaymentError("Mutasi kredit QRIS AdilaNet memiliki nominal atau tanggal tidak valid. Perlu pemeriksaan admin.", 502);
     }
     // Prefer stable acquirer/issuer references. Old documented responses omit
     // them, so use the ledger timestamp + amount + brand + balance fingerprint.
     const issuer = String(row.issuer_reff || "");
     const buyer = String(row.buyer_reff || "");
     if (!issuer && !buyer && (row.balance === undefined || row.balance === null)) {
-      throw new PaymentError("Mutasi Qiospay tidak memiliki referensi atau saldo untuk deduplikasi yang aman.", 502);
+      throw new PaymentError("Mutasi QRIS AdilaNet tidak memiliki referensi atau saldo untuk deduplikasi yang aman.", 502);
     }
     if (!issuer && !buyer && !Number.isFinite(Number(row.balance))) {
-      throw new PaymentError("Saldo mutasi Qiospay tidak valid untuk deduplikasi yang aman.", 502);
+      throw new PaymentError("Saldo mutasi QRIS AdilaNet tidak valid untuk deduplikasi yang aman.", 502);
     }
     const identity = issuer || buyer
       ? ["refs", issuer, buyer]
@@ -136,11 +136,11 @@ export async function fetchCredits(config: QiospayConfig, fetcher: typeof fetch 
       headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15_000), redirect: "error",
     });
   } catch {
-    throw new PaymentError("Tidak dapat menghubungi Qiospay. Periksa koneksi dan API Key di Setelan.", 502);
+    throw new PaymentError("Tidak dapat menghubungi layanan QRIS AdilaNet. Periksa koneksi dan API Key di Setelan.", 502);
   }
   let body: any;
   try { body = await response.json(); } catch {
-    throw new PaymentError(`Qiospay mengirim respons bukan JSON (HTTP ${response.status}). Periksa akses API akun Qiospay.`, 502);
+    throw new PaymentError(`Layanan QRIS AdilaNet mengirim respons bukan JSON (HTTP ${response.status}). Periksa akses API pembayaran.`, 502);
   }
   if (!response.ok || body?.status !== "success") {
     const message = (typeof body?.messages === "string" ? body.messages :
@@ -154,7 +154,7 @@ export async function fetchCredits(config: QiospayConfig, fetcher: typeof fetch 
         (body.data == null || (Array.isArray(body.data) && body.data.length === 0))) {
       return [];
     }
-    throw new PaymentError(`Qiospay menolak permintaan mutasi (HTTP ${response.status}). Periksa Merchant Code dan API Key.`, 502);
+    throw new PaymentError(`Layanan QRIS AdilaNet menolak permintaan mutasi (HTTP ${response.status}). Periksa kode merchant dan API Key.`, 502);
   }
   return normalizeCredits(config.merchantCode, body.data);
 }

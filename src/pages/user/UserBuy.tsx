@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { formatRupiah } from '../../lib/format';
-import { QrisCheckoutDetails, useQrisPayment } from '../../components/QrisCheckout';
+import { QrisCheckoutDetails, qrisDisplayText, useQrisPayment } from '../../components/QrisCheckout';
 import { findLatestQrisRecovery, qrisRecoveryKey } from '../../lib/qrisRecovery';
 
 export default function UserBuy() {
@@ -323,7 +323,7 @@ export default function UserBuy() {
                         </div>
                         <div className="text-left">
                           <p className="font-bold text-[15px] text-slate-800">QRIS</p>
-                          <p className="text-[13px] text-slate-500 font-medium">{qrisConfigLoading ? 'Memuat status QRIS...' : qrisEnabled ? 'GoPay, OVO, DANA' : qrisConfigError || 'Sedang Maintenance'}</p>
+                          <p className="text-[13px] text-slate-500 font-medium">{qrisConfigLoading ? 'Memuat status QRIS...' : qrisEnabled ? 'GoPay, OVO, DANA' : qrisDisplayText(qrisConfigError || 'Sedang Maintenance')}</p>
                         </div>
                       </div>
                       {paymentMethod === 'qris' && qrisEnabled && <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center"><Check className="w-3 h-3 text-white" /></div>}
@@ -331,7 +331,7 @@ export default function UserBuy() {
                   </div>
 
                   {(error || qrisPayment.error) && (
-                    <div className="mb-4 text-center text-rose-500 text-[13px] font-medium bg-rose-50 py-2 rounded-[12px]">{error || qrisPayment.error}</div>
+                    <div className="mb-4 text-center text-rose-500 text-[13px] font-medium bg-rose-50 py-2 rounded-[12px]">{qrisDisplayText(error || qrisPayment.error || '')}</div>
                   )}
 
                   <button
@@ -356,7 +356,7 @@ export default function UserBuy() {
                     <p className="text-slate-500 text-[13px] font-medium max-w-[200px] mx-auto">Verifikasi PIN keamanan transaksi Anda.</p>
                   </div>
                   {error && (
-                    <div className="mb-6 text-center text-rose-500 text-[13px] font-medium bg-rose-50 py-2 rounded-[12px]">{error}</div>
+                    <div className="mb-6 text-center text-rose-500 text-[13px] font-medium bg-rose-50 py-2 rounded-[12px]">{qrisDisplayText(error)}</div>
                   )}
                   <div className="mb-10 text-center">
                     <input
@@ -378,13 +378,13 @@ export default function UserBuy() {
                   <button onClick={() => { setShowQrisCode(false); setError(null); }} aria-label="Tutup" className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white border border-slate-100 rounded-full text-slate-400 hover:text-slate-600 shadow-sm">
                     <X className="w-4 h-4" />
                   </button>
-                  <h3 className="text-[22px] font-bold mb-2 text-slate-800 tracking-tight mt-4">Bayar dengan QRIS</h3>
+                  <h3 className="text-[22px] font-bold mb-2 text-slate-800 tracking-tight mt-4">QRIS AdilaNet</h3>
                   <QrisCheckoutDetails payment={qrisPayment.payment} status={qrisPayment.status} message={qrisPayment.statusMessage} />
 
                   {(error || qrisPayment.error) && (
-                    <div className="mb-4 text-center text-rose-500 text-[13px] font-medium bg-rose-50 py-2 rounded-[12px]">{error || qrisPayment.error}</div>
+                    <div className="mb-4 text-center text-rose-500 text-[13px] font-medium bg-rose-50 py-2 rounded-[12px]">{qrisDisplayText(error || qrisPayment.error || '')}</div>
                   )}
-                  {qrisPayment.statusError && <p className="text-[11px] text-rose-600 bg-rose-50 rounded-[10px] p-2 mb-3">{qrisPayment.statusError}</p>}
+                  {qrisPayment.statusError && <p className="text-[11px] text-rose-600 bg-rose-50 rounded-[10px] p-2 mb-3">{qrisDisplayText(qrisPayment.statusError)}</p>}
 
                   {['pending', 'paid', 'provisioning'].includes(qrisPayment.status) && (
                     <div className="w-full flex items-center justify-center gap-2 bg-sky-50 border border-sky-100 text-sky-600 font-semibold py-3 rounded-[16px] text-[13px] mt-3">

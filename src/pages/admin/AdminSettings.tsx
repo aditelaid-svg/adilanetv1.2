@@ -6,6 +6,8 @@ import { useToast } from '../../components/Toast';
 import QiospayReconciliation from './QiospayReconciliation';
 import { readApiResponse } from '../../lib/apiResponse';
 
+const neutralizeProvider = (value: string) => value.replace(/\b(?:QRIS\s+)?Qiospay\b/gi, 'QRIS AdilaNet');
+
 export default function AdminSettings() {
   const { currentUser, updateUser } = useAppContext();
   const toast = useToast();
@@ -88,8 +90,8 @@ export default function AdminSettings() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Periksa koneksi server.';
       setSettingsLoaded(false);
-      setSettingsLoadError(message);
-      toast.error('Gagal memuat pengaturan', message);
+      setSettingsLoadError(neutralizeProvider(message));
+      toast.error('Gagal memuat pengaturan', neutralizeProvider(message));
       return false;
     } finally {
       setSettingsLoading(false);
@@ -135,7 +137,7 @@ export default function AdminSettings() {
             setReconciliationVersion(version => version + 1);
             const confirmed = await fetchSettings(section === 'all');
             if (!confirmed) {
-              setSaveError('Pengaturan sudah disimpan, tetapi belum dapat dimuat ulang. Tekan Muat ulang pengaturan untuk memastikan statusnya.');
+              setSaveError(neutralizeProvider('Pengaturan sudah disimpan, tetapi belum dapat dimuat ulang. Tekan Muat ulang pengaturan untuk memastikan statusnya.'));
               return;
             }
             setIsSaved(true);
@@ -145,8 +147,8 @@ export default function AdminSettings() {
         }
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Periksa koneksi server.';
-        setSaveError(message);
-        toast.error('Gagal menyimpan pengaturan', message);
+        setSaveError(neutralizeProvider(message));
+        toast.error('Gagal menyimpan pengaturan', neutralizeProvider(message));
     } finally {
         setIsSaving(false);
     }
@@ -226,7 +228,7 @@ export default function AdminSettings() {
               <Shield className="w-5 h-5" strokeWidth={1.8} />
             </div>
             <div className="flex-1">
-                <h2 className="font-semibold text-[15px] text-slate-800">QRIS Qiospay</h2>
+                <h2 className="font-semibold text-[15px] text-slate-800">QRIS AdilaNet</h2>
             </div>
             <div className="flex items-center">
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -239,7 +241,7 @@ export default function AdminSettings() {
           <fieldset disabled={!settingsLoaded || settingsLoading || isSaving} className="min-w-0 space-y-4 disabled:opacity-60">
               <div>
                 <label className="block text-[13px] font-medium text-slate-600 mb-2">Merchant Code</label>
-                <input type="text" value={qiospayMerchantCode} onChange={e => setQiospayMerchantCode(e.target.value)} placeholder="Kode merchant Qiospay" className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200" />
+                <input type="text" value={qiospayMerchantCode} onChange={e => setQiospayMerchantCode(e.target.value)} placeholder="Kode merchant" className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200" />
               </div>
               <div>
                 <label className="block text-[13px] font-medium text-slate-600 mb-2">String QRIS</label>
@@ -259,7 +261,7 @@ export default function AdminSettings() {
                 <label className="block text-[13px] font-medium text-slate-600 mb-2">Callback</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 bg-white border border-slate-200 rounded-[10px] px-3 py-2 text-[11px] text-slate-600 font-mono break-all">
-                    {qiospayCallbackToken ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhook/qiospay/••••••••` : 'Belum tersedia'}
+                    {qiospayCallbackToken ? 'Callback QRIS AdilaNet · URL siap disalin' : 'Belum tersedia'}
                   </code>
                   <button type="button" disabled={!qiospayCallbackUrl} onClick={async () => {
                     try {
@@ -269,7 +271,7 @@ export default function AdminSettings() {
                     } catch {
                       toast.error('Gagal menyalin URL callback', 'Salin URL dengan aman dari browser.');
                     }
-                  }} aria-label="Salin URL callback Qiospay" className="shrink-0 w-9 h-9 bg-sky-100 hover:bg-sky-200 disabled:opacity-40 rounded-[10px] flex items-center justify-center text-sky-600">
+                  }} aria-label="Salin URL callback QRIS AdilaNet" className="shrink-0 w-9 h-9 bg-sky-100 hover:bg-sky-200 disabled:opacity-40 rounded-[10px] flex items-center justify-center text-sky-600">
                     {callbackCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
@@ -288,7 +290,7 @@ export default function AdminSettings() {
         </motion.div>
 
         <details className="glass-strong rounded-[24px] overflow-hidden">
-          <summary className="px-5 py-4 cursor-pointer text-[13px] font-semibold text-slate-700">Mutasi Qiospay</summary>
+          <summary className="px-5 py-4 cursor-pointer text-[13px] font-semibold text-slate-700">Mutasi QRIS</summary>
           <QiospayReconciliation refreshKey={reconciliationVersion} settingsPending={!settingsLoaded || settingsLoading || isSaving || qiospayDirty} />
         </details>
 

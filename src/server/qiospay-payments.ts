@@ -28,14 +28,14 @@ export class QiospayPayments {
       );
       const { rows } = await db.query("SELECT amount,paid_at FROM qiospay_events WHERE event_key=$1", [c.key]);
       if (Number(rows[0].amount) !== c.amount || new Date(rows[0].paid_at).getTime() !== c.paidAt.getTime()) {
-        throw new PaymentError("Referensi mutasi Qiospay berubah. Sinkronisasi dihentikan untuk pemeriksaan admin.", 502);
+        throw new PaymentError("Referensi mutasi QRIS AdilaNet berubah. Sinkronisasi dihentikan untuk pemeriksaan admin.", 502);
       }
     }
   }
 
   async create(pkg: any, amount: number, userId: number | null, phone: string | null) {
     if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 99_998_999) {
-      throw new PaymentError("Harga paket Qiospay harus berupa rupiah bulat positif.");
+      throw new PaymentError("Harga paket QRIS AdilaNet harus berupa rupiah bulat positif.");
     }
     const purpose = pkg.purpose === "topup" ? "topup" : "voucher";
     if (purpose === "topup" && (!Number.isSafeInteger(userId) || !userId || userId <= 0)) {
@@ -177,7 +177,7 @@ export class QiospayPayments {
     let lockedId: number | undefined;
     try {
       const { rows: ids } = await db.query("SELECT transaction_id FROM qiospay_invoices WHERE reference_id=$1", [reference]);
-      if (!ids.length) throw new PaymentError("Transaksi Qiospay tidak ditemukan.", 404);
+      if (!ids.length) throw new PaymentError("Transaksi QRIS AdilaNet tidak ditemukan.", 404);
       const id = ids[0].transaction_id;
       const { rows: locks } = await db.query("SELECT pg_try_advisory_lock($1,$2) AS locked", [LOCK_NAMESPACE, id]);
       if (!locks[0].locked) return;
@@ -269,7 +269,7 @@ export class QiospayPayments {
       );
       for (const invoice of paid) await this.provision(invoice.reference_id);
     } catch (e) {
-      const message = e instanceof PaymentError ? e.message : "Sinkronisasi Qiospay gagal. Periksa koneksi database dan konfigurasi.";
+      const message = e instanceof PaymentError ? e.message : "Sinkronisasi QRIS AdilaNet gagal. Periksa koneksi database dan konfigurasi.";
       await this.syncState(message);
       throw new PaymentError(message, e instanceof PaymentError ? e.status : 503);
     } finally {

@@ -4,7 +4,7 @@ import { useAppContext } from '../AppContext';
 import { ArrowRight, Phone, Wallet, Copy, Check, Info, Wifi, Clock, Zap, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatRupiah } from '../lib/format';
-import { QrisCheckoutDetails, useQrisPayment } from '../components/QrisCheckout';
+import { QrisCheckoutDetails, qrisDisplayText, useQrisPayment } from '../components/QrisCheckout';
 import { qrisRecoveryKey } from '../lib/qrisRecovery';
 
 export default function PublicBuy() {
@@ -103,7 +103,7 @@ export default function PublicBuy() {
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
-        className="w-full max-w-sm relative z-10"
+        className="w-full max-w-[448px] relative z-10"
       >
         <div className="flex flex-col items-center mb-6">
           <div className="w-14 h-14 rounded-[18px] bg-white flex items-center justify-center shadow-[0_8px_20px_rgba(14,165,233,0.25)] ring-1 ring-sky-100 mb-4 p-2">
@@ -170,7 +170,7 @@ export default function PublicBuy() {
                       className="flex items-center gap-2 mt-2 text-[12px] text-rose-500 bg-rose-50 rounded-[10px] px-3 py-2 border border-rose-100"
                     >
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={1.8} />
-                      {error || qrisPayment.error}
+                      {qrisDisplayText(error || qrisPayment.error || '')}
                     </motion.div>
                   )}
                   <p className="text-[11px] text-slate-400 mt-2 flex items-start gap-1.5">
@@ -194,7 +194,7 @@ export default function PublicBuy() {
                 ) : (
                   <div className="p-4 bg-rose-50 border border-rose-100 rounded-[16px] text-center">
                     <p className="font-semibold text-[13px] text-rose-500">Pembayaran Sedang Maintenance</p>
-                    <p className="text-[11px] text-slate-400 mt-1">{qrisConfigLoading ? 'Memuat status pembayaran...' : qrisConfigError || 'Hubungi admin untuk pembelian.'}</p>
+                    <p className="text-[11px] text-slate-400 mt-1">{qrisConfigLoading ? 'Memuat status pembayaran...' : qrisDisplayText(qrisConfigError || 'Hubungi admin untuk pembelian.')}</p>
                   </div>
                 )}
 
@@ -217,17 +217,17 @@ export default function PublicBuy() {
                 transition={{ duration: 0.22 }}
                 className="text-center"
               >
-                <p className="text-[11px] font-bold tracking-widest uppercase text-slate-400 mb-4">Scan QRIS untuk Bayar</p>
+                <p className="text-[11px] font-bold tracking-[0.16em] uppercase text-sky-700 mb-4">QRIS AdilaNet · Pembayaran</p>
 
                 {qrisPayment.payment && <QrisCheckoutDetails payment={qrisPayment.payment} status={qrisPayment.status} message={qrisPayment.statusMessage} />}
                 <p className="text-[12px] text-slate-500 mb-4">DANA · OVO · GoPay · ShopeePay · M-Banking</p>
 
                 {(error || qrisPayment.error) && (
                   <div className="flex items-center gap-2 text-[12px] text-rose-500 bg-rose-50 rounded-[12px] px-3 py-2.5 mb-4 border border-rose-100">
-                    <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.8} /> {error || qrisPayment.error}
+                    <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.8} /> {qrisDisplayText(error || qrisPayment.error || '')}
                   </div>
                 )}
-                {qrisPayment.statusError && <p className="text-[11px] text-rose-600 bg-rose-50 rounded-[10px] p-2 mb-3">{qrisPayment.statusError}</p>}
+                {qrisPayment.statusError && <p className="text-[11px] text-rose-600 bg-rose-50 rounded-[10px] p-2 mb-3">{qrisDisplayText(qrisPayment.statusError)}</p>}
 
                 {['pending', 'paid', 'provisioning'].includes(qrisPayment.status) && <div className="w-full flex items-center justify-center gap-2 bg-sky-50 border border-sky-100 text-sky-600 font-semibold py-4 rounded-[16px] text-[14px] mb-2.5">
                   <div className="w-4 h-4 border-2 border-sky-300 border-t-sky-600 rounded-full animate-spin" />
@@ -276,7 +276,7 @@ export default function PublicBuy() {
                   <ol className="space-y-1.5 text-[12px] text-slate-500">
                     <li className="flex items-start gap-2"><span className="text-sky-600 font-bold shrink-0">1.</span>Buka halaman login WiFi di browser</li>
                     <li className="flex items-start gap-2"><span className="text-sky-600 font-bold shrink-0">2.</span>Masukkan kode di atas sebagai Username &amp; Password</li>
-                    <li className="flex items-start gap-2"><span className="text-sky-600 font-bold shrink-0">3.</span>Klik Login — Internet siap digunakan! 🎉</li>
+                    <li className="flex items-start gap-2"><span className="text-sky-600 font-bold shrink-0">3.</span>Klik Login untuk mulai menggunakan internet.</li>
                   </ol>
                 </div>
 
