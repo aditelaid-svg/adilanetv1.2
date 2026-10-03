@@ -38,3 +38,9 @@ Generate HTTP-CHAP credentials from a fresh gateway challenge after checkout, no
 **Why:** QRIS checkout can take several minutes, and reopening the gateway changes its challenge. Reusing the initial challenge can reject an otherwise valid, successfully purchased voucher.
 
 **How to apply:** Keep authentication in a small self-contained MikroTik bridge, preserve CHAP support, and avoid external hashing-script dependencies. Server-hosted presentation must not replace MikroTik's client authentication: preserve the local native login submission even when all visible UI is hosted externally, rather than replacing the bridge with an unconditional server redirect.
+
+Jangan menyimpulkan perangkat klien menggunakan VPN dari ikon pada perangkat penerima screenshot.
+
+**Why:** Pengguna mengoreksi bahwa ikon VPN pada gambar sebelumnya berasal dari perangkat penerima gambar, bukan HP yang menguji hotspot.
+
+**How to apply:** Bedakan tampilan penampil gambar dari screenshot asli perangkat klien sebelum memakai ikon jaringan sebagai petunjuk diagnosis.
