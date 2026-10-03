@@ -9,6 +9,12 @@ Pengguna menginginkan setelah pembelian voucher melalui QRIS atau saldo berhasil
 
 **How to apply:** Treat payment confirmation, voucher provisioning on the correct router/profile, and hotspot authentication as separate steps. Automate login only after the voucher is ready. Do not claim internet is active merely because payment succeeded. Retain the voucher and a manual Login WiFi fallback if automatic navigation or authentication cannot finish. This requirement concerns voucher purchases, not wallet funding by itself.
 
+Portal utama tetap menyediakan kolom untuk memasukkan voucher WiFi yang sudah dimiliki, dengan tombol Login WiFi, selain alur Beli Voucher.
+
+**Why:** Pengguna menegaskan: “Tapi sediakan juga kolom untuk masukan voucher wifi.”
+
+**How to apply:** Make manual voucher entry available before any purchase, not only as a fallback after automatic login fails.
+
 Hotspot authentication must reach the client's actual MikroTik hotspot gateway, which is distinct from the router API host.
 
 **Why:** Authentication grants access to the connected client; a server-side API address is not necessarily reachable as that client's captive-portal login address.
