@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AdilaNet Glass Login</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-page">
+
+<div class="wrapper">
+    <div class="box-wrapp">
+        <div class="appbar">
+            <img src="img/logo.png" style="width:220px; height:auto; margin-bottom:10px;">
+            <div class="appbar-title">ADILA NET</div>
+        </div>
+
+        <div class="main">
+            <div class="btn-row">
+                <button id="v-tab" class="btn btn-merah active" onclick="setMode('v')">VOUCHER</button>
+                <button id="m-tab" class="btn btn-hijau inactive" onclick="setMode('m')">MEMBER</button>
+            </div>
+
+            <p id="label-info" style="font-size: 12px; color: #4fc4f6; margin-bottom: 12px;">Mode: Masukkan Voucher</p>
+
+            $(if error)<div class="infoError">$(error)</div>$(endif)
+
+            <form name="login" action="$(link-login-only)" method="post" $(if chap-id) onSubmit="return doLogin()" $(endif)>
+                <input type="hidden" name="dst" value="$(link-orig)" />
+                <input id="user" name="username" type="text" placeholder="KODE VOUCHER" required autocomplete="off">
+                <input id="pass" name="password" type="password" placeholder="PASSWORD" style="display:none;" required autocomplete="off">
+
+                <div class="btn-row">
+                    $(if trial == 'yes')
+                    <a href="$(link-login-only)?dst=$(link-orig-esc)&amp;username=T-$(mac-esc)" class="btn btn-hijau" style="text-decoration:none;">GRATIS</a>
+                    $(else)
+                    <button class="btn btn-hijau inactive" disabled>LIMIT</button>
+                    $(endif)
+                    <button type="submit" class="btn btn-blue">LOGIN</button>
+                </div>
+            </form>
+
+            <div class="paket-voucher">
+                <h4 style="color:#ffcc00; margin:15px 0 5px;">💳 BELI VOUCHER (QRIS)</h4>
+                <table>
+                    <tr>
+                        <td align="left">⏰ 10 JAM</td>
+                        <td style="color:#4fc4f6; font-weight:bold;">Rp 2.000</td>
+                        <td align="right"><a href="https://app.adilanet.web.id/checkout/5" target="_blank" class="btn-buy">BELI</a></td>
+                    </tr>
+                    <tr>
+                        <td align="left">⏰ 24 JAM</td>
+                        <td style="color:#4fc4f6; font-weight:bold;">Rp 4.000</td>
+                        <td align="right"><a href="https://app.adilanet.web.id/checkout/6" target="_blank" class="btn-buy">BELI</a></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+$(if chap-id)
+<form name="sendin" action="$(link-login-only)" method="post">
+    <input type="hidden" name="username" /><input type="hidden" name="password" />
+    <input type="hidden" name="dst" value="$(link-orig)" /><input type="hidden" name="popup" value="false" />
+</form>
+<script type="text/javascript" src="md5.js"></script>
+<script type="text/javascript">
+function doLogin(){document.sendin.username.value=document.login.username.value;document.sendin.password.value=hexMD5('$(chap-id)'+document.login.password.value+'$(chap-challenge)');document.sendin.submit();return false;}
+</script>
+$(endif)
+
+<script>
+    var u=document.getElementById("user"), p=document.getElementById("pass"), vt=document.getElementById("v-tab"), mt=document.getElementById("m-tab"), lb=document.getElementById("label-info");
+    function setMode(m){
+        u.value=""; p.value="";
+        if(m=='v'){
+            u.placeholder="KODE VOUCHER"; p.style.display="none"; 
+            u.oninput=function(){p.value=u.value;}; // Sinkronisasi otomatis
+            vt.classList.add("active"); vt.classList.remove("inactive");
+            mt.classList.add("inactive"); mt.classList.remove("active");
+            lb.innerText="Mode: Masukkan Voucher";
+        } else {
+            u.placeholder="USERNAME"; p.style.display="block"; 
+            u.oninput=null; 
+            mt.classList.add("active"); mt.classList.remove("inactive");
+            vt.classList.add("inactive"); vt.classList.remove("active");
+            lb.innerText="Mode: Masukkan User & Pass";
+        }
+    }
+    window.onload=function(){setMode('v');};
+</script>
+</body>
+</html>
