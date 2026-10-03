@@ -8,7 +8,7 @@ import { Pool } from "pg";
 import { QiospayPayments } from "../src/server/qiospay-payments";
 import { ensureQiospaySchema } from "../src/server/qiospay-schema";
 import { PaymentError, crc16, validateStaticQr, paymentQrString, validCallbackToken, normalizeCredits, parseMutationDate, fetchCredits, readQiospayConfig } from "../src/server/qiospay-client";
-import { readQrisRecovery, storeQrisRecovery, qrisRecoveryKey, clearQrisRecoveryForIdentity } from "../src/lib/qrisRecovery";
+import { readQrisRecovery, storeQrisRecovery, qrisRecoveryKey, qrisTopupRecoveryKey, clearQrisRecoveryForIdentity, findLatestQrisRecovery } from "../src/lib/qrisRecovery";
 import { readApiResponse, apiErrorMessage } from "../src/lib/apiResponse";
 
 // Fixtures only: never contact Qiospay or provision a live MikroTik voucher.
@@ -47,13 +47,17 @@ before(async () => {
   await root.query(`CREATE SCHEMA ${schemaName}`);
   pool = new Pool({ connectionString: process.env.DATABASE_URL, options: `-c search_path=${schemaName}`, max: 8 });
   await pool.query(`
-    CREATE TABLE users(id INT PRIMARY KEY,name TEXT);
+    CREATE TABLE users(id INT PRIMARY KEY,name TEXT,balance NUMERIC(10,2) DEFAULT 0,status TEXT DEFAULT 'active',updated_at TIMESTAMPTZ DEFAULT NOW());
+    CREATE TABLE topups(id SERIAL PRIMARY KEY,user_id INT REFERENCES users(id),admin_id INT REFERENCES users(id),
+      amount NUMERIC(10,2) NOT NULL,type TEXT DEFAULT 'topup',idempotency_key TEXT,created_at TIMESTAMPTZ DEFAULT NOW());
+    CREATE UNIQUE INDEX topups_idempotency_key_idx ON topups(idempotency_key) WHERE idempotency_key IS NOT NULL;
+    CREATE TABLE notifications(id SERIAL PRIMARY KEY,user_id INT REFERENCES users(id),title TEXT,body TEXT,type TEXT,created_at TIMESTAMPTZ DEFAULT NOW());
     CREATE TABLE routers(id INT PRIMARY KEY);
     CREATE TABLE packages(id INT PRIMARY KEY);
     CREATE TABLE settings(config_key TEXT PRIMARY KEY,config_value TEXT,updated_at TIMESTAMPTZ DEFAULT NOW());
     CREATE TABLE transactions(id SERIAL PRIMARY KEY,user_id INT,package_id INT,amount NUMERIC(10,2),
       payment_method TEXT,status VARCHAR(20),reference_id VARCHAR(100) UNIQUE,phone TEXT,voucher_code TEXT UNIQUE,created_at TIMESTAMPTZ DEFAULT NOW());
-    INSERT INTO users VALUES(1,'Test User');
+    INSERT INTO users(id,name) VALUES(1,'Test User'),(2,'Other Test User');
     INSERT INTO routers VALUES(1);
     INSERT INTO packages VALUES(1),(2);
   `);
@@ -65,7 +69,7 @@ after(async () => {
   if (root) { await root.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE`); await root.end(); }
 });
 beforeEach(async () => {
-  await pool.query("DELETE FROM qiospay_invoices; DELETE FROM qiospay_events; DELETE FROM transactions; DELETE FROM settings;");
+  await pool.query("DELETE FROM qiospay_invoices; DELETE FROM qiospay_events; DELETE FROM transactions; DELETE FROM settings; DELETE FROM topups; DELETE FROM notifications; UPDATE users SET balance=0,status='active';");
   config = fixtureConfig(); ledger = []; fulfillCalls = []; failRouter = false;
   payments = new QiospayPayments(pool, async () => config, async () => `TEST-${++seq}`, async (_invoice, code) => {
     fulfillCalls.push(code);
@@ -431,6 +435,146 @@ test("immutable ledger references reject changed amounts without minting", async
   await assert.rejects(payments.sync(), /berubah/);
   assert.equal(fulfillCalls.length, 0);
 });
+test("wallet top-up credits base amount once, records one receipt/notification, and never provisions MikroTik", async () => {
+  const a = await payments.createTopup(10000, 1);
+  await inWindow(a.reference_id);
+  ledger = [credit(a.amount, "topup-one")];
+  await Promise.all([payments.sync(), payments.sync()]);
+  await payments.sync();
+  await Promise.all([payments.provision(a.reference_id), payments.provision(a.reference_id)]);
+  const status = await payments.status(a.reference_id, 1);
+  assert.equal(status?.status, "success");
+  assert.equal(status?.credited_amount, 10000);
+  assert.equal(status?.voucher_code, null);
+  assert.equal(Number((await pool.query("SELECT balance FROM users WHERE id=1")).rows[0].balance), 10000);
+  assert.equal((await pool.query("SELECT * FROM topups")).rows.length, 1);
+  assert.equal((await pool.query("SELECT * FROM notifications")).rows.length, 1);
+  assert.equal(fulfillCalls.length, 0);
+});
+test("top-up invoices reuse only same customer's same pending amount and share voucher nominal reservations", async () => {
+  const voucher = await order();
+  const a = await payments.createTopup(5000, 1);
+  const same = await payments.createTopup(5000, 1);
+  const other = await payments.createTopup(5000, 2);
+  assert.equal(same.reference_id, a.reference_id);
+  assert.deepEqual([voucher.unique_code, a.unique_code, other.unique_code], [1, 2, 3]);
+  assert.notEqual(other.reference_id, a.reference_id);
+  assert.equal(a.purpose, "topup");
+  assert.equal((await pool.query("SELECT router_id FROM qiospay_invoices WHERE reference_id=$1", [a.reference_id])).rows[0].router_id, null);
+});
+test("top-up status requires the owning session and cannot leak through public voucher status", async () => {
+  const a = await payments.createTopup(10000, 1);
+  assert.equal((await payments.status(a.reference_id, 1))?.status, "pending");
+  await assert.rejects(payments.status(a.reference_id), (e: PaymentError) => e.status === 404);
+  await assert.rejects(payments.status(a.reference_id, 2), (e: PaymentError) => e.status === 404);
+});
+test("top-up rejects invalid identity/amount, inactive accounts and disabled QRIS", async () => {
+  for (const amount of [0, -1, 1.5, NaN, 99998999 + 1]) await assert.rejects(payments.createTopup(amount, 1));
+  await assert.rejects(payments.createTopup(10000, null as any), (e: PaymentError) => e.status === 401);
+  await assert.rejects(payments.createTopup(10000, 999), (e: PaymentError) => e.status === 403);
+  await pool.query("UPDATE users SET status='inactive' WHERE id=1");
+  await assert.rejects(payments.createTopup(10000, 1), (e: PaymentError) => e.status === 403);
+  await pool.query("UPDATE users SET status='active' WHERE id=1");
+  config.qrisEnabled = "false";
+  await assert.rejects(payments.createTopup(10000, 1), (e: PaymentError) => e.status === 409);
+  assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM qiospay_invoices")).rows[0].n, 0);
+});
+test("wrong amount, callback-only proof, and late ledger payments cannot credit the wallet", async () => {
+  const a = await payments.createTopup(10000, 1);
+  await inWindow(a.reference_id);
+  await payments.provision(a.reference_id);
+  ledger = [credit(a.base_amount, "wrong-topup")];
+  await payments.sync();
+  assert.equal((await payments.status(a.reference_id, 1))?.status, "pending");
+  await pool.query("UPDATE qiospay_invoices SET created_at=NOW()-INTERVAL '20 minutes',expires_at=NOW()-INTERVAL '10 minutes' WHERE reference_id=$1", [a.reference_id]);
+  ledger = [credit(a.amount, "late-topup")];
+  await payments.sync();
+  assert.equal((await payments.status(a.reference_id, 1))?.status, "review");
+  assert.equal(Number((await pool.query("SELECT balance FROM users WHERE id=1")).rows[0].balance), 0);
+  assert.equal((await pool.query("SELECT * FROM topups")).rows.length, 0);
+});
+test("wallet balance, history, status and notification roll back together; verified money recovers without provider", async () => {
+  const a = await payments.createTopup(10000, 1);
+  await inWindow(a.reference_id);
+  await pool.query("ALTER TABLE notifications ADD CONSTRAINT fixture_reject_topup CHECK(title <> 'Top Up QRIS Berhasil')");
+  try {
+    ledger = [credit(a.amount, "rollback-topup")];
+    await payments.sync();
+    assert.equal((await payments.status(a.reference_id, 1))?.status, "paid");
+    assert.equal(Number((await pool.query("SELECT balance FROM users WHERE id=1")).rows[0].balance), 0);
+    assert.equal((await pool.query("SELECT * FROM topups")).rows.length, 0);
+    assert.equal((await pool.query("SELECT * FROM notifications")).rows.length, 0);
+  } finally { await pool.query("ALTER TABLE notifications DROP CONSTRAINT fixture_reject_topup"); }
+  const offline = new QiospayPayments(pool, async () => config, async () => { throw new Error("no voucher"); },
+    async () => { throw new Error("no router"); }, async () => { throw new Error("provider unavailable"); });
+  await offline.provision(a.reference_id, true);
+  await offline.provision(a.reference_id, true);
+  assert.equal((await offline.status(a.reference_id, 1))?.status, "success");
+  assert.equal(Number((await pool.query("SELECT balance FROM users WHERE id=1")).rows[0].balance), 10000);
+  assert.equal((await pool.query("SELECT * FROM topups")).rows.length, 1);
+  assert.equal((await pool.query("SELECT * FROM notifications")).rows.length, 1);
+});
+test("two different top-ups on one wallet accumulate atomically; duplicate actual payments go to review", async () => {
+  const a = await payments.createTopup(10000, 1);
+  const b = await payments.createTopup(20000, 1);
+  await inWindow(a.reference_id); await inWindow(b.reference_id);
+  ledger = [credit(a.amount, "wallet-a"), credit(b.amount, "wallet-b"), credit(a.amount, "wallet-extra")];
+  await payments.sync();
+  await payments.sync();
+  assert.equal(Number((await pool.query("SELECT balance FROM users WHERE id=1")).rows[0].balance), 30000);
+  assert.equal((await pool.query("SELECT * FROM topups")).rows.length, 2);
+  assert.equal((await payments.overview()).events.filter(e => e.status === "review").length, 1);
+});
+test("top-up HTTP routes require auth, ignore body identity, validate input and scope history/status to the session", async () => {
+  const source = await readFile(new URL("../server.ts", import.meta.url), "utf8");
+  const start = source.indexOf('  app.post("/api/payment/topup-qris",');
+  const end = source.indexOf('  app.post("/api/payment/create-qris",', start);
+  assert.ok(start >= 0 && end > start);
+  const routes = new Map<string, any[]>();
+  const auth = () => {};
+  const limiter = () => {};
+  const app = {
+    post: (path: string, ...handlers: any[]) => routes.set(`POST ${path}`, handlers),
+    get: (path: string, ...handlers: any[]) => routes.set(`GET ${path}`, handlers),
+  };
+  new Function("app", "requireAuth", "qrisLimiter", "getSettings", "qiospay", "pool", "PaymentError",
+    transformSync(source.slice(start, end), { loader: "ts", format: "cjs" }).code)(
+    app, auth, limiter, async () => config, {
+      createTopup: payments.createTopup.bind(payments),
+      status: payments.status.bind(payments), requestSync: () => {},
+    }, pool, PaymentError);
+  for (const handlers of routes.values()) assert.equal(handlers[0], auth);
+  const invoke = async (route: string, userId: number, body: any = {}, params: any = {}) => {
+    const result = { status: 200, json: null as any };
+    const res = {
+      status: (n: number) => { result.status = n; return res; },
+      json: (json: unknown) => { result.json = json; return res; },
+    };
+    const handlers = routes.get(route)!;
+    await handlers.at(-1)({ body, params, session: { userId } }, res);
+    return result;
+  };
+  for (const amount of [0, -5, 1.5, "10000", 100000000]) {
+    assert.equal((await invoke("POST /api/payment/topup-qris", 1, { amount })).status, 400);
+  }
+  const a = (await invoke("POST /api/payment/topup-qris", 1, { amount: 10000, user_id: 2 })).json.data;
+  assert.equal((await pool.query("SELECT user_id FROM transactions WHERE reference_id=$1", [a.reference_id])).rows[0].user_id, 1);
+  assert.equal((await invoke("GET /api/payment/topup-status/:refId", 2, {}, { refId: a.reference_id })).status, 404);
+  await inWindow(a.reference_id);
+  ledger = [credit(a.amount, "http-wallet-one")];
+  await payments.sync();
+  const b = await payments.createTopup(20000, 2);
+  await inWindow(b.reference_id);
+  ledger.push(credit(b.amount, "http-wallet-two"));
+  await payments.sync();
+  const own = await invoke("GET /api/payment/topup-history", 1, { user_id: 2 });
+  assert.equal(own.json.data.length, 1);
+  assert.equal(own.json.data[0].amount, 10000);
+  assert.equal(own.json.data[0].reference_id, a.reference_id);
+  assert.equal(own.json.data[0].payment_method, "QRIS Qiospay");
+  const status = await invoke("GET /api/payment/topup-status/:refId", 1, {}, { refId: a.reference_id });
+  assert.equal(status.json.data.credited_amount, 10000);
+});
 test("nominal reservation blocks accidental removal of financial history", async () => {
   const a = await order();
   await assert.rejects(pool.query("DELETE FROM transactions WHERE reference_id=$1", [a.reference_id]), /foreign key/);
@@ -454,8 +598,13 @@ test("browser receipt recovery is scoped, discards corrupt data, and never hydra
     assert.equal((readQrisRecovery(a) as any).voucher_code, undefined);
     assert.equal(readQrisRecovery(b), null);
     storeQrisRecovery(b, payment);
+    const topupKey = qrisTopupRecoveryKey("1");
+    storeQrisRecovery(topupKey, { ...payment, purpose: "topup" });
+    assert.equal(readQrisRecovery(topupKey)?.purpose, "topup");
+    assert.equal(findLatestQrisRecovery("user-1")?.packageId, "1");
     clearQrisRecoveryForIdentity("user-1");
     assert.equal(readQrisRecovery(a), null);
+    assert.equal(readQrisRecovery(topupKey), null);
     assert.ok(readQrisRecovery(b));
     storeQrisRecovery(a, { ...payment, qr_url: "javascript:alert(1)" });
     assert.equal(readQrisRecovery(a), null);

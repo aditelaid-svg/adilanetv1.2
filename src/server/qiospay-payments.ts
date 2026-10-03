@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { fetchCredits, PaymentError, readQiospayConfig, renderQr, type Credit } from "./qiospay-client";
+import { creditQrisTopup } from "./qiospay-wallet";
 
 type Settings = () => Promise<Record<string, string>>;
 type Fulfill = (invoice: any, code: string) => Promise<void>;
@@ -36,7 +37,11 @@ export class QiospayPayments {
     if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 99_998_999) {
       throw new PaymentError("Harga paket Qiospay harus berupa rupiah bulat positif.");
     }
-    if (!pkg.router_id || !pkg.mikrotik_profile) {
+    const purpose = pkg.purpose === "topup" ? "topup" : "voucher";
+    if (purpose === "topup" && (!Number.isSafeInteger(userId) || !userId || userId <= 0)) {
+      throw new PaymentError("Login diperlukan untuk top-up saldo.", 401);
+    }
+    if (purpose === "voucher" && (!pkg.router_id || !pkg.mikrotik_profile)) {
       throw new PaymentError("Paket belum memiliki router dan profil MikroTik. Konfigurasikan sebelum menerima pembayaran.", 409);
     }
     if (!userId && (!phone || !/^\+?\d{10,20}$/.test(phone))) {
@@ -56,13 +61,18 @@ export class QiospayPayments {
         throw new PaymentError("Konfigurasi QRIS berubah. Muat ulang halaman sebelum melanjutkan.", 409);
       }
       await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`qiospay-allocate:${config.merchantCode}`]);
+      if (purpose === "topup") {
+        const { rows: target } = await db.query("SELECT id FROM users WHERE id=$1 AND status='active'", [userId]);
+        if (!target.length) throw new PaymentError("Akun top-up tidak tersedia atau nonaktif.", 403);
+      }
       await this.recordCredits(config.merchantCode, credits, db);
       const { rows: prior } = await db.query(
         `SELECT i.* FROM qiospay_invoices i JOIN transactions t ON t.id=i.transaction_id
-         WHERE i.merchant_code=$1 AND t.package_id=$2 AND t.user_id IS NOT DISTINCT FROM $3
+         WHERE i.merchant_code=$1 AND t.package_id IS NOT DISTINCT FROM $2 AND t.user_id IS NOT DISTINCT FROM $3
          AND t.phone IS NOT DISTINCT FROM $4 AND i.base_amount=$5 AND t.status='pending'
+         AND i.purpose=$6
          AND i.expires_at>NOW() ORDER BY i.created_at DESC LIMIT 1`,
-        [config.merchantCode, pkg.id, userId, phone, amount],
+        [config.merchantCode, pkg.id, userId, phone, amount, purpose],
       );
       let invoice = prior[0];
       if (!invoice) {
@@ -81,7 +91,9 @@ export class QiospayPayments {
           [config.merchantCode, amount],
         );
         if (!available.length) {
-          throw new PaymentError("Kode unik 1–200 untuk harga ini sudah habis. Nominal lama tidak digunakan ulang; hubungi admin dan gunakan pembayaran saldo.", 409);
+          throw new PaymentError(purpose === "topup"
+            ? "Kode unik 1–200 untuk nominal ini sudah habis. Hubungi admin atau pilih nominal top-up lain."
+            : "Kode unik 1–200 untuk harga ini sudah habis. Nominal lama tidak digunakan ulang; hubungi admin dan gunakan pembayaran saldo.", 409);
         }
         const code = Number(available[0].code);
         const ref = `QPAY-${crypto.randomBytes(16).toString("hex")}`;
@@ -92,16 +104,16 @@ export class QiospayPayments {
         );
         const { rows } = await db.query(
           `INSERT INTO qiospay_invoices(transaction_id,reference_id,merchant_code,base_amount,unique_code,
-           total_amount,expires_at,router_id,mikrotik_profile)
-           VALUES($1,$2,$3,$4,$5,$6,NOW()+($7 * INTERVAL '1 second'),$8,$9) RETURNING *`,
-          [tx[0].id, ref, config.merchantCode, amount, code, amount + code, TTL_SECONDS, pkg.router_id, pkg.mikrotik_profile],
+           total_amount,expires_at,router_id,mikrotik_profile,purpose)
+           VALUES($1,$2,$3,$4,$5,$6,NOW()+($7 * INTERVAL '1 second'),$8,$9,$10) RETURNING *`,
+          [tx[0].id, ref, config.merchantCode, amount, code, amount + code, TTL_SECONDS, pkg.router_id, pkg.mikrotik_profile, purpose],
         );
         invoice = rows[0];
       }
       const qrUrl = await renderQr(config.qrString, Number(invoice.total_amount));
       await db.query("COMMIT");
       return {
-        provider: "qiospay", reference_id: invoice.reference_id, qr_url: qrUrl,
+        provider: "qiospay", purpose, reference_id: invoice.reference_id, qr_url: qrUrl,
         amount: invoice.total_amount, base_amount: invoice.base_amount, unique_code: invoice.unique_code,
         expires_at: invoice.expires_at, status: "pending",
       };
@@ -109,6 +121,10 @@ export class QiospayPayments {
       await db.query("ROLLBACK");
       throw e;
     } finally { db.release(); }
+  }
+
+  async createTopup(amount: number, userId: number) {
+    return this.create({ id: null, router_id: null, mikrotik_profile: null, purpose: "topup" }, amount, userId, null);
   }
 
   async expire() {
@@ -138,7 +154,7 @@ export class QiospayPayments {
         if (!eligible || current[0].event_key) {
           const reason = current[0].event_key
             ? "Ada pembayaran tambahan untuk nominal yang sudah dipakai. Periksa/refund secara manual."
-            : "Dana masuk di luar waktu invoice. Perlu pemeriksaan/refund manual; voucher tidak diterbitkan otomatis.";
+            : "Dana masuk di luar waktu invoice. Perlu pemeriksaan/refund manual; transaksi tidak diproses otomatis.";
           await db.query("UPDATE qiospay_events SET status='review',reference_id=$2,error=$3 WHERE event_key=$1", [row.credit_key, row.reference_id, reason]);
           if (!current[0].event_key && paidAt > new Date(row.expires_at).getTime()) {
             await db.query("UPDATE transactions SET status='review' WHERE id=$1 AND status IN ('pending','expired')", [row.transaction_id]);
@@ -178,6 +194,18 @@ export class QiospayPayments {
         return;
       }
       if (!manual && invoice.next_attempt_at && new Date(invoice.next_attempt_at).getTime() > Date.now()) return;
+      if (invoice.purpose === "topup") {
+        try {
+          await creditQrisTopup(db, invoice);
+        } catch {
+          await db.query(
+            `UPDATE qiospay_invoices SET last_error=$2,next_attempt_at=NOW()+INTERVAL '30 seconds'
+             WHERE transaction_id=$1`,
+            [id, "Pembayaran terverifikasi, tetapi saldo belum berhasil ditambahkan. Sistem akan mencoba lagi; jangan membayar ulang."],
+          );
+        }
+        return;
+      }
       let code = invoice.voucher_candidate;
       if (!code) {
         code = await this.generateCode();
@@ -265,19 +293,21 @@ export class QiospayPayments {
     return { configured, last_sync_at: s.qiospayLastSyncAt || null, error: s.qiospaySyncError || null, reservations_count: rows[0].count, events };
   }
 
-  async status(reference: string) {
+  async status(reference: string, userId?: number) {
     await this.expire();
     const { rows } = await this.pool.query(
-      `SELECT t.status,t.voucher_code,i.base_amount,i.unique_code,i.total_amount,i.expires_at,i.last_error
+      `SELECT t.status,t.voucher_code,t.user_id,i.purpose,i.base_amount,i.unique_code,i.total_amount,i.expires_at,i.last_error
        FROM qiospay_invoices i JOIN transactions t ON t.id=i.transaction_id WHERE i.reference_id=$1`, [reference],
     );
     if (!rows.length) return null;
     const r = rows[0];
+    if (r.purpose === "topup" && r.user_id !== userId) throw new PaymentError("Transaksi tidak ditemukan.", 404);
     const message = r.status === "review" ? "Pembayaran di luar batas waktu. Hubungi admin untuk pemeriksaan/refund; jangan bayar lagi."
       : r.status === "expired" ? "Waktu pembayaran habis. QRIS statis tidak batal di penyedia. Jangan bayar QR ini; jika sudah membayar, hubungi admin."
-      : r.status === "paid" || r.status === "provisioning" ? r.last_error || "Pembayaran terverifikasi. Voucher sedang dipasang ke router."
+      : r.status === "paid" || r.status === "provisioning" ? r.last_error || (r.purpose === "topup" ? "Pembayaran terverifikasi. Saldo sedang ditambahkan." : "Pembayaran terverifikasi. Voucher sedang dipasang ke router.")
       : null;
-    return { provider: "qiospay", status: r.status, voucher_code: r.status === "success" ? r.voucher_code : null,
+    return { provider: "qiospay", purpose: r.purpose, credited_amount: r.purpose === "topup" && r.status === "success" ? r.base_amount : 0,
+      status: r.status, voucher_code: r.status === "success" ? r.voucher_code : null,
       amount: r.total_amount, base_amount: r.base_amount, unique_code: r.unique_code, expires_at: r.expires_at, message };
   }
 

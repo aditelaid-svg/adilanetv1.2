@@ -1,5 +1,6 @@
 export type QrisRecoveryPayment = {
   provider: string;
+  purpose?: 'voucher' | 'topup';
   reference_id: string;
   qr_url: string;
   amount: number;
@@ -9,6 +10,10 @@ export type QrisRecoveryPayment = {
 };
 
 const RECOVERY_PREFIX = 'adilanet:qris:';
+
+export function qrisTopupRecoveryKey(userId: string) {
+  return `${RECOVERY_PREFIX}user-${userId}:topup`;
+}
 
 export function qrisRecoveryKey(identityScope: string, packageId: string | number) {
   return `${RECOVERY_PREFIX}${identityScope}:package:${packageId}`;
@@ -41,6 +46,7 @@ export function readQrisRecovery(key: string | null): QrisRecoveryPayment | null
     // Copy only the checkout metadata; never hydrate persisted voucher/status fields.
     return {
       provider: value.provider,
+      ...(value.purpose === 'topup' || value.purpose === 'voucher' ? { purpose: value.purpose } : {}),
       reference_id: value.reference_id,
       qr_url: value.qr_url,
       amount: value.amount,
@@ -82,10 +88,10 @@ export function storeQrisRecovery(key: string | null, payment: QrisRecoveryPayme
       window.sessionStorage.removeItem(key);
       return;
     }
-    const { provider, reference_id, qr_url, amount, base_amount, unique_code, expires_at } = payment;
+    const { provider, purpose, reference_id, qr_url, amount, base_amount, unique_code, expires_at } = payment;
     window.sessionStorage.setItem(key, JSON.stringify({
       version: 1,
-      payment: { provider, reference_id, qr_url, amount, base_amount, unique_code, expires_at },
+      payment: { provider, purpose, reference_id, qr_url, amount, base_amount, unique_code, expires_at },
     }));
   } catch {
     // A successful invoice remains usable in memory when browser storage is unavailable.

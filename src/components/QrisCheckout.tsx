@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, AlertTriangle } from 'lucide-react';
 import { formatRupiah } from '../lib/format';
 import { clearQrisRecoveryForIdentity, QrisRecoveryPayment, readQrisRecovery, storeQrisRecovery } from '../lib/qrisRecovery';
+import { readApiResponse } from '../lib/apiResponse';
 
 export type QrisPayment = QrisRecoveryPayment;
 export type QrisPaymentStatus = 'pending' | 'paid' | 'provisioning' | 'success' | 'expired' | 'review' | 'failed';
 
-export function useQrisPayment(storageKey: string | null, identityScope: string | null) {
+export function useQrisPayment(storageKey: string | null, identityScope: string | null, purpose: 'voucher' | 'topup' = 'voucher') {
   const [paymentState, setPaymentState] = useState<{ scope: string | null; payment: QrisPayment | null }>(
     () => ({ scope: storageKey, payment: readQrisRecovery(storageKey) })
   );
@@ -58,12 +59,12 @@ export function useQrisPayment(storageKey: string | null, identityScope: string 
     setCreating(true);
     setError(null);
     try {
-      const response = await fetch('/api/payment/create-qris', {
+      const response = await fetch(purpose === 'topup' ? '/api/payment/topup-qris' : '/api/payment/create-qris', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const json = await response.json();
+      const json = await readApiResponse<{success: boolean; error?: string; data: QrisPayment}>(response);
       if (requestGeneration !== generation.current || activeStorageKey.current !== storageKey) return false;
       if (!response.ok || !json.success) {
         setError(json.error || 'Gagal membuat transaksi QRIS.');
@@ -86,7 +87,7 @@ export function useQrisPayment(storageKey: string | null, identityScope: string 
         setCreating(false);
       }
     }
-  }, [storageKey]);
+  }, [storageKey, purpose]);
 
   const clearPayment = useCallback(() => {
     generation.current += 1;
@@ -111,8 +112,9 @@ export function useQrisPayment(storageKey: string | null, identityScope: string 
       if (polling) return;
       polling = true;
       try {
-        const response = await fetch(`/api/payment/status/${encodeURIComponent(payment.reference_id)}`);
-        const json = await response.json();
+        const statusPath = purpose === 'topup' ? 'topup-status' : 'status';
+        const response = await fetch(`/api/payment/${statusPath}/${encodeURIComponent(payment.reference_id)}`, { credentials: 'include' });
+        const json = await readApiResponse<{success: boolean; error?: string; data: any}>(response);
         if (!active || pollGeneration !== generation.current || activeStorageKey.current !== pollStorageKey) return;
         if (!response.ok || !json.success || !json.data) {
           setStatusError(json.error || 'Status pembayaran belum dapat dimuat. Sistem akan mencoba kembali.');
@@ -132,8 +134,8 @@ export function useQrisPayment(storageKey: string | null, identityScope: string 
           expires_at: json.data.expires_at || current.payment.expires_at,
           },
         });
-        if (next === 'success' && json.data.voucher_code) {
-          setVoucherCode(json.data.voucher_code);
+        if (next === 'success' && (purpose === 'topup' ? json.data.purpose === 'topup' && Number(json.data.credited_amount) === payment.base_amount : json.data.voucher_code)) {
+          setVoucherCode(json.data.voucher_code || null);
           setStatus('success');
         } else if (['pending', 'paid', 'provisioning', 'expired', 'review', 'failed'].includes(next)) {
           setStatus(current => {
@@ -155,7 +157,7 @@ export function useQrisPayment(storageKey: string | null, identityScope: string 
       active = false;
       window.clearInterval(id);
     };
-  }, [payment?.reference_id, storageKey, status === 'success' || status === 'failed']);
+  }, [payment?.reference_id, storageKey, purpose, status === 'success' || status === 'failed']);
 
   useEffect(() => {
     if (!payment?.expires_at || status === 'success' || status === 'failed') return;
@@ -193,9 +195,9 @@ export function QrisCheckoutDetails({ payment, status, message }: { payment: Qri
   };
 
   const statusMessage: Record<QrisPaymentStatus, string> = {
-    pending: 'Menunggu pembayaran. QRIS ini bersifat statis dan tidak menampilkan nominal secara otomatis.',
-    paid: 'Pembayaran diterima. Voucher sedang menunggu penerbitan oleh sistem.',
-    provisioning: 'Pembayaran diterima. Voucher sedang diproses, mohon tunggu.',
+    pending: 'Menunggu pembayaran. Periksa total nominal sebelum menyetujui pembayaran QRIS.',
+    paid: payment.purpose === 'topup' ? 'Pembayaran diterima. Saldo sedang ditambahkan.' : 'Pembayaran diterima. Voucher sedang menunggu penerbitan oleh sistem.',
+    provisioning: payment.purpose === 'topup' ? 'Pembayaran diterima. Saldo sedang ditambahkan.' : 'Pembayaran diterima. Voucher sedang diproses, mohon tunggu.',
     success: 'Pembayaran berhasil.',
     expired: 'Batas waktu pembayaran terlewati. Jika Anda sudah membayar, pembayaran tetap akan diperiksa.',
     review: 'Transaksi sedang ditinjau. Jika sudah membayar, hubungi admin untuk pemeriksaan.',
@@ -207,7 +209,7 @@ export function QrisCheckoutDetails({ payment, status, message }: { payment: Qri
       {canShowQr ? (
         <div className="bg-white p-4 rounded-[20px] inline-block mb-4 shadow-sm border border-slate-100">
           <div className="w-[180px] h-[180px] bg-white rounded-lg flex items-center justify-center m-auto relative">
-            <img src={payment.qr_url} alt="QRIS statis Qiospay" className="absolute inset-0 w-full h-full object-contain rounded-lg" />
+            <img src={payment.qr_url} alt="QRIS pembayaran Qiospay" className="absolute inset-0 w-full h-full object-contain rounded-lg" />
           </div>
         </div>
       ) : (
@@ -218,14 +220,14 @@ export function QrisCheckoutDetails({ payment, status, message }: { payment: Qri
 
       <div className="bg-sky-50 border border-sky-100 rounded-[18px] p-4 text-left mb-4">
         <p className="text-[11px] uppercase tracking-wider font-bold text-sky-700 mb-2">Rincian pembayaran</p>
-        <div className="flex justify-between text-[12px] text-slate-600 mb-1"><span>Harga paket</span><span>{formatRupiah(payment.base_amount)}</span></div>
+        <div className="flex justify-between text-[12px] text-slate-600 mb-1"><span>{payment.purpose === 'topup' ? 'Saldo yang ditambahkan' : 'Harga paket'}</span><span>{formatRupiah(payment.base_amount)}</span></div>
         {payment.unique_code > 0 && (
           <div className="flex justify-between text-[12px] text-slate-600 pb-2 border-b border-sky-100">
             <span>Nominal unik</span><span>+{formatRupiah(payment.unique_code)}</span>
           </div>
         )}
         <p className="text-[11px] text-slate-500 mt-2">Bayar tepat sebesar</p>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <strong className="text-[24px] leading-tight text-sky-700">{formatRupiah(payment.amount)}</strong>
           <button type="button" onClick={copyAmount} className="shrink-0 flex items-center gap-1.5 rounded-[10px] bg-white border border-sky-100 px-3 py-2 text-[11px] font-semibold text-sky-700">
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -234,10 +236,10 @@ export function QrisCheckoutDetails({ payment, status, message }: { payment: Qri
         </div>
       </div>
       <p className="text-[12px] text-slate-500 mb-2">{message || statusMessage[status]}</p>
-      {canShowQr && <p className="text-[11px] text-slate-400 mb-2">Di aplikasi wallet, masukkan nominal persis di atas. Jangan membayar nominal lain.</p>}
+      {canShowQr && <p className="text-[11px] text-slate-400 mb-2">Pastikan nominal di aplikasi pembayaran sama persis dengan total di atas.</p>}
       <p className="text-[10px] text-slate-400">
-        Metode: Qiospay · QRIS statis.
-        {payment.unique_code > 0 ? ' Nominal unik sudah termasuk dalam total dan tidak dikembalikan otomatis.' : ''}
+        Metode: Qiospay · QRIS.
+        {payment.unique_code > 0 ? payment.purpose === 'topup' ? ' Kode unik tidak ditambahkan ke saldo.' : ' Nominal unik sudah termasuk dalam total dan tidak dikembalikan otomatis.' : ''}
       </p>
       {payment.expires_at && status === 'pending' && (
         <p className="text-[11px] font-medium text-slate-500 mb-2">

@@ -811,7 +811,8 @@ async function startServer() {
   app.get("/api/topups", requireAdmin, async (req, res) => {
     try {
       const { rows } = await pool.query(`
-        SELECT t.*, u.name AS user_name, a.name AS admin_name
+        SELECT t.*, u.name AS user_name,
+          COALESCE(a.name, CASE WHEN t.idempotency_key LIKE 'qris:%' THEN 'QRIS Qiospay' ELSE 'Sistem' END) AS admin_name
         FROM topups t
         LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN users a ON t.admin_id = a.id
@@ -1112,14 +1113,15 @@ async function startServer() {
         LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN packages p ON t.package_id = p.id
         LEFT JOIN qiospay_invoices qi ON qi.transaction_id=t.id
+        WHERE COALESCE(qi.purpose,'voucher')='voucher'
       `;
       const params: any[] = [];
       if (!isAdmin) {
         // Regular users only ever see their own transactions
-        query += ` WHERE t.user_id = $1`;
+        query += ` AND t.user_id = $1`;
         params.push(req.session.userId);
       } else if (req.query.user_id) {
-        query += ` WHERE t.user_id = $1`;
+        query += ` AND t.user_id = $1`;
         params.push(req.query.user_id);
       }
       query += ` ORDER BY t.created_at DESC LIMIT 500`;
@@ -1613,6 +1615,49 @@ async function startServer() {
 
   // ─── PAYMENT (Qiospay static QRIS + unique amount) ─────────────────────────
   // Voucher fulfillment requires an authenticated merchant-ledger credit.
+  app.post("/api/payment/topup-qris", requireAuth, qrisLimiter, async (req, res) => {
+    try {
+      const s = await getSettings();
+      if (s.qrisEnabled === "false") throw new PaymentError("Pembayaran via QRIS sedang dinonaktifkan.", 403);
+      const amount = req.body?.amount;
+      if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount <= 0 || amount > 99_998_999) {
+        throw new PaymentError("Nominal top-up harus berupa rupiah bulat positif.");
+      }
+      res.json({ success: true, data: await qiospay.createTopup(amount, req.session.userId!) });
+    } catch (e) {
+      res.status(e instanceof PaymentError ? e.status : 503).json({
+        success: false, error: e instanceof PaymentError ? e.message : "Top-up QRIS belum dapat dibuat. Coba lagi.",
+      });
+    }
+  });
+  app.get("/api/payment/topup-status/:refId", requireAuth, async (req, res) => {
+    try {
+      const data = await qiospay.status(String(req.params.refId), req.session.userId);
+      if (!data || data.purpose !== "topup") throw new PaymentError("Transaksi top-up tidak ditemukan.", 404);
+      if (["pending","expired","paid","provisioning"].includes(data.status)) qiospay.requestSync();
+      res.json({ success: true, data });
+    } catch (e) {
+      res.status(e instanceof PaymentError ? e.status : 503).json({
+        success: false, error: e instanceof PaymentError ? e.message : "Status top-up belum dapat dimuat.",
+      });
+    }
+  });
+  app.get("/api/payment/topup-history", requireAuth, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT t.id,t.amount,t.type,t.created_at,
+          COALESCE(a.name,'Sistem') AS admin_name,
+          CASE WHEN t.idempotency_key LIKE 'qris:%' THEN 'QRIS Qiospay' ELSE 'Admin' END AS payment_method,
+          CASE WHEN t.idempotency_key LIKE 'qris:%' THEN substring(t.idempotency_key from 6) ELSE NULL END AS reference_id
+         FROM topups t LEFT JOIN users a ON t.admin_id=a.id WHERE t.user_id=$1 ORDER BY t.created_at DESC,t.id DESC LIMIT 100`,
+        [req.session.userId],
+      );
+      res.json({ success: true, data: rows.map(row => ({ ...row, amount: Number(row.amount) })) });
+    } catch {
+      res.status(503).json({ success: false, error: "Riwayat saldo belum dapat dimuat." });
+    }
+  });
+
   app.post("/api/payment/create-qris", async (req, res) => {
     try {
       const s = await getSettings();
@@ -1661,7 +1706,7 @@ async function startServer() {
         },
       });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      res.status(err instanceof PaymentError ? err.status : 500).json({ success: false, error: err.message });
     }
   });
 

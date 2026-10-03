@@ -18,6 +18,7 @@ import UserHistory from './pages/user/UserHistory';
 import UserProfile from './pages/user/UserProfile';
 import UserNotifications from './pages/user/UserNotifications';
 import UserHelp from './pages/user/UserHelp';
+import UserTopup from './pages/user/UserTopup';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminRouters from './pages/admin/AdminRouters';
@@ -60,6 +61,7 @@ function AppRoutes() {
           <Route index element={<UserHome />} />
           <Route path="packages" element={<UserPackages />} />
           <Route path="buy" element={<UserBuy />} />
+          <Route path="topup" element={<UserTopup />} />
           <Route path="history" element={<UserHistory />} />
           <Route path="notifications" element={<UserNotifications />} />
           <Route path="help" element={<UserHelp />} />

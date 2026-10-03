@@ -1,14 +1,31 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAppContext, Promo } from '../../AppContext';
 import { Wifi, Zap, ArrowRight, ChevronRight, Plus, CreditCard, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { formatRupiah } from '../../lib/format';
 import { PROMO_BG, PromoIcon } from '../../lib/promoStyles';
+import { readApiResponse } from '../../lib/apiResponse';
 
 export default function UserHome() {
-  const { currentUser, packages, transactions, promos } = useAppContext();
+  const { currentUser, setCurrentUser, packages, transactions, promos } = useAppContext();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+    const refreshBalance = async () => {
+      try {
+        const response = await fetch('/api/auth/me', { credentials: 'include' });
+        const json = await readApiResponse<{ success: boolean; data: typeof currentUser }>(response);
+        if (active && response.ok && json.success && json.data?.id === currentUser?.id) {
+          setCurrentUser(json.data);
+        }
+      } catch { /* Keep the last server-confirmed balance and retry on the next tick. */ }
+    };
+    void refreshBalance();
+    const timer = window.setInterval(refreshBalance, 30_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [currentUser?.id]);
 
   const userTransactions = transactions.filter(t => t.user_id === currentUser?.id);
   const activeTx = userTransactions[0];
@@ -63,7 +80,7 @@ export default function UserHome() {
           </div>
 
           <div className="flex gap-3 pt-6 border-t border-slate-200/60">
-            <button className="flex-1 py-3.5 rounded-[18px] bg-white border border-slate-100 shadow-sm font-semibold text-[14px] text-slate-700 flex justify-center items-center gap-2 active:scale-95 transition-transform">
+            <button onClick={() => navigate('/user/topup')} className="flex-1 py-3.5 rounded-[18px] bg-white border border-slate-100 shadow-sm font-semibold text-[14px] text-slate-700 flex justify-center items-center gap-2 active:scale-95 transition-transform">
               <Plus size={18} className="text-slate-400" /> Top Up
             </button>
             <button

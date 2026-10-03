@@ -38,3 +38,15 @@ Qiospay's narrowly recognized HTTP 200 / `status: "error"` / missing-mutation-da
 **Why:** Live read-only checks returned this response for the saved account. Both nonexistent credentials and the same saved merchant with a deliberately invalid test key returned HTTP 401 instead. Blocking an empty ledger prevented first-time checkout before a QR could be displayed. The public documentation omits this empty-ledger behavior. Pengguna kemudian mengonfirmasi QRIS berhasil muncul dan pembayaran nyata otomatis menghasilkan voucher.
 
 **How to apply:** Recognize only specific empty-data messages with HTTP 200, exact status `error`, and absent/null/empty-array data. Reject all other errors and malformed envelopes without exposing provider messages. Zero credits may allow a pending QR invoice, never payment success or voucher fulfillment.
+
+Untuk top-up otomatis, pengguna memilih “Nominal utama saja masuk saldo.” Kode unik dibayar tetapi tidak dikreditkan ke saldo.
+
+**Why:** The user explicitly selected this crediting rule. A Rp10.000 top-up paid as Rp10.001 must increase the wallet by Rp10.000, not Rp10.001.
+
+**How to apply:** Disclose the credited amount and extra unique addition separately before payment. Balance, top-up history, success state and notification must commit together exactly once.
+
+Voucher purchases and wallet top-ups must share one merchant-wide payment-total reservation policy.
+
+**Why:** The mutation ledger does not identify an app invoice or its purpose. Separate reservations could allocate the same total to a voucher buyer and a wallet top-up.
+
+**How to apply:** Reserve totals permanently across both purposes, retain exact amount/time matching, and never treat a callback alone as proof of wallet funding.

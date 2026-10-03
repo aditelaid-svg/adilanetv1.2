@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS qiospay_invoices (
   total_amount INTEGER NOT NULL CHECK (total_amount = base_amount + unique_code),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at TIMESTAMPTZ NOT NULL,
-  router_id INTEGER NOT NULL REFERENCES routers(id) ON DELETE RESTRICT,
-  mikrotik_profile VARCHAR(100) NOT NULL,
+  router_id INTEGER REFERENCES routers(id) ON DELETE RESTRICT,
+  mikrotik_profile VARCHAR(100),
   event_key VARCHAR(64) UNIQUE REFERENCES qiospay_events(event_key),
   voucher_candidate VARCHAR(100) UNIQUE,
   claim_started_at TIMESTAMPTZ,
@@ -32,4 +32,18 @@ CREATE TABLE IF NOT EXISTS qiospay_invoices (
   -- A static QR cannot invalidate an old payment instruction.
   UNIQUE (merchant_code, total_amount)
 );
+-- Add wallet payments without renumbering/removing existing voucher invoices.
+ALTER TABLE qiospay_invoices ADD COLUMN IF NOT EXISTS purpose VARCHAR(12) NOT NULL DEFAULT 'voucher'
+  CHECK (purpose IN ('voucher','topup'));
+ALTER TABLE qiospay_invoices ALTER COLUMN router_id DROP NOT NULL;
+ALTER TABLE qiospay_invoices ALTER COLUMN mikrotik_profile DROP NOT NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conrelid='qiospay_invoices'::regclass AND conname='qiospay_invoice_destination'
+  ) THEN
+    ALTER TABLE qiospay_invoices ADD CONSTRAINT qiospay_invoice_destination
+      CHECK (purpose='topup' OR (router_id IS NOT NULL AND mikrotik_profile IS NOT NULL));
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS qiospay_events_unmatched ON qiospay_events(merchant_code, status);
