@@ -1,18 +1,28 @@
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import QRCode, { type QRCodeToDataURLOptions } from "qrcode";
 import { readFile } from "node:fs/promises";
 import { transformSync } from "esbuild";
 import { Pool } from "pg";
 import { QiospayPayments } from "../src/server/qiospay-payments";
 import { ensureQiospaySchema } from "../src/server/qiospay-schema";
-import { PaymentError, crc16, validateStaticQr, validCallbackToken, normalizeCredits, parseMutationDate, fetchCredits, readQiospayConfig } from "../src/server/qiospay-client";
+import { PaymentError, crc16, validateStaticQr, paymentQrString, validCallbackToken, normalizeCredits, parseMutationDate, fetchCredits, readQiospayConfig } from "../src/server/qiospay-client";
 import { readQrisRecovery, storeQrisRecovery, qrisRecoveryKey, clearQrisRecoveryForIdentity } from "../src/lib/qrisRecovery";
 import { readApiResponse, apiErrorMessage } from "../src/lib/apiResponse";
 
 // Fixtures only: never contact Qiospay or provision a live MikroTik voucher.
 const qrBody = "0002010102115204000053033605802ID5908TESTSHOP6007JAKARTA6304";
 const staticQr = qrBody + crc16(qrBody);
+const qrTags = (value: string) => {
+  const tags = new Map<string, string>();
+  for (let pos = 0; pos < value.length;) {
+    const length = Number(value.slice(pos + 2, pos + 4));
+    tags.set(value.slice(pos, pos + 2), value.slice(pos + 4, pos + 4 + length));
+    pos += 4 + length;
+  }
+  return tags;
+};
 const fixtureConfig = () => ({
   qrisProvider: "qiospay", qrisEnabled: "true", qiospayMerchantCode: "TEST-MERCHANT",
   qiospayApiKey: "fixture-only-not-a-real-key", qiospayQrString: staticQr,
@@ -143,6 +153,26 @@ test("QR validator accepts full static IDR QR and rejects corrupted/dynamic/amou
   assert.throws(() => validateStaticQr(fixed + crc16(fixed)));
   assert.throws(() => validateStaticQr("https://example.com/qr.png"));
 });
+test("payment QR encodes the exact IDR amount, preserves merchant fields and recalculates CRC", () => {
+  const body = qrBody.replace("5204", "26160004TEST0104SHOP5204").replace("6304", "62070503ABC6304");
+  const merchantQr = body + crc16(body);
+  const result = paymentQrString(merchantQr, 2001);
+  const tags = qrTags(result);
+  assert.equal(tags.get("01"), "12");
+  assert.equal(tags.get("54"), "2001");
+  assert.equal(result.slice(-4), crc16(result.slice(0, -4)));
+  for (const [tag, value] of qrTags(merchantQr)) {
+    if (tag !== "01" && tag !== "63") assert.equal(tags.get(tag), value);
+  }
+  assert.doesNotThrow(() => validateStaticQr(merchantQr));
+  assert.throws(() => validateStaticQr(result));
+  const noInitiation = qrBody.replace("010211", "");
+  assert.equal(qrTags(paymentQrString(noInitiation + crc16(noInitiation), 5200)).get("01"), "12");
+  for (const amount of [0, -1, 1.5, NaN, Infinity, 100_000_000]) {
+    assert.throws(() => paymentQrString(merchantQr, amount), /Total pembayaran/);
+  }
+  assert.throws(() => paymentQrString(merchantQr.slice(0, -1) + "X", 2001));
+});
 
 test("API responses distinguish HTML, unavailable routes, proxy failures and real JSON errors", async () => {
   for (const [status, pattern] of [[200, /Respons API bukan JSON/], [404, /Endpoint API/], [502, /Server\/proxy/]] as const) {
@@ -269,18 +299,30 @@ test("unconfigured/misconfigured/no-router checkout cannot take payment or mint 
   assert.equal(fulfillCalls.length, 0);
 });
 test("creation renders QR locally, charges unique total, and reuses one active invoice", async () => {
-  const a = await order();
-  const b = await order();
-  assert.equal(a.reference_id, b.reference_id);
-  assert.equal(a.amount, 5000 + a.unique_code);
-  assert.ok(a.unique_code >= 1 && a.unique_code <= 999);
-  assert.match(a.qr_url, /^data:image\/png;base64,/);
-  assert.equal(a.status, "pending");
-  assert.equal(fulfillCalls.length, 0);
+  const encoded: string[] = [];
+  const original = QRCode.toDataURL;
+  QRCode.toDataURL = (async (text: string, options: QRCodeToDataURLOptions) => {
+    encoded.push(text);
+    return original(text, options);
+  }) as unknown as typeof QRCode.toDataURL;
+  try {
+    const a = await order();
+    const b = await order();
+    assert.equal(a.reference_id, b.reference_id);
+    assert.equal(a.amount, 5000 + a.unique_code);
+    assert.equal(a.unique_code, 1);
+    assert.match(a.qr_url, /^data:image\/png;base64,/);
+    assert.equal(a.status, "pending");
+    assert.equal(fulfillCalls.length, 0);
+    assert.equal(encoded.length, 2);
+    for (const qr of encoded) assert.equal(qrTags(qr).get("54"), String(a.amount));
+    assert.equal(encoded[0], encoded[1]);
+  } finally { QRCode.toDataURL = original; }
 });
 test("parallel buyers of the same package receive different totals", async () => {
   const results = await Promise.all([order("081234567891"), order("081234567892"), order("081234567893")]);
   assert.equal(new Set(results.map(r => r.amount)).size, 3);
+  assert.deepEqual(results.map(r => r.unique_code).sort((a, b) => a - b), [1, 2, 3]);
   assert.equal(new Set(results.map(r => r.reference_id)).size, 3);
 });
 test("expired invoice total is never recycled, even for the same buyer", async () => {
@@ -289,15 +331,33 @@ test("expired invoice total is never recycled, even for the same buyer", async (
   assert.equal((await payments.status(a.reference_id))?.status, "expired");
   const b = await order();
   assert.notEqual(a.amount, b.amount);
+  assert.equal(b.unique_code, 2);
+});
+test("a previous-day expired invoice keeps its nominal reserved", async () => {
+  const a = await order();
+  await pool.query("UPDATE qiospay_invoices SET created_at=NOW()-INTERVAL '2 days',expires_at=NOW()-INTERVAL '1 day' WHERE reference_id=$1", [a.reference_id]);
+  const b = await order();
+  assert.equal(b.unique_code, 2);
+});
+test("existing invoices with legacy codes above 200 retain their total and QR amount", async () => {
+  const a = await order();
+  await pool.query("UPDATE qiospay_invoices SET unique_code=900,total_amount=5900 WHERE reference_id=$1", [a.reference_id]);
+  await pool.query("UPDATE transactions SET amount=5900 WHERE reference_id=$1", [a.reference_id]);
+  const existing = await order();
+  assert.equal(existing.reference_id, a.reference_id);
+  assert.equal(existing.unique_code, 900);
+  assert.equal(existing.amount, 5900);
+  const next = await order("081234567892");
+  assert.equal(next.unique_code, 1);
 });
 test("already existing merchant credits cannot pay a new invoice", async () => {
-  ledger = Array.from({ length: 998 }, (_, i) => credit(5001 + i, `old-${i}`, new Date(Date.now() - 86400_000)));
+  ledger = Array.from({ length: 199 }, (_, i) => credit(5001 + i, `old-${i}`, new Date(Date.now() - 86400_000)));
   const a = await order();
-  assert.equal(a.amount, 5999);
+  assert.equal(a.amount, 5200);
   const data = await payments.sync();
   assert.equal((await payments.status(a.reference_id))?.status, "pending");
   assert.equal(data.reservations_count, 1);
-  await assert.rejects(order("081234567899"), /habis/);
+  await assert.rejects(order("081234567899"), /1–200.*habis/);
 });
 test("no ledger credit and wrong amounts never mint vouchers", async () => {
   const a = await order(); await inWindow(a.reference_id);

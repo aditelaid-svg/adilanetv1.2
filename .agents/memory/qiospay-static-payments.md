@@ -11,9 +11,15 @@ The user chose “Siapkan QR statis + nominal unik” for Qiospay. Show the extr
 
 Never recycle an exact merchant payment total for automatic order matching, including expired/successful invoices. Keep persistent reservations and reject exhaustion explicitly.
 
-**Why:** Static QR payment instructions cannot be remotely expired. Reusing a nominal lets a late or repeated payment for an old invoice incorrectly fulfill a new buyer's invoice.
+**Why:** Neither a static QR nor a locally generated amount-bearing QR can be remotely expired through the documented Qiospay API. Encoding a total and dynamic initiation flag is not a provider-created order. Reusing a nominal lets a late or repeated payment for an old invoice incorrectly fulfill a new buyer's invoice.
 
 **How to apply:** Do not remove reservations with transaction cleanup. Changing this rule requires a provider-supported per-order reference/cancellation mechanism, not merely a time delay.
+
+Pengguna memilih kode unik sampai 200 karena pembayaran QRIS belum banyak. Gunakan kode kecil berurutan tanpa reset harian.
+
+**Why:** The user wants smaller additions. Retaining permanent total reservations prevents late payment of an old QR from fulfilling a new order.
+
+**How to apply:** Preserve legacy invoices, including codes above 200; do not renumber or remove historical reservations. Stop new checkout when no safe total remains in the selected range.
 
 Only a verified credit in the authenticated merchant mutation ledger can pay an invoice. Callback fields are wake-up notifications, not independently trusted proof. Outside-window or duplicate actual credits require manual review.
 

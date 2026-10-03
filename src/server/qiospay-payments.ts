@@ -43,7 +43,6 @@ export class QiospayPayments {
       throw new PaymentError("Nomor HP pembeli wajib diisi dengan 10–20 digit.");
     }
     const config = readQiospayConfig(await this.settings());
-    const qrUrl = await renderQr(config.qrString);
     // Check the real merchant ledger before charging. Old credits also reserve
     // their nominal, so they cannot retrospectively pay a newly-created order.
     const credits = await fetchCredits(config, this.fetcher);
@@ -75,14 +74,14 @@ export class QiospayPayments {
         );
         if (limits[0].count >= 3) throw new PaymentError("Masih ada transaksi QRIS yang belum selesai. Selesaikan dahulu.", 429);
         const { rows: available } = await db.query(
-          `SELECT code FROM generate_series(1,999) code
+          `SELECT code FROM generate_series(1,200) code
            WHERE NOT EXISTS (SELECT 1 FROM qiospay_invoices WHERE merchant_code=$1 AND total_amount=$2+code)
              AND NOT EXISTS (SELECT 1 FROM qiospay_events WHERE merchant_code=$1 AND amount=$2+code)
-           ORDER BY random() LIMIT 1`,
+           ORDER BY code ASC LIMIT 1`,
           [config.merchantCode, amount],
         );
         if (!available.length) {
-          throw new PaymentError("Nominal unik untuk harga ini sudah habis. QRIS statis tidak bisa membatalkan instruksi lama; hubungi admin dan gunakan pembayaran saldo.", 409);
+          throw new PaymentError("Kode unik 1–200 untuk harga ini sudah habis. Nominal lama tidak digunakan ulang; hubungi admin dan gunakan pembayaran saldo.", 409);
         }
         const code = Number(available[0].code);
         const ref = `QPAY-${crypto.randomBytes(16).toString("hex")}`;
@@ -99,6 +98,7 @@ export class QiospayPayments {
         );
         invoice = rows[0];
       }
+      const qrUrl = await renderQr(config.qrString, Number(invoice.total_amount));
       await db.query("COMMIT");
       return {
         provider: "qiospay", reference_id: invoice.reference_id, qr_url: qrUrl,

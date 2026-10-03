@@ -51,9 +51,34 @@ export function validateStaticQr(value: string): void {
       !/6304[0-9A-Fa-f]{4}$/.test(value) || crc16(value.slice(0, -4)) !== value.slice(-4).toUpperCase()) throw invalid();
 }
 
-export async function renderQr(qrString: string): Promise<string> {
+export function paymentQrString(qrString: string, amount: number): string {
   validateStaticQr(qrString);
-  return QRCode.toDataURL(qrString, { width: 300, margin: 4, errorCorrectionLevel: "M" });
+  if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 99_999_999) {
+    throw new PaymentError("Total pembayaran QRIS tidak valid.");
+  }
+  const fields: { tag: string; value: string }[] = [];
+  for (let pos = 0; pos < qrString.length - 8;) {
+    const tag = qrString.slice(pos, pos + 2);
+    const length = Number(qrString.slice(pos + 2, pos + 4));
+    fields.push({ tag, value: qrString.slice(pos + 4, pos + 4 + length) });
+    pos += 4 + length;
+  }
+  const hasInitiation = fields.some(field => field.tag === "01");
+  const encode = (tag: string, value: string) => `${tag}${String(value.length).padStart(2, "0")}${value}`;
+  const parts: string[] = [];
+  for (const field of fields) {
+    parts.push(encode(field.tag, field.tag === "01" ? "12" : field.value));
+    if (field.tag === "00" && !hasInitiation) parts.push("010212");
+    if (field.tag === "53") parts.push(encode("54", String(amount)));
+  }
+  // The merchant data stays unchanged. Amount-bearing QR does not introduce
+  // provider order references or remote expiry; ledger verification still applies.
+  const body = parts.join("") + "6304";
+  return body + crc16(body);
+}
+
+export async function renderQr(qrString: string, amount: number): Promise<string> {
+  return QRCode.toDataURL(paymentQrString(qrString, amount), { width: 300, margin: 4, errorCorrectionLevel: "M" });
 }
 
 export function validCallbackToken(given: unknown, expected: string): boolean {
