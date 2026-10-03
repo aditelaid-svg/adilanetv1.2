@@ -7,6 +7,7 @@ import ts from 'typescript';
 import { chapMd5, entryToken, matchesEntryToken, hotspotFiles, zipHotspot } from '../src/server/hotspot-package';
 import { portalUrl, contextUsable, registerHotspotRoutes, type ClientState } from '../src/server/hotspot-routes';
 import { loginDestination } from '../src/lib/loginDestination';
+import { isSellablePackage } from '../src/lib/packageCatalog';
 
 const config = { routerId: 1, loginUrl: 'http://hotspot.test/login', portalUrl: 'https://portal.test', enabled: true };
 const secret = 'fixture-only-not-a-live-session-secret';
@@ -56,6 +57,13 @@ test('installer validates URLs; credentials, scripts, query and arbitrary paths 
   assert.equal(portalUrl(config.loginUrl,true),config.loginUrl);
   for(const url of ['javascript:alert(1)','https://u:p@portal.test','https://portal.test/path','https://portal.test/?token=x','https://portal.test/#x']) assert.throws(()=>portalUrl(url));
   assert.throws(()=>portalUrl('http://hotspot.test/admin',true));
+});
+test('customer package catalog only exposes packages that can provision a hotspot voucher',()=>{
+  const ready={id:5,name:'1 Jam',speed:'2M',quota:'Unlimited',duration:'1 Jam',price:5000,badge_color:'blue',router_id:1,mikrotik_profile:'1jam'};
+  assert.equal(isSellablePackage(ready),true);
+  assert.equal(isSellablePackage({...ready,price:0}),false);
+  assert.equal(isSellablePackage({...ready,router_id:null}),false);
+  assert.equal(isSellablePackage({...ready,mikrotik_profile:'  '}),false);
 });
 test('bridge entry token binds router, gateway and portal and fails closed on malformed input',()=>{
   const token=entryToken(config,secret); assert.ok(matchesEntryToken(token,token));

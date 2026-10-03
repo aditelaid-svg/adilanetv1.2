@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Clock, Zap, Wifi, Link as LinkIcon, Check, X, Refre
 import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { formatRupiah } from '../../lib/format';
+import { isSellablePackage } from '../../lib/packageCatalog';
 import EmptyState from '../../components/ui/EmptyState';
 
 interface MikrotikProfile {
@@ -95,6 +96,11 @@ export default function AdminPackages() {
   };
 
   const handleCopyLink = (id: number) => {
+    const pkg = packages.find(item => item.id === id);
+    if (!pkg || !isSellablePackage(pkg)) {
+      toast.error('Paket belum siap dijual', 'Isi harga di atas nol, pilih router, dan pilih profil Hotspot MikroTik.');
+      return;
+    }
     navigator.clipboard.writeText(`${window.location.origin}/checkout/${id}`);
     setCopiedLink(id);
     toast.success('Link disalin!', `${window.location.origin}/checkout/${id}`);
@@ -181,7 +187,8 @@ export default function AdminPackages() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-[26px] font-bold tracking-tight text-slate-800 mb-0.5">Paket Voucher</h1>
-          <p className="text-slate-500 text-[13px] font-medium">{packages.length} paket tersedia</p>
+          <p className="text-slate-500 text-[13px] font-medium">{packages.length} paket tersimpan</p>
+          <p data-testid="text-package-catalog-guidance" className="mt-1 max-w-xl text-[11px] leading-relaxed text-slate-500">Ini satu katalog untuk portal hotspot dan dashboard pelanggan. Agar paket tampil untuk dibeli, isi harga di atas nol serta pilih router dan profil Hotspot MikroTik.</p>
         </div>
         <button
           onClick={openAdd}

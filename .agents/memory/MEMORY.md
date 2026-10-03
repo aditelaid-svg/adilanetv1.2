@@ -1,6 +1,6 @@
 - [Toast system](toast-system.md) — Global toast+confirm in src/components/Toast.tsx (ToastProvider in App.tsx); replaces all window.confirm/alert across admin pages.
-- [Package schema](package-schema.md) — packages table has router_id and mikrotik_profile (nullable); AppContext has updatePackage via PATCH /api/packages/:id.
 - [Qiospay static payments](qiospay-static-payments.md) — User chose unique nominal additions; never recycle merchant totals; callbacks only wake authenticated ledger checks.
+- [Package catalog](package-catalog.md) — Keep Admin → Paket as the one sellable catalog for portal and dashboard; individual voucher codes are not public products.
 - [Voucher format](voucher-format.md) — admin-configurable charset/length/prefix in settings table; generateUniqueVoucher reads them; username=password mode kept.
 - [Admin bulk vouchers](voucher-bulk-admin.md) — AdminVouchers now really provisions N codes to MikroTik via POST /api/router/create-vouchers-bulk + createVouchersBulk (one connection, partial-failure). Stateless (no DB), like single-create.
 - [Hotspot user list](hotspot-user-list.md) — two reads: active-users (live, /active) vs hotspot-users (full /user/print incl offline, merged w/ active). AdminHotspotUsers page = Mikhmon-style list, no demo fallback.

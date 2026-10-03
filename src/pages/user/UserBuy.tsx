@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAppContext, Package, Promo } from '../../AppContext';
 import { Wifi, Zap, X, Check, Copy, Wallet, CheckCircle2, ChevronRight, Lock, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { formatRupiah } from '../../lib/format';
+import { isSellablePackage } from '../../lib/packageCatalog';
 import { QrisCheckoutDetails, qrisDisplayText, useQrisPayment } from '../../components/QrisCheckout';
 import { findLatestQrisRecovery, qrisRecoveryKey } from '../../lib/qrisRecovery';
 import HotspotConnect from '../../components/HotspotConnect';
@@ -12,9 +13,10 @@ import HotspotConnect from '../../components/HotspotConnect';
 export default function UserBuy() {
   const { packages, promos, currentUser, buyPackage, refreshData } = useAppContext();
   const location = useLocation();
+  const availablePackages = useMemo(() => packages.filter(isSellablePackage), [packages]);
   const statePromoId: number | undefined = location.state?.promoId;
   const [selectedPkg, setSelectedPkg] = useState<Package | null>(
-    packages.find(p => p.id === location.state?.packageId) || null
+    packages.find(p => p.id === location.state?.packageId && isSellablePackage(p)) || null
   );
 
   // A discount only applies when the buyer arrived via a specific package promo
@@ -66,11 +68,11 @@ export default function UserBuy() {
   }, [currentUser?.id, packages, selectedPkg]);
 
   useEffect(() => {
-    if (querySelectionApplied.current || !queryPackageId || packages.length === 0) return;
+    if (querySelectionApplied.current || !queryPackageId || availablePackages.length === 0) return;
     querySelectionApplied.current = true;
-    const requestedPackage = packages.find(pkg => String(pkg.id) === queryPackageId);
+    const requestedPackage = availablePackages.find(pkg => String(pkg.id) === queryPackageId);
     if (requestedPackage) setSelectedPkg(requestedPackage);
-  }, [queryPackageId, packages]);
+  }, [queryPackageId, packages, availablePackages]);
 
   useEffect(() => {
     if (showPinInput && pinInputRef.current) {
@@ -188,7 +190,7 @@ export default function UserBuy() {
       </div>
 
       <div className="grid gap-3">
-        {packages.map((pkg, idx) => (
+        {availablePackages.length ? availablePackages.map((pkg, idx) => (
           <motion.div
             key={pkg.id}
             onClick={() => { setSelectedPkg(pkg); setSuccessCode(null); setShowPinInput(false); setError(null); }}
@@ -230,7 +232,7 @@ export default function UserBuy() {
               <ChevronRight className="w-4 h-4 text-slate-300" />
             </div>
           </motion.div>
-        ))}
+        )) : <p data-testid="text-buy-packages-empty" className="rounded-2xl border border-slate-100 bg-white/70 px-4 py-6 text-center text-[12px] text-slate-500">Belum ada paket siap dibeli. Silakan hubungi admin.</p>}
       </div>
 
       {/* Purchase Modal */}

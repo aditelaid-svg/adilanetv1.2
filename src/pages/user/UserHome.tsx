@@ -4,6 +4,7 @@ import { Wifi, Zap, ArrowRight, ChevronRight, Plus, CreditCard, Clock } from 'lu
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { formatRupiah } from '../../lib/format';
+import { isSellablePackage } from '../../lib/packageCatalog';
 import { PROMO_BG, PromoIcon } from '../../lib/promoStyles';
 import { readApiResponse } from '../../lib/apiResponse';
 
@@ -30,6 +31,7 @@ export default function UserHome() {
   const userTransactions = transactions.filter(t => t.user_id === currentUser?.id);
   const activeTx = userTransactions[0];
   const activePackage = packages.find(p => p.id === activeTx?.package_id);
+  const availablePackages = packages.filter(isSellablePackage);
 
   const handlePromoClick = (p: Promo) => {
     if (p.link_type === 'packages') navigate('/user/packages');
@@ -160,7 +162,7 @@ export default function UserHome() {
         </div>
 
         <div className="flex overflow-x-auto gap-4 hide-scrollbar snap-x pb-2 -mx-6 px-6">
-          {packages.slice(0, 5).map((pkg, idx) => {
+          {availablePackages.length ? availablePackages.slice(0, 5).map((pkg, idx) => {
             const popular = idx === 1;
             return (
               <button
@@ -190,7 +192,7 @@ export default function UserHome() {
                 </div>
               </button>
             );
-          })}
+          }) : <p data-testid="text-home-no-sellable-packages" className="w-full rounded-2xl bg-white/70 px-4 py-5 text-center text-[12px] text-slate-500">Belum ada paket yang siap dijual.</p>}
         </div>
       </section>
 

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatRupiah } from '../lib/format';
 import { QrisCheckoutDetails, qrisDisplayText, useQrisPayment } from '../components/QrisCheckout';
 import { qrisRecoveryKey } from '../lib/qrisRecovery';
+import { isSellablePackage } from '../lib/packageCatalog';
 import HotspotConnect from '../components/HotspotConnect';
 
 export default function PublicBuy() {
@@ -25,11 +26,12 @@ export default function PublicBuy() {
   const [qrisConfigLoading, setQrisConfigLoading] = useState(true);
   const [qrisConfigError, setQrisConfigError] = useState<string | null>(null);
 
-  const pkg = packages.find(p => p.id === Number(packageId));
+  const requestedPackage = packages.find(p => p.id === Number(packageId));
+  const pkg = requestedPackage && isSellablePackage(requestedPackage) ? requestedPackage : undefined;
 
   useEffect(() => {
-    if (packages.length > 0 && !pkg) navigate('/login');
-  }, [pkg, packages, navigate]);
+    if (packages.length > 0 && !requestedPackage) navigate('/login');
+  }, [requestedPackage, packages, navigate]);
 
   useEffect(() => {
     fetch('/api/config/public')
@@ -54,6 +56,16 @@ export default function PublicBuy() {
       setStep('success');
     }
   }, [qrisPayment.payment, qrisPayment.voucherCode]);
+
+  if (!pkg && requestedPackage && packages.length > 0) return (
+    <div className="coastal-bg flex min-h-screen items-center justify-center p-5">
+      <div className="max-w-md rounded-3xl bg-white/90 p-6 text-center shadow-xl">
+        <h1 data-testid="text-checkout-package-unavailable" className="text-lg font-bold text-slate-800">Paket belum siap dijual</h1>
+        <p className="mt-2 text-sm text-slate-600">Paket ini belum memiliki harga, router, atau profil Hotspot MikroTik yang lengkap. Silakan hubungi admin.</p>
+        <a data-testid="link-checkout-back-to-hotspot" href="/hotspot" className="mt-5 inline-flex rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white">Lihat paket tersedia</a>
+      </div>
+    </div>
+  );
 
   if (!pkg) return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">

@@ -4,17 +4,19 @@ import { Wifi, Search, Clock, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { formatRupiah } from '../../lib/format';
+import { isSellablePackage } from '../../lib/packageCatalog';
 
 export default function UserPackages() {
   const { packages, currentUser, buyPackage } = useAppContext();
   const navigate = useNavigate();
   const [filter, setFilter] = useState('Semua');
+  const availablePackages = packages.filter(isSellablePackage);
 
   return (
     <div className="px-6 pt-14 pb-24">
       <div className="mb-5">
         <h1 className="text-[28px] font-bold tracking-tight text-slate-800 mb-1">Paket Voucher</h1>
-        <p className="text-slate-500 text-[13px] font-medium">{packages.length} paket tersedia saat ini</p>
+        <p className="text-slate-500 text-[13px] font-medium">{availablePackages.length} paket tersedia saat ini</p>
       </div>
 
       <div className="relative mb-5">
@@ -39,7 +41,7 @@ export default function UserPackages() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {packages.map((pkg, idx) => (
+        {availablePackages.length ? availablePackages.map((pkg, idx) => (
           <motion.div 
             key={pkg.id} 
             initial={{ opacity: 0, scale: 0.95 }}
@@ -80,7 +82,7 @@ export default function UserPackages() {
                 </button>
             </div>
           </motion.div>
-        ))}
+        )) : <p data-testid="text-packages-empty" className="col-span-2 rounded-2xl border border-slate-100 bg-white/70 px-4 py-6 text-center text-[12px] text-slate-500">Belum ada paket siap dibeli. Silakan hubungi admin.</p>}
       </div>
     </div>
   );
