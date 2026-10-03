@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2, CircleAlert, Clock3, LockKeyhole, Wifi, Zap }
 import { motion } from 'motion/react';
 import type { Package } from '../AppContext';
 import HotspotConnect from '../components/HotspotConnect';
-import { connectHotspot, getPendingHotspotVoucher, navigateToHotspot } from '../lib/hotspot';
+import { clearPendingHotspotVoucher, connectHotspot, getPendingHotspotVoucher, navigateToHotspot } from '../lib/hotspot';
 import { formatRupiah } from '../lib/format';
 import { readApiResponse } from '../lib/apiResponse';
 
@@ -35,7 +35,10 @@ export default function HotspotPortal() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const pending = connected ? getPendingHotspotVoucher() : null;
+  // A gateway may return to /hotspot without preserving ?connected=1.
+  // Recover the attempt once on mount, and verify it without resubmitting.
+  const [pending, setPending] = useState(() => getPendingHotspotVoucher());
+  const verifyReturn = connected || !!pending;
 
   useEffect(() => {
     let cancelled = false;
@@ -93,7 +96,7 @@ export default function HotspotPortal() {
         navigateToHotspot(result.redirect_url);
         return;
       }
-      if (result.on_network) setNotice('Voucher diterima. Periksa status koneksi WiFi Anda.');
+      if (result.on_network) setNotice('Perangkat terdeteksi, tetapi permintaan login belum dikirim ke MikroTik.');
       else setError(result.error || 'Voucher belum dapat digunakan. Periksa kode dan coba lagi.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Koneksi gagal. Coba lagi.');
@@ -122,15 +125,19 @@ export default function HotspotPortal() {
           </span>
         </header>
 
-        {connected ? (
+        {verifyReturn ? (
           <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-strong rounded-[28px] p-5 sm:p-6">
             <div className="mb-4 flex items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-50 text-teal-600"><CheckCircle2 className="h-5 w-5" /></span>
               <div><h1 className="text-[19px] font-bold tracking-tight">Memeriksa koneksi</h1><p className="mt-0.5 text-[12px] text-slate-500">Verifikasi sesi voucher Anda.</p></div>
             </div>
-            {pending ? <HotspotConnect voucherCode={pending.code} packageRouterId={pending.routerId ?? undefined} auto /> :
+            {pending ? <HotspotConnect voucherCode={pending.code} packageRouterId={pending.routerId ?? undefined} auto={false} verifyOnly /> :
               <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-800">Data voucher tidak ditemukan di perangkat ini. Kembali ke portal dan masukkan kode secara manual.</div>}
-            <Link to="/hotspot" className="mt-4 inline-flex items-center gap-2 text-[12px] font-semibold text-sky-700">Kembali ke portal <ArrowRight className="h-3.5 w-3.5" /></Link>
+            <Link data-testid="link-hotspot-back-to-entry" to="/hotspot" onClick={() => {
+              setCode(pending?.code || '');
+              clearPendingHotspotVoucher();
+              setPending(null);
+            }} className="mt-4 inline-flex items-center gap-2 text-[12px] font-semibold text-sky-700">Kembali ke portal <ArrowRight className="h-3.5 w-3.5" /></Link>
           </motion.section>
         ) : (
           <>
@@ -153,6 +160,7 @@ export default function HotspotPortal() {
                   {notice && <p role="status" className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-2.5 text-[12px] text-teal-800">{notice}</p>}
                   {context?.error && !code && <p role="alert" className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2.5 text-[11px] leading-relaxed text-rose-700">{context.error}</p>}
                   {!context?.has_context && !loading && <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-800">{context?.reason || 'Hubungkan perangkat ke WiFi AdilaNet untuk masuk otomatis.'}</p>}
+                  {context?.login_url && <p data-testid="text-hotspot-gateway" className="break-all text-[11px] text-slate-500">Gateway login MikroTik: {context.login_url}</p>}
                   <button data-testid="button-hotspot-login" type="submit" disabled={submitting || loading} className="flex w-full items-center justify-center gap-2 rounded-[17px] bg-sky-600 px-4 py-4 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(2,132,199,.22)] transition hover:bg-sky-700 active:scale-[.99] disabled:cursor-wait disabled:opacity-60">
                     {submitting ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Menghubungkan...</> : <>Login WiFi <ArrowRight className="h-4 w-4" /></>}
                   </button>

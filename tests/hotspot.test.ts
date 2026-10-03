@@ -8,6 +8,7 @@ import { chapMd5, entryToken, matchesEntryToken, hotspotFiles, zipHotspot } from
 import { portalUrl, contextUsable, registerHotspotRoutes, type ClientState } from '../src/server/hotspot-routes';
 import { loginDestination } from '../src/lib/loginDestination';
 import { isSellablePackage } from '../src/lib/packageCatalog';
+import { verifyHotspotConnection } from '../src/lib/hotspot';
 
 const config = { routerId: 1, loginUrl: 'http://hotspot.test/login', portalUrl: 'https://portal.test', enabled: true };
 const secret = 'fixture-only-not-a-live-session-secret';
@@ -184,4 +185,64 @@ test('hotspot portal shows MikroTik login rejection before the customer retries'
   const path=new URL('../src/pages/HotspotPortal.tsx',import.meta.url);
   const source=readFileSync(path,'utf8');
   assert.match(source,/context\?\.error && !code/);
+});
+
+test('installed bridge submits voucher to RouterOS with fresh CHAP instead of redirecting back to entry',()=>{
+  const voucher='FIXTURE-ONLY',challenge=Array.from({length:16},(_,i)=>i*13);
+  const octal=(bytes:number[])=>bytes.map(b=>`\\${b.toString(8).padStart(3,'0')}`).join('');
+  for(const chap of [false,true]) {
+    const html=hotspotFiles(config,secret)['login.html']
+      .replaceAll('$(chap-id)',chap?octal([7]):'')
+      .replaceAll('$(chap-challenge)',chap?octal(challenge):'');
+    const script=html.match(/<script>([\s\S]*?)<\/script>/)![1];
+    let nativeSubmits=0,entrySubmits=0;
+    const native={elements:{username:{value:''},password:{value:''}},submit(){nativeSubmits++;}};
+    const elements:any={native,entry:{submit(){entrySubmits++;}},message:{textContent:''}};
+    vm.runInNewContext(script,{
+      URLSearchParams,
+      location:{hash:`#${new URLSearchParams({'an-voucher':voucher})}`,pathname:'/login',search:''},
+      history:{replaceState(){}},document:{getElementById:(id:string)=>elements[id]},
+    });
+    assert.equal(nativeSubmits,1);
+    assert.equal(entrySubmits,0);
+    assert.equal(native.elements.username.value,voucher);
+    assert.equal(native.elements.password.value,chap?
+      crypto.createHash('md5').update(Buffer.from([7,...Buffer.from(voucher),...challenge])).digest('hex'):voucher);
+  }
+});
+
+test('verification waits for RouterOS session visibility but never infers success from a redirect',async()=>{
+  let reads=0,pauses=0;
+  const result=await verifyHotspotConnection('FIXTURE-ONLY',{
+    read:async()=>({on_network:true,active:++reads===3,uptime:'1s'}),
+    pause:async()=>{pauses++;},
+  });
+  assert.equal(result.active,true);assert.equal(reads,3);assert.equal(pauses,2);
+  reads=0;
+  const inactive=await verifyHotspotConnection('FIXTURE-ONLY',{
+    read:async()=>{reads++;return {on_network:true,active:false};},pause:async()=>{},
+  });
+  assert.equal(inactive.active,false);assert.equal(reads,5);
+});
+
+test('verification preserves router rejection, handles transient errors, and supports cancellation',async()=>{
+  let reads=0;
+  const denied=await verifyHotspotConnection('FIXTURE-ONLY',{
+    read:async()=>{reads++;return {on_network:true,active:false,error:'Login ditolak MikroTik: invalid username or password'};},
+    pause:async()=>{assert.fail('Router rejection must not be retried');},
+  });
+  assert.match(denied.error!,/invalid username/);assert.equal(reads,1);
+  reads=0;
+  const recovered=await verifyHotspotConnection('FIXTURE-ONLY',{
+    read:async()=>{if(++reads===1)throw new Error('Temporary outage');return {on_network:true,active:true};},pause:async()=>{},
+  });
+  assert.equal(recovered.active,true);assert.equal(reads,2);
+  const controller=new AbortController();
+  reads=0;
+  await assert.rejects(verifyHotspotConnection('FIXTURE-ONLY',{
+    signal:controller.signal,
+    read:async()=>{reads++;return {on_network:true,active:false};},
+    pause:async()=>{controller.abort();},
+  }),{name:'AbortError'});
+  assert.equal(reads,1);
 });

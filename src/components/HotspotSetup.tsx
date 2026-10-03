@@ -164,6 +164,7 @@ export default function HotspotSetup() {
       )}
       <div className="mt-5 rounded-[16px] border border-sky-100 bg-sky-50/80 p-4">
         <p className="mb-2 text-[11px] font-bold text-sky-800">Instalasi manual MikroTik</p>
+        <p data-testid="text-hotspot-bridge-required" className="mb-3 text-[11px] leading-relaxed text-sky-800">Tampilan portal berada di server, tetapi autentikasi tetap diproses oleh login.html di MikroTik. Pengalihan biasa ke /hotspot tidak cukup; file dari ZIP harus menerima voucher dan mengirim form login ke gateway.</p>
         <ol className="list-decimal space-y-1.5 pl-4 text-[10px] leading-relaxed text-slate-600">
           <li>Cadangkan folder hotspot lama sebelum mengganti berkas.</li>
           <li>Ekstrak ZIP, lalu unggah folder <code className="font-mono font-semibold">hotspot-adilanet</code> ke penyimpanan flash router.</li>

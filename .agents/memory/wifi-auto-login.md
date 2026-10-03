@@ -7,7 +7,7 @@ Pengguna menginginkan setelah pembelian voucher melalui QRIS atau saldo berhasil
 
 **Why:** Pengguna meminta alur yang lebih praktis dan premium: “ketika user beli dan sukses wifi otomatis terhubung dan internet mengalir.”
 
-**How to apply:** Treat payment confirmation, voucher provisioning on the correct router/profile, and hotspot authentication as separate steps. Automate login only after the voucher is ready. Do not claim internet is active merely because payment succeeded. Retain the voucher and a manual Login WiFi fallback if automatic navigation or authentication cannot finish. This requirement concerns voucher purchases, not wallet funding by itself.
+**How to apply:** Treat payment confirmation, voucher provisioning on the correct router/profile, and hotspot authentication as separate steps. Automate login only after the voucher is ready. Do not claim internet is active merely because payment succeeded or the browser returned to the portal. Retain the voucher and a manual Login WiFi fallback if automatic navigation or authentication cannot finish. This requirement concerns voucher purchases, not wallet funding by itself.
 
 Login otomatis hanya berlaku jika perangkat pembeli sedang berada di jaringan hotspot AdilaNet. Pembelian dari luar jaringan tetap menghasilkan kode voucher untuk dimasukkan manual setelah pelanggan terhubung ke hotspot.
 
@@ -37,4 +37,4 @@ Generate HTTP-CHAP credentials from a fresh gateway challenge after checkout, no
 
 **Why:** QRIS checkout can take several minutes, and reopening the gateway changes its challenge. Reusing the initial challenge can reject an otherwise valid, successfully purchased voucher.
 
-**How to apply:** Keep authentication in a small self-contained MikroTik bridge, preserve CHAP support, and avoid external hashing-script dependencies. Server-hosted presentation must not replace MikroTik's client authentication.
+**How to apply:** Keep authentication in a small self-contained MikroTik bridge, preserve CHAP support, and avoid external hashing-script dependencies. Server-hosted presentation must not replace MikroTik's client authentication: preserve the local native login submission even when all visible UI is hosted externally, rather than replacing the bridge with an unconditional server redirect.

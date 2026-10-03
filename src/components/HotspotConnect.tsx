@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, LoaderCircle, Wifi, CircleAlert } from 'lucide-react';
-import { connectHotspot, hotspotConnection, navigateToHotspot } from '../lib/hotspot';
+import { connectHotspot, verifyHotspotConnection, navigateToHotspot } from '../lib/hotspot';
 
-export default function HotspotConnect({ voucherCode, packageRouterId = null, auto = true }: {
-  voucherCode: string; packageRouterId?: number | null; auto?: boolean;
+export default function HotspotConnect({ voucherCode, packageRouterId = null, auto = true, verifyOnly = false }: {
+  voucherCode: string; packageRouterId?: number | null; auto?: boolean; verifyOnly?: boolean;
 }) {
-  const returning = new URLSearchParams(window.location.search).get('connected') === '1';
+  const returning = verifyOnly || new URLSearchParams(window.location.search).get('connected') === '1';
   const [phase, setPhase] = useState<'checking'|'manual'|'connecting'|'active'>('checking');
   const [message, setMessage] = useState('Memeriksa jaringan hotspot AdilaNet…');
   const [busy, setBusy] = useState(false);
@@ -35,22 +35,30 @@ export default function HotspotConnect({ voucherCode, packageRouterId = null, au
   }, [voucherCode, packageRouterId]);
 
   useEffect(() => {
-    if (!voucherCode || started.current === voucherCode) return;
+    if (!voucherCode || !returning) return;
     started.current = voucherCode;
-    if (returning) {
-      void hotspotConnection(voucherCode).then(result => {
-        if (!mounted.current || started.current !== voucherCode) return;
+    const controller = new AbortController();
+    setPhase('checking');
+    setMessage('Memeriksa apakah MikroTik sudah mengaktifkan sesi voucher…');
+    void verifyHotspotConnection(voucherCode, { signal: controller.signal }).then(result => {
+        if (controller.signal.aborted || !mounted.current || started.current !== voucherCode) return;
         setPhase(result.active ? 'active' : 'manual');
         const sessionDetails = [
           result.uptime ? `Terhubung selama ${result.uptime}.` : '',
           result.session_time_left ? `Sisa sesi ${result.session_time_left}.` : '',
         ].filter(Boolean).join(' ');
         setMessage(result.active ? `Login hotspot berhasil. ${sessionDetails || 'Akses internet sesuai paket sudah diaktifkan oleh MikroTik.'}` :
-          result.error || 'Login hotspot belum terkonfirmasi. Periksa voucher dan coba Login WiFi kembali.');
+          result.error || 'MikroTik belum mengonfirmasi sesi voucher. Jika selalu kembali ke portal, periksa URL login gateway dan pastikan login.html di router memproses an-voucher, bukan hanya mengalihkan ke server.');
       }).catch(() => {
-        if (mounted.current && started.current === voucherCode) { setPhase('manual'); setMessage('Status login belum dapat diverifikasi. Jangan membeli ulang; gunakan voucher yang sama.'); }
+        if (!controller.signal.aborted && mounted.current && started.current === voucherCode) { setPhase('manual'); setMessage('Status login belum dapat diverifikasi. Jangan membeli ulang; gunakan voucher yang sama.'); }
       });
-    } else if (auto) {
+    return () => controller.abort();
+  }, [voucherCode, returning]);
+
+  useEffect(() => {
+    if (!voucherCode || returning || started.current === voucherCode) return;
+    started.current = voucherCode;
+    if (auto) {
       const key = `adilanet_hotspot_attempt:${voucherCode}`;
       let attempted = false;
       try { attempted = !!sessionStorage.getItem(key); sessionStorage.setItem(key, '1'); } catch { /* bounded by mounted component */ }
@@ -67,9 +75,9 @@ export default function HotspotConnect({ voucherCode, packageRouterId = null, au
         {phase === 'active' ? 'Internet aktif' : phase === 'connecting' ? 'Menghubungkan WiFi' : phase === 'checking' ? 'Menyiapkan akses WiFi' : 'Voucher siap digunakan'}
       </div>
       <p className="mt-2 text-xs leading-relaxed text-slate-600">{message}</p>
-      {phase !== 'active' && <button type="button" disabled={busy} onClick={() => void connect(false)}
+      {phase !== 'active' && <button data-testid="button-hotspot-connect-retry" type="button" disabled={busy || phase === 'checking'} onClick={() => void connect(false)}
         className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
-        <Wifi size={17} />{busy ? 'Memeriksa hotspot…' : 'Login WiFi'}
+        <Wifi size={17} />{busy || phase === 'checking' ? 'Memeriksa hotspot…' : 'Login WiFi'}
       </button>}
       {phase !== 'active' && <p className="mt-2 text-[11px] leading-relaxed text-slate-500">Di luar jaringan AdilaNet? Simpan kode dan masukkan di kolom Login Voucher saat kembali ke hotspot.</p>}
     </section>
