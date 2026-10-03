@@ -118,6 +118,16 @@ export async function fetchCredits(config: QiospayConfig, fetcher: typeof fetch 
     throw new PaymentError(`Qiospay mengirim respons bukan JSON (HTTP ${response.status}). Periksa akses API akun Qiospay.`, 502);
   }
   if (!response.ok || body?.status !== "success") {
+    const message = typeof body?.messages === "string" ? body.messages :
+      typeof body?.message === "string" ? body.message : "";
+    const noMutationData = /\b(?:data|mutasi|transaksi)\b.*\b(?:not found|not exist|tidak ditemukan|belum ada|kosong)\b|\b(?:no|tidak ada)\b.*\b(?:data|mutasi|transaksi)\b/i.test(message);
+    const mentionsCredentials = /api.?key|apikey|merchant|credential|token|unauthori|forbidden/i.test(message);
+    // An undocumented empty-ledger error is NOT proof of authentication or
+    // payment. Only change the safe message; never return credits for it.
+    if (response.status === 200 && body?.status === "error" && noMutationData && !mentionsCredentials &&
+        (body.data == null || (Array.isArray(body.data) && body.data.length === 0))) {
+      throw new PaymentError("Mutasi Qiospay belum tersedia. Qiospay melaporkan data mutasi tidak ditemukan; belum ada pembayaran yang dapat diverifikasi.", 502);
+    }
     throw new PaymentError(`Qiospay menolak permintaan mutasi (HTTP ${response.status}). Periksa Merchant Code dan API Key.`, 502);
   }
   return normalizeCredits(config.merchantCode, body.data);
