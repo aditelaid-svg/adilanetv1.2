@@ -29,6 +29,6 @@ Untuk pengaturan admin, pengguna meminta: “buat simpel setingan QRIS Qiospay, 
 
 Qiospay's narrowly recognized HTTP 200 / `status: "error"` / missing-mutation-data response represents zero credits, not a failed checkout or a paid invoice.
 
-**Why:** Live read-only checks returned this response for the saved account. Both nonexistent credentials and the same saved merchant with a deliberately invalid test key returned HTTP 401 instead. Blocking an empty ledger prevented first-time checkout before a QR could be displayed. The public documentation omits this empty-ledger behavior.
+**Why:** Live read-only checks returned this response for the saved account. Both nonexistent credentials and the same saved merchant with a deliberately invalid test key returned HTTP 401 instead. Blocking an empty ledger prevented first-time checkout before a QR could be displayed. The public documentation omits this empty-ledger behavior. Pengguna kemudian mengonfirmasi QRIS berhasil muncul dan pembayaran nyata otomatis menghasilkan voucher.
 
 **How to apply:** Recognize only specific empty-data messages with HTTP 200, exact status `error`, and absent/null/empty-array data. Reject all other errors and malformed envelopes without exposing provider messages. Zero credits may allow a pending QR invoice, never payment success or voucher fulfillment.
