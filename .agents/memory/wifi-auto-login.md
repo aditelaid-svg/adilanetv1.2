@@ -35,9 +35,9 @@ Use browser navigation rather than cross-origin fetch for client hotspot login.
 
 Validate gateway transport before diagnosing voucher authentication; a configured hotspot DNS name alone does not establish a reachable login endpoint.
 
-**Why:** A hostname-based HTTP recommendation led to a client screenshot showing an HTTPS connection-closed error. The source of the scheme change was not established, so blaming the voucher, certificate, or browser alone would be premature.
+**Why:** A hostname-based HTTP recommendation led to a client screenshot showing an HTTPS connection-closed error. Subsequent RouterOS screenshots showed HTTPS authentication enabled with no SSL certificate, and a hotspot service address distinct from the management address. Confirm the active server profile before treating those settings as the client's configuration.
 
-**How to apply:** Compare the saved login URL with the scheme actually displayed by the client. Confirm the hotspot interface address rather than assuming the Winbox management address is the captive gateway. Do not disable CHAP or browser security to hide a transport failure.
+**How to apply:** Compare the saved login URL with the scheme actually displayed by the client. Confirm the hotspot interface address rather than assuming the Winbox management address is the captive gateway. RouterOS https-redirect intercepts unauthenticated HTTPS requests; it is not by itself proof that HTTP is upgraded to HTTPS. HTTPS authentication requires a configured certificate. Prefer valid gateway TLS; for explicitly explained temporary HTTP recovery, retain CHAP and remove only the nonfunctional HTTPS path. HTTP CHAP is not full transport encryption. Do not disable CHAP or browser security to hide a transport failure.
 
 Generate HTTP-CHAP credentials from a fresh gateway challenge after checkout, not from the challenge captured when the customer first opened the portal.
 
