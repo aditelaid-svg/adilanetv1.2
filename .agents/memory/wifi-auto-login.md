@@ -33,6 +33,12 @@ Use browser navigation rather than cross-origin fetch for client hotspot login.
 
 **How to apply:** Prefer a correctly configured secure gateway, preserve a user-initiated login fallback, and do not promise silent automatic internet access on every device.
 
+Validate gateway transport before diagnosing voucher authentication; a configured hotspot DNS name alone does not establish a reachable login endpoint.
+
+**Why:** A hostname-based HTTP recommendation led to a client screenshot showing an HTTPS connection-closed error. The source of the scheme change was not established, so blaming the voucher, certificate, or browser alone would be premature.
+
+**How to apply:** Compare the saved login URL with the scheme actually displayed by the client. Confirm the hotspot interface address rather than assuming the Winbox management address is the captive gateway. Do not disable CHAP or browser security to hide a transport failure.
+
 Generate HTTP-CHAP credentials from a fresh gateway challenge after checkout, not from the challenge captured when the customer first opened the portal.
 
 **Why:** QRIS checkout can take several minutes, and reopening the gateway changes its challenge. Reusing the initial challenge can reject an otherwise valid, successfully purchased voucher.
