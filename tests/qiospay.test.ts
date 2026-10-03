@@ -198,17 +198,18 @@ test("provider failures do not disclose key-bearing URLs or provider messages", 
   const rejected: typeof fetch = async () => new Response(JSON.stringify({ status: "error", messages: c.apiKey }), { status: 403 });
   await assert.rejects(fetchCredits(c, rejected), (e: Error) => !e.message.includes(c.apiKey));
 });
-test("missing mutation data has a safe distinct error, never a successful ledger", async () => {
+test("only the known HTTP 200 empty-ledger response normalizes to zero credits", async () => {
   const c = readQiospayConfig(config);
   for (const messages of ["Data not found.", "Data tidak ditemukan", "Mutasi tidak ditemukan"]) {
     const fetcher: typeof fetch = async () => new Response(JSON.stringify({ status: "error", messages }));
-    await assert.rejects(fetchCredits(c, fetcher), (e: PaymentError) =>
-      e.status === 502 && e.message.includes("Mutasi Qiospay belum tersedia") && !e.message.includes("API Key"));
+    assert.deepEqual(await fetchCredits(c, fetcher), []);
   }
   for (const body of [
     { status: "error", messages: "Merchant data not found" },
     { status: "error", messages: `API Key invalid: ${c.apiKey}. Data not found.` },
     { status: "error", messages: "Unknown failure" },
+    { status: "error", messages: "Internal server error: Data not found" },
+    { status: "error", messages: "Data not found", data: {} },
     { status: "error", messages: "Data not found", data: [credit(5100)] },
     { messages: "Data not found" },
   ]) {
@@ -221,18 +222,42 @@ test("missing mutation data has a safe distinct error, never a successful ledger
   const emptySuccess: typeof fetch = async () => new Response(JSON.stringify({ status: "success", data: [] }));
   assert.deepEqual(await fetchCredits(c, emptySuccess), []);
 });
-test("missing mutation data cannot provision vouchers or advance last successful sync", async () => {
-  const invoice = await order();
+test("an initially empty Qiospay ledger allows checkout but pays only a later matching credit", async () => {
+  const fetcher: typeof fetch = async () => ledger.length
+    ? fakeFetch("https://example.invalid/fixture")
+    : new Response(JSON.stringify({ status: "error", messages: "Data not found." }));
+  const emptyPayments = new QiospayPayments(pool, async () => config, async () => "TEST-EMPTY-LEDGER", async (_invoice, code) => {
+    fulfillCalls.push(code);
+  }, fetcher);
+  const invoice = await emptyPayments.create(pkg, 5000, 1, "081234567891");
+  assert.match(invoice.qr_url, /^data:image\/png;base64,/);
+  assert.equal(invoice.status, "pending");
+  assert.equal(invoice.amount, 5000 + invoice.unique_code);
   await inWindow(invoice.reference_id);
-  const emptyPayments = new QiospayPayments(pool, async () => config, async () => "UNUSED", async () => {
-    assert.fail("An empty-ledger error must never provision a voucher");
-  }, async () => new Response(JSON.stringify({ status: "error", messages: "Data not found." })));
-  await assert.rejects(emptyPayments.sync(), /Mutasi Qiospay belum tersedia/);
+  await emptyPayments.sync();
   assert.equal((await payments.status(invoice.reference_id))?.status, "pending");
   assert.equal(fulfillCalls.length, 0);
   const { rows } = await pool.query("SELECT config_key,config_value FROM settings WHERE config_key IN ('qiospaySyncError','qiospayLastSyncAt')");
-  assert.match(rows.find(r => r.config_key === "qiospaySyncError")?.config_value || "", /Mutasi Qiospay belum tersedia/);
-  assert.ok(!rows.some(r => r.config_key === "qiospayLastSyncAt" && r.config_value));
+  assert.equal(rows.find(r => r.config_key === "qiospaySyncError")?.config_value, "");
+  assert.ok(rows.some(r => r.config_key === "qiospayLastSyncAt" && r.config_value));
+  const wrongCredit = credit(invoice.amount + 1, "wrong-amount");
+  ledger = [wrongCredit];
+  await emptyPayments.sync();
+  assert.equal((await payments.status(invoice.reference_id))?.status, "pending");
+  assert.equal(fulfillCalls.length, 0);
+  ledger = [wrongCredit, credit(invoice.amount, "matching-amount")];
+  await emptyPayments.sync();
+  await emptyPayments.sync();
+  assert.equal((await payments.status(invoice.reference_id))?.status, "success");
+  assert.equal(fulfillCalls.length, 1);
+});
+test("HTTP 401 cannot create a QRIS invoice or provision a voucher even with an empty-data message", async () => {
+  const rejectedPayments = new QiospayPayments(pool, async () => config, async () => "UNUSED", async () => {
+    assert.fail("Rejected credentials must never provision a voucher");
+  }, async () => new Response(JSON.stringify({ status: "error", messages: "Data not found" }), { status: 401 }));
+  await assert.rejects(rejectedPayments.create(pkg, 5000, 1, "081234567891"), /Periksa Merchant Code/);
+  const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM qiospay_invoices");
+  assert.equal(rows[0].count, 0);
 });
 test("unconfigured/misconfigured/no-router checkout cannot take payment or mint voucher", async () => {
   config.qiospayApiKey = "";

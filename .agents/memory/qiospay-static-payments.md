@@ -27,8 +27,8 @@ Untuk pengaturan admin, pengguna meminta: “buat simpel setingan QRIS Qiospay, 
 
 **How to apply:** Keep the admin QRIS form compact, with field labels and essential save/error feedback rather than explanatory notes. This presentation preference does not remove payment safeguards or buyer-facing amount disclosure.
 
-Do not infer invalid credentials solely from Qiospay HTTP 200 with `status: "error"`.
+Qiospay's narrowly recognized HTTP 200 / `status: "error"` / missing-mutation-data response represents zero credits, not a failed checkout or a paid invoice.
 
-**Why:** Live read-only checks also returned that envelope with a message indicating no mutation data. The public documentation does not specify this empty-ledger behavior.
+**Why:** Live read-only checks returned this response for the saved account. Both nonexistent credentials and the same saved merchant with a deliberately invalid test key returned HTTP 401 instead. Blocking an empty ledger prevented first-time checkout before a QR could be displayed. The public documentation omits this empty-ledger behavior.
 
-**How to apply:** Distinguish missing mutation data from explicit credential rejection without exposing raw provider messages. Do not treat an undocumented error envelope as verified authentication or payment success.
+**How to apply:** Recognize only specific empty-data messages with HTTP 200, exact status `error`, and absent/null/empty-array data. Reject all other errors and malformed envelopes without exposing provider messages. Zero credits may allow a pending QR invoice, never payment success or voucher fulfillment.
