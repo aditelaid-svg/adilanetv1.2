@@ -4,7 +4,13 @@ import { entryToken, matchesEntryToken, hotspotFiles, zipHotspot, type PortalCon
 
 type Context = { routerId: number; mac: string; ip: string; browserIp: string; loginUrl: string; portalUrl: string; createdAt: number; error: string | null };
 declare module 'express-session' { interface SessionData { hotspot?: Context } }
-export type ClientState = { present: boolean; active: boolean; idleSeconds: number | null };
+export type ClientState = {
+  present: boolean;
+  active: boolean;
+  idleSeconds: number | null;
+  uptime?: string | null;
+  sessionTimeLeft?: string | null;
+};
 type Reader = (router: any, mac: string, ip: string, code?: string) => Promise<ClientState>;
 export function portalUrl(value: unknown, gateway = false): string {
   if (typeof value !== 'string' || value.length > 512) throw new Error('Alamat tidak valid.');
@@ -85,8 +91,12 @@ export function registerHotspotRoutes(app: Express, pool: Pool, getSettings: () 
       if (!config || !matchesEntryToken(req.query.entry, entryToken(config, secret))) return res.status(403).send('Portal tidak valid. Simpan pengaturan dan unduh ulang paket hotspot AdilaNet.');
       const mac = String(req.query.mac || '').toUpperCase(), ip = String(req.query.ip || '');
       if (!/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac) || !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip) || ip.split('.').some(p => Number(p) > 255)) return res.status(400).send('Data hotspot tidak lengkap. Buka melalui jaringan WiFi AdilaNet.');
+      const routerError = typeof req.query.error === 'string'
+        ? req.query.error.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 160)
+        : '';
       req.session.hotspot = { routerId: config.routerId, mac, ip, browserIp: req.ip || '', loginUrl: config.loginUrl, portalUrl: config.portalUrl, createdAt: Date.now(),
-        error: req.query.error ? 'Login WiFi belum berhasil. Periksa kode voucher atau hubungi admin.' : null };
+        error: routerError ? `Login ditolak MikroTik: ${routerError}` :
+          req.query.error ? 'Login ditolak MikroTik. Periksa kode voucher dan masa berlakunya.' : null };
       req.session.save(err => {
         if (err) return res.status(503).send('Sesi hotspot belum dapat disimpan. Coba kembali.');
         res.setHeader('Cache-Control', 'no-store');
@@ -135,7 +145,13 @@ export function registerHotspotRoutes(app: Express, pool: Pool, getSettings: () 
       if (typeof code !== 'string' || !/^[\x21-\x7e]{1,128}$/.test(code)) return res.status(400).json({ success: false, error: 'Kode voucher tidak valid.' });
       res.setHeader('Cache-Control', 'no-store');
       const s = await state(req, code);
-      res.json({ success: true, data: { active: !!s.client?.active, on_network: !!s.client?.present, error: s.ctx?.error || s.reason } });
+      res.json({ success: true, data: {
+        active: !!s.client?.active,
+        on_network: !!s.client?.present,
+        uptime: s.client?.active ? s.client.uptime || null : null,
+        session_time_left: s.client?.active ? s.client.sessionTimeLeft || null : null,
+        error: s.ctx?.error || s.reason,
+      } });
     } catch { res.status(503).json({ success: false, error: 'Status login belum dapat diperiksa.' }); }
   });
 }

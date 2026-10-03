@@ -256,6 +256,25 @@ function toNum(v: any): number {
 
 // Read the live hotspot sessions currently connected to the router
 // (RouterOS `/ip/hotspot/active`). Each row is one connected user.
+function formatHotspotDuration(value: unknown): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw || raw === '-' || raw === '0s') return null;
+
+  let units: Array<[number, string]> = [];
+  if (/^\d+:\d{2}:\d{2}$/.test(raw)) {
+    const [hours, minutes, seconds] = raw.split(':').map(Number);
+    units = [[hours, 'jam'], [minutes, 'menit'], [seconds, 'detik']];
+  } else {
+    const matches = raw.match(/\d+[wdhms]/g);
+    if (!matches || matches.join('') !== raw) return null;
+    const labels: Record<string, string> = { w: 'minggu', d: 'hari', h: 'jam', m: 'menit', s: 'detik' };
+    units = matches.map(part => [Number(part.slice(0, -1)), labels[part.slice(-1)]]);
+  }
+
+  const parts = units.filter(([amount]) => amount > 0).map(([amount, label]) => `${amount} ${label}`);
+  return parts.length ? parts.join(' ') : null;
+}
+
 export async function readHotspotClient(config: MikrotikConfig, mac: string, ip: string, code?: string) {
   const api = new RouterOSAPI({ host: config.host, user: config.user, password: config.pass,
     port: config.port ? Number(config.port) : 8728, timeout: 4 });
@@ -269,7 +288,8 @@ export async function readHotspotClient(config: MikrotikConfig, mac: string, ip:
     const matches = (row: any) => String(row['mac-address'] || '').toUpperCase() === mac.toUpperCase() &&
       (row.address === ip || row['to-address'] === ip);
     const host = Array.isArray(hosts) ? hosts.find(matches) : undefined;
-    const connected = Array.isArray(active) && active.some(row => matches(row) && row.user === code);
+    const activeSession = Array.isArray(active) ? active.find(row => matches(row) && row.user === code) : undefined;
+    const connected = !!activeSession;
     const idle = host?.['idle-time'];
     let idleSeconds: number | null = null;
     if (typeof idle === 'string') {
@@ -279,7 +299,13 @@ export async function readHotspotClient(config: MikrotikConfig, mac: string, ip:
         idleSeconds = [...idle.matchAll(/(\d+)([wdhms])/g)].reduce((sum, item) => sum + Number(item[1]) * ({w:604800,d:86400,h:3600,m:60,s:1}[item[2]] || 0), 0);
       }
     }
-    return { present: !!host || connected, active: connected, idleSeconds };
+    return {
+      present: !!host || connected,
+      active: connected,
+      idleSeconds,
+      uptime: activeSession ? formatHotspotDuration(activeSession.uptime) : null,
+      sessionTimeLeft: activeSession ? formatHotspotDuration(activeSession['session-time-left']) : null,
+    };
   } finally { if (timer) clearTimeout(timer); api.close(); }
 }
 

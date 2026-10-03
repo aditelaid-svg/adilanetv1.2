@@ -27,10 +27,18 @@ export async function connectHotspot(code: string, routerId?: number | null, aut
 export function navigateToHotspot(url: string): void {
   window.location.assign(url);
 }
-export async function hotspotConnection(code: string): Promise<{active:boolean;on_network:boolean;error?:string}> {
+export async function hotspotConnection(code: string): Promise<{
+  active: boolean;
+  on_network: boolean;
+  uptime?: string | null;
+  session_time_left?: string | null;
+  error?: string;
+}> {
   const response = await fetch('/api/hotspot/connection', { method: 'POST', credentials: 'include',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
-  const json = await readApiResponse<{success:boolean;error?:string;data:{active:boolean;on_network:boolean;error?:string}}>(response);
+  const json = await readApiResponse<{success:boolean;error?:string;data:{
+    active:boolean;on_network:boolean;uptime?:string|null;session_time_left?:string|null;error?:string
+  }}>(response);
   if (!response.ok || !json.success) throw new Error(json.error || 'Status WiFi belum dapat diperiksa.');
   return json.data;
 }

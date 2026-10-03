@@ -41,7 +41,11 @@ export default function HotspotConnect({ voucherCode, packageRouterId = null, au
       void hotspotConnection(voucherCode).then(result => {
         if (!mounted.current || started.current !== voucherCode) return;
         setPhase(result.active ? 'active' : 'manual');
-        setMessage(result.active ? 'Login hotspot berhasil. Akses internet sesuai paket sudah diaktifkan oleh MikroTik.' :
+        const sessionDetails = [
+          result.uptime ? `Terhubung selama ${result.uptime}.` : '',
+          result.session_time_left ? `Sisa sesi ${result.session_time_left}.` : '',
+        ].filter(Boolean).join(' ');
+        setMessage(result.active ? `Login hotspot berhasil. ${sessionDetails || 'Akses internet sesuai paket sudah diaktifkan oleh MikroTik.'}` :
           result.error || 'Login hotspot belum terkonfirmasi. Periksa voucher dan coba Login WiFi kembali.');
       }).catch(() => {
         if (mounted.current && started.current === voucherCode) { setPhase('manual'); setMessage('Status login belum dapat diverifikasi. Jangan membeli ulang; gunakan voucher yang sama.'); }

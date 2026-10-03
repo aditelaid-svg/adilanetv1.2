@@ -151,7 +151,8 @@ export default function HotspotPortal() {
                   </div>
                   {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2.5 text-[12px] text-rose-700"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />{error}</p>}
                   {notice && <p role="status" className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-2.5 text-[12px] text-teal-800">{notice}</p>}
-                  {!context?.has_context && !loading && <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-800">{context?.reason || context?.error || 'Hubungkan perangkat ke WiFi AdilaNet untuk masuk otomatis.'}</p>}
+                  {context?.error && !code && <p role="alert" className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2.5 text-[11px] leading-relaxed text-rose-700">{context.error}</p>}
+                  {!context?.has_context && !loading && <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-800">{context?.reason || 'Hubungkan perangkat ke WiFi AdilaNet untuk masuk otomatis.'}</p>}
                   <button data-testid="button-hotspot-login" type="submit" disabled={submitting || loading} className="flex w-full items-center justify-center gap-2 rounded-[17px] bg-sky-600 px-4 py-4 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(2,132,199,.22)] transition hover:bg-sky-700 active:scale-[.99] disabled:cursor-wait disabled:opacity-60">
                     {submitting ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Menghubungkan...</> : <>Login WiFi <ArrowRight className="h-4 w-4" /></>}
                   </button>

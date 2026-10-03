@@ -84,10 +84,11 @@ test('ZIP includes standalone bridge, success/redirect/status pages and safe ins
 test('GET bridge entry validates signed installation data and saves only expected gateway context',async()=>{
   const h=harness();
   const bad=await h.invoke('GET','/api/hotspot/entry',{query:{router:1,entry:'bad'}});assert.equal(bad.res.statusCode,403);
-  const good=await h.invoke('GET','/api/hotspot/entry',{query:{router:1,entry:entryToken(config,secret),mac:'aa:bb:cc:dd:ee:ff',ip:'10.5.50.2',login:'https://evil.test'}});
+  const good=await h.invoke('GET','/api/hotspot/entry',{query:{router:1,entry:entryToken(config,secret),mac:'aa:bb:cc:dd:ee:ff',ip:'10.5.50.2',error:'invalid username or password',login:'https://evil.test'}});
   assert.equal(good.res.statusCode,303);assert.equal(good.res.redirectUrl,'/hotspot');
   assert.equal(good.req.session.hotspot.loginUrl,config.loginUrl);
   assert.equal(good.req.session.hotspot.mac,'AA:BB:CC:DD:EE:FF');
+  assert.equal(good.req.session.hotspot.error,'Login ditolak MikroTik: invalid username or password');
 });
 test('automatic login only redirects verified hotspot client, no context never calls router',async()=>{
   const h=harness();
@@ -118,9 +119,11 @@ test('manual login may retry trusted gateway during API outage; wrong router or 
 });
 test('internet active is independent of payment: only verified active router session reports true',async()=>{
   for(const active of [true,false]) {
-    const h=harness({present:true,active,idleSeconds:0});
+    const h=harness({present:true,active,idleSeconds:0,uptime:'5 menit',sessionTimeLeft:'45 menit'});
     const {res}=await h.invoke('POST','/api/hotspot/connection',{body:{code:'ABCD123'}});
     assert.equal(res.body.data.active,active);
+    assert.equal(res.body.data.uptime,active?'5 menit':null);
+    assert.equal(res.body.data.session_time_left,active?'45 menit':null);
   }
 });
 test('catalog limits hotspot purchases to originating router but offers public catalog outside',async()=>{
@@ -168,4 +171,9 @@ test('hotspot installation form is independent from general-settings and passwor
     ts.forEachChild(node,visit);
   };
   visit(source);assert.equal(count,1);
+});
+test('hotspot portal shows MikroTik login rejection before the customer retries',()=>{
+  const path=new URL('../src/pages/HotspotPortal.tsx',import.meta.url);
+  const source=readFileSync(path,'utf8');
+  assert.match(source,/context\?\.error && !code/);
 });
