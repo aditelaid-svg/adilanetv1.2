@@ -9,6 +9,12 @@ Pengguna menginginkan setelah pembelian voucher melalui QRIS atau saldo berhasil
 
 **How to apply:** Treat payment confirmation, voucher provisioning on the correct router/profile, and hotspot authentication as separate steps. Automate login only after the voucher is ready. Do not claim internet is active merely because payment succeeded. Retain the voucher and a manual Login WiFi fallback if automatic navigation or authentication cannot finish. This requirement concerns voucher purchases, not wallet funding by itself.
 
+Login otomatis hanya berlaku jika perangkat pembeli sedang berada di jaringan hotspot AdilaNet. Pembelian dari luar jaringan tetap menghasilkan kode voucher untuk dimasukkan manual setelah pelanggan terhubung ke hotspot.
+
+**Why:** Pengguna mengonfirmasi: “jika pelanggan beli voucer sedang ada d jaringan adilanet otomatis tapi jika sedang d luar jaringan adilanet kode ttap masuksn manual.”
+
+**How to apply:** Gate automatic login on trusted hotspot context and current gateway reachability; do not infer WiFi attachment merely from a successful purchase, a saved gateway URL, or stale browser context. If the network cannot be established, show the voucher and manual-login path without claiming internet is active.
+
 Portal utama tetap menyediakan kolom untuk memasukkan voucher WiFi yang sudah dimiliki, dengan tombol Login WiFi, selain alur Beli Voucher.
 
 **Why:** Pengguna menegaskan: “Tapi sediakan juga kolom untuk masukan voucher wifi.”
