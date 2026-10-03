@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { ArrowRight, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAppContext } from '../AppContext';
 import { motion } from 'motion/react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export default function Login() {
   const { login } = useAppContext();
-  const navigate = useNavigate();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -20,7 +19,8 @@ export default function Login() {
     const result = await login(identifier, password);
     setLoading(false);
     if (result.success) {
-      // navigate happens via App.tsx redirect
+      // AppRoutes honors a narrowly validated user package-buy destination;
+      // admin sessions continue to their admin landing page.
     } else {
       setError(result.error || 'Login gagal.');
     }

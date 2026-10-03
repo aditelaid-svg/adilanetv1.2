@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy, Ticket, Wifi, MessageCircle } from 'lucide-react';
+import { Save, Settings2, Shield, Bell, Key, UserCog, Check, Copy, Ticket, MessageCircle } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
 import { useToast } from '../../components/Toast';
 import QiospayReconciliation from './QiospayReconciliation';
 import { readApiResponse } from '../../lib/apiResponse';
+import HotspotSetup from '../../components/HotspotSetup';
 
 const neutralizeProvider = (value: string) => value.replace(/\b(?:QRIS\s+)?Qiospay\b/gi, 'QRIS AdilaNet');
 
@@ -24,8 +25,6 @@ export default function AdminSettings() {
   const [voucherCharset, setVoucherCharset] = useState('alphanumeric');
   const [voucherLength, setVoucherLength] = useState(8);
   const [voucherPrefix, setVoucherPrefix] = useState('WFI-');
-
-  const [hotspotLoginUrl, setHotspotLoginUrl] = useState('');
 
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [whatsappMessage, setWhatsappMessage] = useState('');
@@ -75,7 +74,6 @@ export default function AdminSettings() {
         setVoucherCharset(settings.voucherCharset || 'alphanumeric');
         setVoucherLength(settings.voucherLength || 8);
         setVoucherPrefix(settings.voucherPrefix ?? 'WFI-');
-        setHotspotLoginUrl(settings.hotspotLoginUrl || '');
         setWhatsappNumber(settings.whatsappNumber || '');
         setWhatsappMessage(settings.whatsappMessage ?? '');
       }
@@ -124,7 +122,6 @@ export default function AdminSettings() {
                 voucherCharset: voucherCharset,
                 voucherLength: voucherLength,
                 voucherPrefix: voucherPrefix,
-                hotspotLoginUrl: hotspotLoginUrl,
                 whatsappNumber: whatsappNumber,
                 whatsappMessage: whatsappMessage
                 } : {})
@@ -374,39 +371,6 @@ export default function AdminSettings() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
-          className="glass-strong rounded-[24px] p-5"
-        >
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-[12px] bg-teal-100 text-teal-600 flex items-center justify-center">
-              <Wifi className="w-5 h-5" strokeWidth={1.8} />
-            </div>
-            <h2 className="font-semibold text-[15px] text-slate-800">Login WiFi Otomatis</h2>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-[13px] font-medium text-slate-600 mb-2">URL Login Hotspot</label>
-              <input
-                type="text"
-                value={hotspotLoginUrl}
-                onChange={e => setHotspotLoginUrl(e.target.value)}
-                placeholder="http://10.5.50.1/login"
-                className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] font-mono focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-300 transition-colors"
-              />
-              <p className="text-[11px] text-slate-400 mt-1.5">Alamat halaman login hotspot Mikrotik (gateway), bukan IP API.</p>
-            </div>
-
-            <div className="bg-teal-50 border border-teal-100 rounded-[16px] p-4 space-y-1.5">
-              <p className="text-[12px] font-semibold text-teal-700">Cara kerja</p>
-              <p className="text-[12px] text-slate-500 leading-relaxed">
-                Jika diisi, pelanggan yang membeli voucher dari aplikasi (sambil terhubung ke WiFi) akan melihat tombol <b>“Login WiFi Sekarang”</b> yang langsung menghubungkan mereka ke internet — tanpa ketik kode manual. Kosongkan untuk menyembunyikan tombol.
-              </p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.19 }}
           className="glass-strong rounded-[24px] p-5"
         >
@@ -504,6 +468,9 @@ export default function AdminSettings() {
           )}
         </button>
       </form>
+      <div className="mt-5">
+        <HotspotSetup />
+      </div>
     </div>
   );
 }

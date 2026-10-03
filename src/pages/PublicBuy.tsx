@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatRupiah } from '../lib/format';
 import { QrisCheckoutDetails, qrisDisplayText, useQrisPayment } from '../components/QrisCheckout';
 import { qrisRecoveryKey } from '../lib/qrisRecovery';
+import HotspotConnect from '../components/HotspotConnect';
 
 export default function PublicBuy() {
   const { packageId } = useParams<{ packageId: string }>();
@@ -278,6 +279,10 @@ export default function PublicBuy() {
                     <li className="flex items-start gap-2"><span className="text-sky-600 font-bold shrink-0">2.</span>Masukkan kode di atas sebagai Username &amp; Password</li>
                     <li className="flex items-start gap-2"><span className="text-sky-600 font-bold shrink-0">3.</span>Klik Login untuk mulai menggunakan internet.</li>
                   </ol>
+                </div>
+
+                <div className="mb-4 text-left">
+                  <HotspotConnect voucherCode={successCode} packageRouterId={pkg.router_id ?? undefined} auto />
                 </div>
 
                 <button

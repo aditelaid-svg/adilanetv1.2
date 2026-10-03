@@ -256,6 +256,33 @@ function toNum(v: any): number {
 
 // Read the live hotspot sessions currently connected to the router
 // (RouterOS `/ip/hotspot/active`). Each row is one connected user.
+export async function readHotspotClient(config: MikrotikConfig, mac: string, ip: string, code?: string) {
+  const api = new RouterOSAPI({ host: config.host, user: config.user, password: config.pass,
+    port: config.port ? Number(config.port) : 8728, timeout: 4 });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([api.connect(), new Promise((_, reject) => {
+      timer = setTimeout(() => { api.close(); reject(new Error('Hotspot connection timed out')); }, 4500);
+    })]);
+    const hosts = await api.write('/ip/hotspot/host/print', [`?mac-address=${mac}`]) as any[];
+    const active = code ? await api.write('/ip/hotspot/active/print', [`?user=${code}`]) as any[] : [];
+    const matches = (row: any) => String(row['mac-address'] || '').toUpperCase() === mac.toUpperCase() &&
+      (row.address === ip || row['to-address'] === ip);
+    const host = Array.isArray(hosts) ? hosts.find(matches) : undefined;
+    const connected = Array.isArray(active) && active.some(row => matches(row) && row.user === code);
+    const idle = host?.['idle-time'];
+    let idleSeconds: number | null = null;
+    if (typeof idle === 'string') {
+      if (/^\d+:\d{2}:\d{2}$/.test(idle)) {
+        const [h,m,s] = idle.split(':').map(Number); idleSeconds = h * 3600 + m * 60 + s;
+      } else if (/^(?:\d+[wdhms])+$/.test(idle)) {
+        idleSeconds = [...idle.matchAll(/(\d+)([wdhms])/g)].reduce((sum, item) => sum + Number(item[1]) * ({w:604800,d:86400,h:3600,m:60,s:1}[item[2]] || 0), 0);
+      }
+    }
+    return { present: !!host || connected, active: connected, idleSeconds };
+  } finally { if (timer) clearTimeout(timer); api.close(); }
+}
+
 export async function getActiveUsers(config: MikrotikConfig): Promise<ActiveUser[]> {
   const api = connect(config);
   try {

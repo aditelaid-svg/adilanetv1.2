@@ -7,6 +7,7 @@ import { useLocation } from 'react-router-dom';
 import { formatRupiah } from '../../lib/format';
 import { QrisCheckoutDetails, qrisDisplayText, useQrisPayment } from '../../components/QrisCheckout';
 import { findLatestQrisRecovery, qrisRecoveryKey } from '../../lib/qrisRecovery';
+import HotspotConnect from '../../components/HotspotConnect';
 
 export default function UserBuy() {
   const { packages, promos, currentUser, buyPackage, refreshData } = useAppContext();
@@ -44,6 +45,8 @@ export default function UserBuy() {
   const [error, setError] = useState<string | null>(null);
 
   const pinInputRef = useRef<HTMLInputElement>(null);
+  const queryPackageId = new URLSearchParams(location.search).get('packageId');
+  const querySelectionApplied = useRef(false);
 
   const [showQrisCode, setShowQrisCode] = useState(false);
   const qrisIdentity = currentUser ? `user-${currentUser.id}` : null;
@@ -53,7 +56,6 @@ export default function UserBuy() {
   const [qrisEnabled, setQrisEnabled] = useState(false);
   const [qrisConfigLoading, setQrisConfigLoading] = useState(true);
   const [qrisConfigError, setQrisConfigError] = useState<string | null>(null);
-  const [hotspotLoginUrl, setHotspotLoginUrl] = useState('');
 
   useEffect(() => {
     if (!currentUser || selectedPkg || packages.length === 0) return;
@@ -62,6 +64,13 @@ export default function UserBuy() {
     const packageToResume = packages.find(pkg => String(pkg.id) === recovered.packageId);
     if (packageToResume) setSelectedPkg(packageToResume);
   }, [currentUser?.id, packages, selectedPkg]);
+
+  useEffect(() => {
+    if (querySelectionApplied.current || !queryPackageId || packages.length === 0) return;
+    querySelectionApplied.current = true;
+    const requestedPackage = packages.find(pkg => String(pkg.id) === queryPackageId);
+    if (requestedPackage) setSelectedPkg(requestedPackage);
+  }, [queryPackageId, packages]);
 
   useEffect(() => {
     if (showPinInput && pinInputRef.current) {
@@ -78,7 +87,6 @@ export default function UserBuy() {
       })
       .then(json => {
         setQrisEnabled(json.data.qrisEnabled ?? true);
-        setHotspotLoginUrl(json.data.hotspotLoginUrl || '');
       })
       .catch(err => {
         setQrisConfigError(err instanceof Error ? err.message : 'Status QRIS tidak dapat dimuat.');
@@ -86,27 +94,6 @@ export default function UserBuy() {
       })
       .finally(() => setQrisConfigLoading(false));
   }, []);
-
-  // One-tap WiFi login: submit the voucher (username = password = code) to the
-  // Mikrotik hotspot login page. Works when the buyer is already on the WiFi.
-  const loginToWifi = () => {
-    if (!hotspotLoginUrl || !successCode) return;
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = hotspotLoginUrl;
-    const add = (name: string, value: string) => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = name;
-      input.value = value;
-      form.appendChild(input);
-    };
-    add('username', successCode);
-    add('password', successCode);
-    add('dst', 'http://www.google.com');
-    document.body.appendChild(form);
-    form.submit();
-  };
 
   const initiateBuy = async () => {
     setError(null);
@@ -418,32 +405,15 @@ export default function UserBuy() {
                     </button>
                   </div>
 
-                  {hotspotLoginUrl ? (
-                    <>
-                      <button
-                        onClick={loginToWifi}
-                        className="w-full bg-sky-500 active:scale-95 text-white font-semibold py-4 rounded-[18px] shadow-[0_8px_20px_rgba(14,165,233,0.3)] transition-transform text-[15px] flex items-center justify-center gap-2 mb-3"
-                      >
-                        <Wifi className="w-5 h-5" strokeWidth={1.8} /> Login WiFi Sekarang
-                      </button>
-                      <p className="text-slate-400 text-[11px] mb-4 px-2">
-                        Pastikan HP Anda terhubung ke jaringan WiFi AdilaNet. Internet langsung aktif setelah klik.
-                      </p>
-                      <button
-                        onClick={closeModals}
-                        className="w-full bg-white border border-slate-100 active:scale-95 text-slate-700 font-semibold py-3.5 rounded-[18px] shadow-sm transition-transform text-[14px]"
-                      >
-                        Nanti Saja
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={closeModals}
-                      className="w-full bg-white border border-slate-100 active:scale-95 text-slate-700 font-semibold py-4 rounded-[18px] shadow-sm transition-transform text-[15px]"
-                    >
-                      Selesai
-                    </button>
-                  )}
+                  <div className="mb-4 text-left">
+                    <HotspotConnect voucherCode={successCode || ''} packageRouterId={selectedPkg?.router_id ?? undefined} auto />
+                  </div>
+                  <button
+                    onClick={closeModals}
+                    className="w-full bg-white border border-slate-100 active:scale-95 text-slate-700 font-semibold py-4 rounded-[18px] shadow-sm transition-transform text-[15px]"
+                  >
+                    Selesai
+                  </button>
                 </div>
               )}
             </motion.div>

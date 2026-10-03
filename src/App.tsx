@@ -1,8 +1,9 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppProvider, useAppContext } from './AppContext';
 import { ToastProvider } from './components/Toast';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
+import { loginDestination } from './lib/loginDestination';
 
 import UserLayout from './components/UserLayout';
 import AdminLayout from './components/AdminLayout';
@@ -10,6 +11,7 @@ import AdminLayout from './components/AdminLayout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import PublicBuy from './pages/PublicBuy';
+import HotspotPortal from './pages/HotspotPortal';
 
 import UserHome from './pages/user/UserHome';
 import UserPackages from './pages/user/UserPackages';
@@ -33,11 +35,14 @@ import AdminTopups from './pages/admin/AdminTopups';
 
 function AppRoutes() {
   const { currentUser } = useAppContext();
+  const location = useLocation();
+  const authenticatedDestination = loginDestination(currentUser?.role, location.search);
 
   return (
     <Routes>
       <Route path="/checkout/:packageId" element={<PublicBuy />} />
-      <Route path="/login" element={!currentUser ? <Login /> : <Navigate to={currentUser.role !== 'user' ? '/admin' : '/user'} replace />} />
+      <Route path="/hotspot" element={<HotspotPortal />} />
+      <Route path="/login" element={!currentUser ? <Login /> : <Navigate to={authenticatedDestination} replace />} />
       <Route path="/register" element={!currentUser ? <Register /> : <Navigate to={currentUser.role !== 'user' ? '/admin' : '/user'} replace />} />
 
       {currentUser && currentUser.role !== 'user' && (

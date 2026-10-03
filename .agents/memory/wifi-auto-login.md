@@ -32,3 +32,9 @@ Use browser navigation rather than cross-origin fetch for client hotspot login.
 **Why:** Captive-portal cross-origin requests encounter CORS and HTTPS-to-HTTP restrictions. Even a top-level form may prompt an insecure-form warning when an HTTPS app submits to an HTTP gateway; automatic login cannot be guaranteed across browsers or closed/background captive-portal windows.
 
 **How to apply:** Prefer a correctly configured secure gateway, preserve a user-initiated login fallback, and do not promise silent automatic internet access on every device.
+
+Generate HTTP-CHAP credentials from a fresh gateway challenge after checkout, not from the challenge captured when the customer first opened the portal.
+
+**Why:** QRIS checkout can take several minutes, and reopening the gateway changes its challenge. Reusing the initial challenge can reject an otherwise valid, successfully purchased voucher.
+
+**How to apply:** Keep authentication in a small self-contained MikroTik bridge, preserve CHAP support, and avoid external hashing-script dependencies. Server-hosted presentation must not replace MikroTik's client authentication.

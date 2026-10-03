@@ -9,11 +9,12 @@ import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { Pool, type PoolClient } from "pg";
-import { createVoucher, createVouchersBulk, createProfile, updateProfile, deleteProfile, checkReaper, repairReaper } from "./src/server/mikrotik";
+import { createVoucher, createVouchersBulk, createProfile, updateProfile, deleteProfile, checkReaper, repairReaper, readHotspotClient } from "./src/server/mikrotik";
 import dotenv from "dotenv";
 import { QiospayPayments } from "./src/server/qiospay-payments";
 import { ensureQiospaySchema } from "./src/server/qiospay-schema";
 import { PaymentError, validateStaticQr, validCallbackToken, readQiospayConfig } from "./src/server/qiospay-client";
+import { registerHotspotRoutes } from "./src/server/hotspot-routes";
 
 dotenv.config();
 
@@ -473,6 +474,8 @@ async function startServer() {
     );
   });
   qiospay.start();
+  registerHotspotRoutes(app, pool, getSettings, requireAdmin, SESSION_SECRET, (router, mac, ip, code) =>
+    readHotspotClient({ host: router.ip_address, user: router.username, pass: router.password, port: router.api_port }, mac, ip, code));
 
   // ─── HEALTH ─────────────────────────────────────────────────────────────
   app.get("/api/health", async (req, res) => {
