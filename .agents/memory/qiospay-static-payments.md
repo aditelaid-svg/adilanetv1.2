@@ -26,3 +26,9 @@ Untuk pengaturan admin, pengguna meminta: “buat simpel setingan QRIS Qiospay, 
 **Why:** Pengguna menyatakan halaman terlihat berantakan karena keterangannya.
 
 **How to apply:** Keep the admin QRIS form compact, with field labels and essential save/error feedback rather than explanatory notes. This presentation preference does not remove payment safeguards or buyer-facing amount disclosure.
+
+Do not infer invalid credentials solely from Qiospay HTTP 200 with `status: "error"`.
+
+**Why:** Live read-only checks also returned that envelope with a message indicating no mutation data. The public documentation does not specify this empty-ledger behavior.
+
+**How to apply:** Distinguish missing mutation data from explicit credential rejection without exposing raw provider messages. Do not treat an undocumented error envelope as verified authentication or payment success.
