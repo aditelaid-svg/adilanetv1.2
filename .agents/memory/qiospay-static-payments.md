@@ -17,7 +17,7 @@ Never recycle an exact merchant payment total for automatic order matching, incl
 
 Pengguna memilih kode unik sampai 200 karena pembayaran QRIS belum banyak. Gunakan kode kecil berurutan tanpa reset harian.
 
-**Why:** The user wants smaller additions. Retaining permanent total reservations prevents late payment of an old QR from fulfilling a new order.
+**Why:** The user wants smaller additions. Retaining permanent total reservations prevents late payment of an old QR from fulfilling a new order. Setelah perubahan kode unik dan nominal pada QR, pengguna mengonfirmasi: “sekarang sudah bagus dan lancar.”
 
 **How to apply:** Preserve legacy invoices, including codes above 200; do not renumber or remove historical reservations. Stop new checkout when no safe total remains in the selected range.
 
