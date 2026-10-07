@@ -224,6 +224,14 @@ test('transport timeout remains pending and retries with the original reference'
   assert.equal(requests.length, 2); assert.equal(requests[0].ref_id, requests[1].ref_id);
   assert.equal((await service.order(1, order.id)).status, 'success');
 });
+test('reserved orders still reconcile through Buyer API if webhook secret is removed', async () => {
+  await live(); const { order } = await buy();
+  credentials.webhookSecret = '';
+  await service.reconcileOne();
+  assert.equal(requests.length, 1);
+  assert.equal((await service.order(1, order.id)).status, 'success');
+  assert.equal(await balance(), 88500);
+});
 test('final authenticated failure refunds once under concurrent workers and callback replay', async () => {
   await live(); const { order } = await buy(); outcome = 'Gagal';
   await Promise.all([service.reconcileOne(), service.reconcileOne(), service.reconcileOne()]);

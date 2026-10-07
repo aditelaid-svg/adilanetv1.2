@@ -342,7 +342,9 @@ export class PpobService {
       await db.query('COMMIT');
     } catch (error) { await db.query('ROLLBACK'); throw error; } finally { db.release(); }
     let result: ProviderResult | null = null;
-    const accountUnavailable = !this.provider.readiness().configured || order.account_hash !== this.provider.fingerprint();
+    // Webhook credentials are only for callback wake-ups. API status checks
+    // must continue while a secret is rotated or temporarily unavailable.
+    const accountUnavailable = !this.provider.readiness().api_configured || order.account_hash !== this.provider.fingerprint();
     try {
       if (accountUnavailable) throw new Error('Account unavailable');
       result = await this.provider.transaction({ ...order, cost_price: Number(order.cost_price) });
