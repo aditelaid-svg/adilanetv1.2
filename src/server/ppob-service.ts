@@ -44,7 +44,8 @@ function viewOrder(order: any, admin = false) {
   return { id: order.id, reference: order.reference, sku: order.sku, product_name: order.product_name,
     customer_no: order.customer_no, amount: Number(order.amount), status: order.status,
     message: order.message, serial: order.serial, created_at: order.created_at, updated_at: order.updated_at,
-    refunded_at: order.refunded_at, ...(admin ? { cost_price: Number(order.provider_price ?? order.cost_price), user_name: order.user_name } : {}) };
+    refunded_at: order.refunded_at, ...(admin ? { response_code: order.response_code,
+      cost_price: Number(order.provider_price ?? order.cost_price), user_name: order.user_name } : {}) };
 }
 function viewProduct(p: any, config: any, admin = false) {
   const price = sellingPrice(p, config);
@@ -387,11 +388,19 @@ export class PpobService {
         const review = accountUnavailable || inconsistent || missingToken || unverifiedFailure ||
           Date.now() - dateMs(order.created_at) > 24 * 60 * 60_000 || order.status === 'review';
         const delay = Math.min(300, 15 * 2 ** Math.min(Number(order.attempts), 5));
+        const nextStatus = review ? 'review' : 'pending';
+        const providerDetail = matches ? `Hasil Digiflazz: ${result!.status} (RC ${result!.rc}). ` : '';
+        const message = review
+          ? `${providerDetail}Perlu pemeriksaan admin. Saldo ditahan sampai hasil pemasok terverifikasi.`
+          : `${providerDetail}Masih diproses. Jangan membeli ulang; status akan diperiksa otomatis.`;
+        const responseCode = matches ? result!.rc : order.response_code;
+        const stateChanged = order.status !== nextStatus || order.message !== message || order.response_code !== responseCode;
         await db.query(`UPDATE ppob_orders SET status=$2,message=$3,lease_until=NULL,
+          response_code=CASE WHEN $5 THEN $6 ELSE response_code END,
           next_check_at=LEAST(next_check_at,now()+($4*interval '1 second')),
-          updated_at=now() WHERE id=$1`, [id,review ? 'review' : 'pending',
-          review ? 'Perlu pemeriksaan admin. Saldo ditahan sampai hasil pemasok terverifikasi.' :
-            'Masih diproses. Jangan membeli ulang; status akan diperiksa otomatis.', delay]);
+          updated_at=now() WHERE id=$1`, [id,nextStatus,message,delay,!!matches,result?.rc ?? null]);
+        if (stateChanged)
+          await this.audit(db, null, `${review ? 'order.review_required' : 'order.pending'}${matches ? `.rc${result!.rc}` : ''}`, id);
         if (inconsistent) await this.audit(db, null, 'order.provider_mismatch', id);
       }
       await db.query('COMMIT');

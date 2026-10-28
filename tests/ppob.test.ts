@@ -257,7 +257,17 @@ test('documented RC 01 and RC 70 timeouts are ambiguous, then later success reso
     assert.equal((await service.order(1, order.id)).status, 'review', `RC ${rc} must remain unresolved`);
     assert.equal(await balance(), 88500);
     assert.equal(await count('ppob_wallet_entries'), 1);
+    const stored = await pool.query('SELECT response_code,message FROM ppob_orders WHERE id=$1', [order.id]);
+    assert.equal(stored.rows[0].response_code, rc);
+    assert.match(stored.rows[0].message, new RegExp(`RC ${rc}`));
+    const adminOrder = (await service.admin()).orders.find(item => item.id === order.id);
+    assert.equal(adminOrder?.response_code, rc, 'admin review includes the latest provider code');
+    const event = await pool.query('SELECT action FROM ppob_audit WHERE entity_id=$1 ORDER BY created_at DESC LIMIT 1', [order.id]);
+    assert.equal(event.rows[0].action, `order.review_required.rc${rc}`);
   }
+  await due(order.id); await service.reconcileOne();
+  const repeated = await pool.query("SELECT count(*) FROM ppob_audit WHERE entity_id=$1 AND action='order.review_required.rc70'", [order.id]);
+  assert.equal(Number(repeated.rows[0].count), 1, 'repeated identical checks do not flood the audit log');
   override = {}; await due(order.id); await service.reconcileOne();
   assert.equal((await service.order(1, order.id)).status, 'success');
   assert.equal(await balance(), 88500);
@@ -265,7 +275,8 @@ test('documented RC 01 and RC 70 timeouts are ambiguous, then later success reso
   override = { status: 'Gagal', rc: '01', price: 0 };
   await due(order.id); await service.reconcileOne();
   assert.equal((await service.order(1, order.id)).status, 'success', 'a late stale result cannot reverse a final success');
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 4);
+  assert.ok(requests.every(request => request.ref_id === order.reference), 'every status retry reuses the immutable purchase reference');
 });
 test('official response-code classifications only refund known terminal failures or first request rejections', () => {
   const failed = (rc: string, attempts: number) => definiteProviderFailure({
