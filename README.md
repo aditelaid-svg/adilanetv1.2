@@ -30,13 +30,19 @@ Edit **3 bagian** sebelum deploy:
 # 1. Ganti URL GitHub dengan repo kamu
 context: https://github.com/GITHUB_USERNAME/NAMA_REPO.git
 
-# 2. Ganti password database (sama di kedua tempat)
-POSTGRES_PASSWORD: password_kamu_disini
-DATABASE_URL: postgres://adilanet:password_kamu_disini@db:5432/adilanet
+# 2. Simpan konfigurasi berikut di file .env privat (jangan commit .env)
+POSTGRES_PASSWORD=<password database yang sudah digunakan volume>
+DATABASE_URL=<URL PostgreSQL lengkap dengan password yang sama>
+SESSION_SECRET=<secret sesi yang sudah digunakan deployment>
 
 # 3. Ganti IP server kamu (untuk webhook QRIS)
 APP_URL: "http://192.168.1.100:5000"
 ```
+
+Salin `.env.example` ke `.env` dan isi nilainya sebelum menjalankan Docker Compose.
+Untuk deployment yang sudah berjalan, gunakan kembali password database dan
+`SESSION_SECRET` yang saat ini dipakai; jangan merotasi keduanya saat memperbarui
+compose. File `.env` diabaikan Git.
 
 ### Langkah 4 — Deploy
 

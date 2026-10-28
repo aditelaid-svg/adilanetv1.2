@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -123,4 +123,25 @@ html, body {
 }
 .loading-bar {
   animation: loading-bar 1.1s ease-in-out infinite;
+}
+
+/* PPOB operations use a more focused ledger palette while retaining AdilaNet's coastal blue. */
+.ppob-page {
+  --pp-ink: #173248;
+  --pp-muted: #647c8a;
+  --pp-blue: #087eaa;
+  --pp-blue-deep: #075b7b;
+  --pp-line: #d8e5e9;
+  --pp-paper: #f5faf9;
+  font-family: 'Manrope', sans-serif;
+}
+.ppob-page .ppob-mono { font-family: 'DM Mono', monospace; }
+.ppob-page .ppob-enter { animation: ppob-enter .38s both; }
+.ppob-page .ppob-enter-delay { animation: ppob-enter .42s .08s both; }
+@keyframes ppob-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ppob-page .ppob-enter, .ppob-page .ppob-enter-delay { animation: none; }
 }

@@ -9,7 +9,8 @@
     "start": "node dist/server.cjs",
     "lint": "tsc --noEmit",
     "test:qiospay": "tsx --test tests/qiospay.test.ts",
-    "test:hotspot": "tsx --test tests/hotspot.test.ts"
+    "test:hotspot": "tsx --test tests/hotspot.test.ts",
+    "test:ppob": "tsx --test tests/ppob.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

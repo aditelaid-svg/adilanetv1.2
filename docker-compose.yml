@@ -29,7 +29,7 @@ services:
     environment:
       POSTGRES_DB: adilanet
       POSTGRES_USER: adilanet
-      POSTGRES_PASSWORD: adilanet_pass_2024   # ← ganti ini
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the private .env file}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -61,15 +61,19 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5000
-      # PostgreSQL — sesuaikan password dengan service db di atas
-      DATABASE_URL: postgres://adilanet:adilanet_pass_2024@db:5432/adilanet
-      # ── WAJIB ── String acak panjang untuk keamanan sesi/login.
-      # App TIDAK akan jalan kalau ini kosong. Ganti nilainya!
-      # Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-      SESSION_SECRET: "GANTI_DENGAN_STRING_ACAK_PANJANG_64_KARAKTER"
+      # Isi DATABASE_URL di .env privat. Gunakan kredensial DB yang sudah ada
+      # untuk deployment lama; jangan merotasi password saat memperbarui compose.
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the private .env file}
+      # Gunakan SESSION_SECRET yang sudah ada pada deployment lama.
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in the private .env file}
       # Biarkan "false" kalau akses lewat HTTP (mis. http://IP:5000).
       # Set "true" HANYA jika app sudah di belakang HTTPS (domain + TLS).
-      COOKIE_SECURE: "false"
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      # PPOB Digiflazz: isi di file .env privat, jangan commit kredensial.
+      # Layanan tetap terkunci tanpa kredensial lengkap + HTTPS/cookie secure.
+      DIGIFLAZZ_USERNAME: "${DIGIFLAZZ_USERNAME:-}"
+      DIGIFLAZZ_API_KEY: "${DIGIFLAZZ_API_KEY:-}"
+      DIGIFLAZZ_WEBHOOK_SECRET: "${DIGIFLAZZ_WEBHOOK_SECRET:-}"
       # Catatan: Merchant Code & API Key Sanpay TIDAK diisi di sini.
       # Cukup masukkan lewat menu Pengaturan di panel admin setelah app jalan.
     depends_on:

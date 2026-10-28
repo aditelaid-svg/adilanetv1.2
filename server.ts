@@ -15,6 +15,9 @@ import { QiospayPayments } from "./src/server/qiospay-payments";
 import { ensureQiospaySchema } from "./src/server/qiospay-schema";
 import { PaymentError, validateStaticQr, validCallbackToken, readQiospayConfig } from "./src/server/qiospay-client";
 import { registerHotspotRoutes } from "./src/server/hotspot-routes";
+import { ensurePpobSchema } from "./src/server/ppob-schema";
+import { PpobService } from "./src/server/ppob-service";
+import { registerPpobRoutes, sameOrigin } from "./src/server/ppob-routes";
 
 dotenv.config();
 
@@ -98,25 +101,32 @@ function genBulkCode(format: string): string {
 }
 
 // ─── AUTH MIDDLEWARE ────────────────────────────────────────────────────────
-function requireAuth(req: Request, res: Response, next: NextFunction) {
+async function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
     return res.status(401).json({ success: false, error: "Silakan login terlebih dahulu." });
   }
-  next();
+  try {
+    const { rows } = await pool.query('SELECT role,status FROM users WHERE id=$1', [req.session.userId]);
+    if (!rows[0] || rows[0].status !== 'active') {
+      return req.session.destroy(() => res.status(401).json({ success: false, error: "Sesi tidak valid." }));
+    }
+    // Revoked/changed roles take effect immediately, not at the next login.
+    req.session.role = rows[0].role;
+    next();
+  } catch { res.status(503).json({ success: false, error: "Sesi belum dapat diverifikasi." }); }
 }
 
 function isAdminRole(role?: string): boolean {
   return role === "admin" || role === "superadmin";
 }
 
-function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!req.session?.userId) {
-    return res.status(401).json({ success: false, error: "Silakan login terlebih dahulu." });
-  }
-  if (!isAdminRole(req.session.role)) {
-    return res.status(403).json({ success: false, error: "Akses ditolak: khusus administrator." });
-  }
-  next();
+async function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  await requireAuth(req, res, () => {
+    if (!isAdminRole(req.session.role)) {
+      res.status(403).json({ success: false, error: "Akses ditolak: khusus administrator." }); return;
+    }
+    next();
+  });
 }
 
 async function initDb() {
@@ -229,6 +239,7 @@ async function initDb() {
   `);
 
   await ensureQiospaySchema(pool);
+  await ensurePpobSchema(pool);
 
   // Seed demo data if empty
   const { rows: userRows } = await pool.query("SELECT COUNT(*) as cnt FROM users");
@@ -379,7 +390,11 @@ async function startServer() {
 
   const isProd = process.env.NODE_ENV === "production";
   app.set("trust proxy", 1);
-  app.use(cors({ origin: true, credentials: true }));
+  // Never reflect an arbitrary site's origin with authenticated cookies.
+  app.use(cors((req, callback) => callback(null, {
+    origin: !req.headers.origin || sameOrigin(req.headers.origin, req.headers.host),
+    credentials: true,
+  })));
 
   // ─── SECURITY HEADERS (Helmet) ───────────────────────────────────────────
   // Adds X-Frame-Options, X-Content-Type-Options, Referrer-Policy, etc.
@@ -427,12 +442,20 @@ async function startServer() {
     message: { success: false, error: "Terlalu banyak request. Coba lagi sebentar." },
     skip: (req) => req.path === "/api/health",
   });
+  const credentialLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false,
+    keyGenerator: req => `credentials:${req.session.userId}`, skipSuccessfulRequests: true,
+    skip: req => !req.body?.pin && !req.body?.password,
+    message: { success: false, error: "Terlalu banyak percobaan verifikasi password. Tunggu 15 menit." },
+  });
 
   app.use("/api/", generalLimiter);
   app.use("/api/auth/login", loginLimiter);
   app.use("/api/auth/register", registerLimiter);
   app.use("/api/payment/create-qris", qrisLimiter);
 
+  // Preserve exact webhook bytes for HMAC; the general JSON parser must not consume them.
+  app.use('/api/ppob/webhook', express.raw({ type: 'application/json', limit: '64kb' }));
   app.use(express.json({ limit: '3mb' }));
 
   const PgSession = connectPgSimple(session);
@@ -474,6 +497,9 @@ async function startServer() {
     );
   });
   qiospay.start();
+  const ppob = new PpobService(pool);
+  registerPpobRoutes(app, pool, ppob, requireAuth, requireAdmin, SESSION_SECRET);
+  ppob.start();
   registerHotspotRoutes(app, pool, getSettings, requireAdmin, SESSION_SECRET, (router, mac, ip, code) =>
     readHotspotClient({ host: router.ip_address, user: router.username, pass: router.password, port: router.api_port }, mac, ip, code));
 
@@ -509,8 +535,10 @@ async function startServer() {
       if (user.status === 'blocked') {
         return res.status(403).json({ success: false, error: "Akun Anda telah ditangguhkan. Hubungi Administrator." });
       }
+      await new Promise<void>((resolve, reject) => req.session.regenerate(err => err ? reject(err) : resolve()));
       req.session.userId = user.id;
       req.session.role = user.role;
+      await new Promise<void>((resolve, reject) => req.session.save(err => err ? reject(err) : resolve()));
       const { password: _pw, pin: _pin, ...safeUser } = user;
       res.json({ success: true, data: { ...safeUser, balance: parseFloat(safeUser.balance), has_pin: !!_pin } });
     } catch (err: any) {
@@ -571,8 +599,10 @@ async function startServer() {
         [name, email, phone_number || null, hashed]
       );
       const user = rows[0];
+      await new Promise<void>((resolve, reject) => req.session.regenerate(err => err ? reject(err) : resolve()));
       req.session.userId = user.id;
       req.session.role = user.role;
+      await new Promise<void>((resolve, reject) => req.session.save(err => err ? reject(err) : resolve()));
       const { password: _pw, pin: _pin, ...safeUser } = user;
       res.json({ success: true, data: { ...safeUser, balance: parseFloat(safeUser.balance), has_pin: !!_pin } });
     } catch (err: any) {
@@ -613,7 +643,7 @@ async function startServer() {
     }
   });
 
-  app.patch("/api/users/:id", requireAuth, async (req, res) => {
+  app.patch("/api/users/:id", requireAuth, credentialLimiter, async (req, res) => {
     try {
       const isAdmin = isAdminRole(req.session.role);
       const isSuper = req.session.role === "superadmin";
@@ -621,7 +651,23 @@ async function startServer() {
       if (!isAdmin && targetId !== req.session.userId) {
         return res.status(403).json({ success: false, error: "Akses ditolak." });
       }
-      const { name, email, phone_number, password, pin, role, balance, status } = req.body;
+      const { name, email, phone_number, password, pin, role, balance, status, current_password } = req.body;
+      const changesCredentials = (password !== undefined && password !== '') || (pin !== undefined && pin !== '');
+      if (changesCredentials) {
+        if (!sameOrigin(req.get('origin'), req.get('host'), req.protocol))
+          return res.status(403).json({ success: false, error: "Perubahan keamanan harus dilakukan dari aplikasi." });
+        if (password !== undefined && password !== '' &&
+            (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72))
+          return res.status(400).json({ success: false, error: "Password baru minimal 8 karakter, maksimal 72 byte." });
+        if (pin !== undefined && pin !== '' && (typeof pin !== 'string' || !/^\d{6}$/.test(pin)))
+          return res.status(400).json({ success: false, error: "PIN transaksi harus enam digit." });
+        if (targetId === req.session.userId) {
+          const account = await pool.query('SELECT password FROM users WHERE id=$1', [targetId]);
+          if (typeof current_password !== 'string' || current_password.length > 128 ||
+              !account.rows[0] || !(await bcrypt.compare(current_password, account.rows[0].password)))
+            return res.status(403).json({ success: false, error: "Password saat ini tidak sesuai. Perubahan PIN/password ditolak." });
+        }
+      }
 
       // Load target role to apply superadmin protections
       const { rows: tgtRows } = await pool.query(`SELECT role FROM users WHERE id = $1`, [targetId]);
@@ -671,6 +717,10 @@ async function startServer() {
       );
       if (rows.length === 0) return res.status(404).json({ success: false, error: "User tidak ditemukan." });
       const u = rows[0];
+      if (changesCredentials) {
+        // Invalidates other sessions when a password or PIN is reset.
+        await pool.query("DELETE FROM user_sessions WHERE sess->>'userId'=$1 AND sid<>$2", [String(targetId), req.sessionID]);
+      }
       res.json({ success: true, data: { ...u, balance: parseFloat(u.balance) } });
     } catch (err: any) {
       if (err.code === '23505') {
@@ -694,6 +744,10 @@ async function startServer() {
       }
       if (isAdminRole(targetRole) && req.session.role !== "superadmin") {
         return res.status(403).json({ success: false, error: "Hanya superadmin yang dapat menghapus admin." });
+      }
+      const financialHistory = await pool.query('SELECT 1 FROM ppob_orders WHERE user_id=$1 LIMIT 1', [targetId]);
+      if (financialHistory.rows.length) {
+        return res.status(409).json({ success: false, error: "Akun memiliki riwayat finansial PPOB dan tidak bisa dihapus. Gunakan status diblokir." });
       }
       await pool.query(`DELETE FROM users WHERE id = $1`, [targetId]);
       res.json({ success: true });

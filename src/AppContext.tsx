@@ -130,7 +130,7 @@ type AppContextType = {
   login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   registerUser: (name: string, email: string, phone_number: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  updateUser: (userId: number, data: Partial<User & { password?: string }>) => Promise<void>;
+  updateUser: (userId: number, data: Partial<User & { password?: string; current_password?: string }>) => Promise<void>;
   topupBalance: (userId: number, amount: number, idempotencyKey?: string) => Promise<void>;
   deductBalance: (userId: number, amount: number, idempotencyKey?: string) => Promise<void>;
   buyPackage: (pkg: Package, method: 'saldo' | 'qris', pin?: string, promoId?: number) => Promise<{ success: boolean; error?: string; voucher_code?: string }>;
@@ -260,6 +260,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await refreshPromos();
 
       if (currentUser) {
+        const me = await apiFetch('/api/auth/me');
+        if (me.success) {
+          _setCurrentUser(me.data);
+          saveSession(me.data);
+        }
         if (currentUser.role !== 'user') {
           // Admin-only endpoints — users, routers, transactions & top-up history
           const [usersRes, routersRes, txRes, topupRes, notifRes] = await Promise.all([
@@ -388,11 +393,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ─── USERS ────────────────────────────────────────────────────────────
-  const updateUser = async (userId: number, data: Partial<User & { password?: string }>) => {
+  const updateUser = async (userId: number, data: Partial<User & { password?: string; current_password?: string }>) => {
     const res = await apiFetch(`/api/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+    if (!res.success) throw new Error(res.error || 'Perubahan akun belum berhasil.');
     if (res.success) {
       const updated = res.data;
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updated } : u));

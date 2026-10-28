@@ -21,6 +21,7 @@ import UserProfile from './pages/user/UserProfile';
 import UserNotifications from './pages/user/UserNotifications';
 import UserHelp from './pages/user/UserHelp';
 import UserTopup from './pages/user/UserTopup';
+import UserPpob from './pages/user/UserPpob';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminRouters from './pages/admin/AdminRouters';
@@ -32,6 +33,7 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminPromos from './pages/admin/AdminPromos';
 import AdminTopups from './pages/admin/AdminTopups';
+import AdminPpob from './pages/admin/AdminPpob';
 
 function AppRoutes() {
   const { currentUser } = useAppContext();
@@ -53,6 +55,7 @@ function AppRoutes() {
           <Route path="promos" element={<AdminPromos />} />
           <Route path="transactions" element={<AdminTransactions />} />
           <Route path="topups" element={<AdminTopups />} />
+          <Route path="ppob" element={<AdminPpob />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="vouchers" element={<AdminVouchers />} />
           <Route path="hotspot-users" element={<AdminHotspotUsers />} />
@@ -67,6 +70,7 @@ function AppRoutes() {
           <Route path="packages" element={<UserPackages />} />
           <Route path="buy" element={<UserBuy />} />
           <Route path="topup" element={<UserTopup />} />
+          <Route path="ppob" element={<UserPpob />} />
           <Route path="history" element={<UserHistory />} />
           <Route path="notifications" element={<UserNotifications />} />
           <Route path="help" element={<UserHelp />} />

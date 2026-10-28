@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Router as RouterIcon, Ticket, TicketPlus, Receipt, Users, UserCheck, Settings, Menu, X, LogOut, ChevronLeft, Megaphone, Wallet } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Router as RouterIcon, Ticket, TicketPlus, Receipt, Users, UserCheck, Settings, Menu, X, LogOut, ChevronLeft, Megaphone, Wallet, Smartphone } from 'lucide-react';
 import { cn } from './UserLayout';
 import { useAppContext } from '../AppContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,20 +15,23 @@ const adminNav = [
   { icon: Megaphone, label: 'Promo / Banner', path: '/admin/promos' },
   { icon: Receipt, label: 'Transaksi', path: '/admin/transactions' },
   { icon: Wallet, label: 'Riwayat Top Up', path: '/admin/topups' },
+  { icon: Smartphone, label: 'PPOB', path: '/admin/ppob' },
   { icon: Users, label: 'Pengguna', path: '/admin/users' },
   { icon: Settings, label: 'Pengaturan', path: '/admin/settings' },
 ];
 
 export default function AdminLayout() {
+  const location = useLocation();
+  const widePpob = location.pathname === '/admin/ppob';
   const { currentUser, setCurrentUser, loading } = useAppContext();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen text-slate-800 font-sans selection:bg-sky-200 overflow-hidden flex justify-center">
-      <div className="relative w-full max-w-md min-h-screen flex flex-col overflow-x-hidden">
+      <div className={`relative w-full ${widePpob ? 'max-w-[1600px]' : 'max-w-md'} min-h-screen flex flex-col overflow-x-hidden`}>
 
         {/* Coastal gradient background */}
-        <div className="coastal-bg fixed inset-0 max-w-md mx-auto">
+        <div className={`coastal-bg fixed inset-0 ${widePpob ? 'max-w-[1600px]' : 'max-w-md'} mx-auto`}>
           <div className="coastal-glow coastal-glow-1" />
           <div className="coastal-glow coastal-glow-2" />
           <div className="coastal-glow coastal-glow-3" />

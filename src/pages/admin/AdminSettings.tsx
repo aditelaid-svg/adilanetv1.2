@@ -30,6 +30,9 @@ export default function AdminSettings() {
   const [whatsappMessage, setWhatsappMessage] = useState('');
 
   const [adminPassword, setAdminPassword] = useState('');
+  const [currentAdminPassword, setCurrentAdminPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -151,13 +154,17 @@ export default function AdminSettings() {
     }
   };
 
-  const handleSavePassword = (e: React.FormEvent) => {
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser || !adminPassword) return;
-    updateUser(currentUser.id, { password: adminPassword });
-    setPasswordSaved(true);
-    setAdminPassword('');
-    setTimeout(() => setPasswordSaved(false), 3000);
+    setPasswordSaving(true); setPasswordError('');
+    try {
+      await updateUser(currentUser.id, { password: adminPassword, current_password: currentAdminPassword });
+      setPasswordSaved(true);
+      setAdminPassword(''); setCurrentAdminPassword('');
+      setTimeout(() => setPasswordSaved(false), 3000);
+    } catch (error) { setPasswordError(error instanceof Error ? error.message : 'Perubahan password ditolak.'); }
+    finally { setPasswordSaving(false); }
   };
 
   return (
@@ -184,12 +191,21 @@ export default function AdminSettings() {
         </div>
         
         <form onSubmit={handleSavePassword} className="space-y-4">
+          <label className="block text-[13px] font-medium text-slate-600">
+            Password admin saat ini
+            <input aria-label="Password admin saat ini" type="password" autoComplete="current-password" required
+              value={currentAdminPassword} onChange={e => setCurrentAdminPassword(e.target.value)}
+              className="mt-2 w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-amber-200" />
+          </label>
           <div>
             <label className="block text-[13px] font-medium text-slate-600 mb-2">Ubah Password Admin</label>
             <div className="relative">
               <input
                 type="password"
                 value={adminPassword}
+                minLength={8}
+                maxLength={72}
+                autoComplete="new-password"
                 onChange={e => setAdminPassword(e.target.value)}
                 placeholder="Masukkan password baru"
                 className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition-colors"
@@ -198,11 +214,13 @@ export default function AdminSettings() {
               <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" strokeWidth={1.8} />
             </div>
           </div>
+          {passwordError && <p role="alert" className="text-sm text-red-600">{passwordError}</p>}
           <button 
             type="submit"
+            disabled={passwordSaving}
             className="w-full bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 active:scale-95 font-semibold flex items-center justify-center gap-2 transition-all text-[15px] py-3.5 rounded-[16px]"
           >
-            {passwordSaved ? 'Berhasil Disimpan' : 'Simpan Password'}
+            {passwordSaving ? 'Menyimpan...' : passwordSaved ? 'Berhasil Disimpan' : 'Simpan Password'}
           </button>
         </form>
       </motion.div>

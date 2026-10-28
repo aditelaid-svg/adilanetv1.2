@@ -1,6 +1,6 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { Home, Package, ShoppingCart, Clock, User as UserIcon, Bell } from 'lucide-react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Home, Package, ShoppingCart, Clock, User as UserIcon, Bell, Smartphone } from 'lucide-react';
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useAppContext } from '../AppContext';
@@ -12,14 +12,16 @@ export function cn(...inputs: ClassValue[]) {
 
 export default function UserLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const widePpob = location.pathname === '/user/ppob';
   const { loading, notifications } = useAppContext();
   const unread = notifications.filter(n => !n.read).length;
 
   return (
     <div className="min-h-screen text-slate-800 font-sans selection:bg-sky-200 overflow-hidden flex justify-center">
-      <div className="relative w-full max-w-md min-h-screen flex flex-col overflow-x-hidden">
+      <div className={`relative w-full ${widePpob ? 'max-w-[1440px]' : 'max-w-md'} min-h-screen flex flex-col overflow-x-hidden`}>
         {/* Coastal gradient background */}
-        <div className="coastal-bg fixed inset-0 max-w-md mx-auto">
+        <div className={`coastal-bg fixed inset-0 ${widePpob ? 'max-w-[1440px]' : 'max-w-md'} mx-auto`}>
           <div className="coastal-glow coastal-glow-1" />
           <div className="coastal-glow coastal-glow-2" />
           <div className="coastal-glow coastal-glow-3" />
@@ -36,7 +38,7 @@ export default function UserLayout() {
           onClick={() => navigate('/user/notifications')}
           aria-label="Notifikasi"
           className="fixed top-4 right-4 max-w-md z-50 w-11 h-11 flex items-center justify-center rounded-full glass-pill text-slate-600 hover:text-slate-800 transition-all active:scale-95 shadow-sm"
-          style={{ right: 'max(1rem, calc((100vw - 28rem) / 2 + 1rem))' }}
+          style={{ right: widePpob ? 'max(1rem, calc((100vw - 90rem) / 2 + 1rem))' : 'max(1rem, calc((100vw - 28rem) / 2 + 1rem))' }}
         >
           <Bell className="w-5 h-5" strokeWidth={1.8} />
           {unread > 0 && (
@@ -74,8 +76,8 @@ export default function UserLayout() {
               )}
             </NavLink>
 
-            {/* Floating Action Button */}
-            <div className="absolute left-1/2 -top-6 -translate-x-1/2 w-16 h-16 rounded-full flex items-center justify-center z-20">
+            {/* Preserve the voucher shortcut elsewhere; PPOB's five-item mobile nav stays unobstructed. */}
+            {!widePpob && <div className="absolute left-1/2 -top-6 -translate-x-1/2 w-16 h-16 rounded-full flex items-center justify-center z-20">
               <div className="absolute inset-0 glass-nav rounded-full" />
               <button
                 onClick={() => navigate('/user/buy')}
@@ -84,13 +86,22 @@ export default function UserLayout() {
               >
                 <ShoppingCart className="w-6 h-6 text-white" />
               </button>
-            </div>
+            </div>}
 
             <NavLink to="/user/history" className={({ isActive }) => cn("flex flex-col items-center justify-center w-16 h-full transition-colors relative group ml-4", isActive ? "text-sky-600" : "text-slate-400 hover:text-slate-600")}>
               {({ isActive }) => (
                 <>
                   <Clock className={cn("w-6 h-6 mb-1 transition-transform", isActive ? "scale-100" : "scale-95")} strokeWidth={isActive ? 2.4 : 1.8} />
                   <span className={cn("text-[10px] tracking-wide", isActive ? "font-bold" : "font-medium")}>Riwayat</span>
+                </>
+              )}
+            </NavLink>
+
+            <NavLink to="/user/ppob" className={({ isActive }) => cn("flex flex-col items-center justify-center w-14 h-full transition-colors relative group", isActive ? "text-sky-600" : "text-slate-400 hover:text-slate-600")}>
+              {({ isActive }) => (
+                <>
+                  <Smartphone className={cn("w-5 h-5 mb-1 transition-transform", isActive ? "scale-100" : "scale-95")} strokeWidth={isActive ? 2.4 : 1.8} />
+                  <span className={cn("text-[9px] tracking-wide", isActive ? "font-bold" : "font-medium")}>PPOB</span>
                 </>
               )}
             </NavLink>

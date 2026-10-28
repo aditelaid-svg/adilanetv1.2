@@ -15,3 +15,4 @@
 - [Auth & session](auth-session.md) — cookie sessions (pg store), bcrypt password+pin w/ idempotent boot migration, requireAuth/requireAdmin, session-scoped data, atomic balance deduction.
 - [Promo/Banner](promo-banners.md) — admin-managed home banners; images stored as base64 in DB (1.5MB cap, json limit 3mb), color tokens must match @theme; package promos deep-link via UserBuy location.state.
 - [Top-up history & notifications](topups-notifications.md) — topups+notifications tables; top-up is atomic (BEGIN/COMMIT), purchase notification is best-effort after money committed; never 500 after money moves.
+- [PPOB scope and safety](ppob-security.md) — Prepaid saldo first; supplier deposit is separate, uncertain fulfillment retains its reference/funds, and callbacks only wake API reconciliation.

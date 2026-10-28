@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../AppContext';
 import { User as UserIcon, LogOut, ChevronRight, Hash, Phone, Mail, KeyRound, ShieldAlert, X, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -13,8 +13,14 @@ export default function UserProfile() {
   const [newPassword, setNewPassword] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [newPin, setNewPin] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [securityError, setSecurityError] = useState('');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    setSecurityError('');
+    setCurrentPassword('');
+  }, [showPasswordModal, showPinModal]);
 
   const showNotification = (message: string, type: 'success' | 'error') => {
     setNotification({ message, type });
@@ -25,22 +31,26 @@ export default function UserProfile() {
     e.preventDefault();
     if (!currentUser) return;
     setSaving(true);
-    await updateUser(currentUser.id, { password: newPassword });
-    setSaving(false);
-    setShowPasswordModal(false);
-    setNewPassword('');
-    showNotification('Password berhasil diubah', 'success');
+    try {
+      await updateUser(currentUser.id, { password: newPassword, current_password: currentPassword });
+      setShowPasswordModal(false);
+      setNewPassword('');
+      showNotification('Password berhasil diubah', 'success');
+    } catch (error) { setSecurityError(error instanceof Error ? error.message : 'Perubahan ditolak.'); }
+    finally { setSaving(false); }
   };
 
   const handleSavePin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
     setSaving(true);
-    await updateUser(currentUser.id, { pin: newPin });
-    setSaving(false);
-    setShowPinModal(false);
-    setNewPin('');
-    showNotification('PIN Transaksi berhasil diubah', 'success');
+    try {
+      await updateUser(currentUser.id, { pin: newPin, current_password: currentPassword });
+      setShowPinModal(false);
+      setNewPin('');
+      showNotification('PIN Transaksi berhasil diubah', 'success');
+    } catch (error) { setSecurityError(error instanceof Error ? error.message : 'Perubahan ditolak.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -181,17 +191,27 @@ export default function UserProfile() {
               </button>
               <h3 className="text-[22px] font-bold tracking-tight text-slate-800 mb-6">Ubah Password</h3>
               <form onSubmit={handleSavePassword} className="space-y-4">
+                <label className="block text-sm font-semibold text-slate-600">
+                  Password saat ini
+                  <input aria-label="Password saat ini" type="password" autoComplete="current-password" required
+                    value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
+                    className="mt-2 w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-sky-200" />
+                </label>
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Password Baru</label>
                   <input
                     type="password"
                     value={newPassword}
+                    minLength={8}
+                    maxLength={72}
+                    autoComplete="new-password"
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Masukkan password baru"
                     className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-800 placeholder-slate-400 text-[15px] focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300"
                     required
                   />
                 </div>
+                {securityError && <p role="alert" className="text-sm text-red-600">{securityError}</p>}
                 <button type="submit" disabled={saving} className="w-full bg-sky-500 text-white shadow-[0_8px_20px_rgba(14,165,233,0.3)] disabled:opacity-50 active:scale-95 transition-transform font-semibold py-4 rounded-[18px] text-[15px]">
                   {saving ? 'Menyimpan...' : 'Simpan Password'}
                 </button>
@@ -214,6 +234,12 @@ export default function UserProfile() {
               <h3 className="text-[22px] font-bold tracking-tight text-slate-800 mb-2">PIN Transaksi</h3>
               <p className="text-[13px] text-slate-500 mb-6">PIN 6 digit untuk verifikasi pembelian dengan saldo.</p>
               <form onSubmit={handleSavePin} className="space-y-4">
+                <label className="block text-sm font-semibold text-slate-600">
+                  Password saat ini
+                  <input aria-label="Password saat ini" type="password" autoComplete="current-password" required
+                    value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
+                    className="mt-2 w-full bg-white border border-slate-200 rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-sky-200" />
+                </label>
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">PIN Baru (6 digit)</label>
                   <input
@@ -227,6 +253,7 @@ export default function UserProfile() {
                     required
                   />
                 </div>
+                {securityError && <p role="alert" className="text-sm text-red-600">{securityError}</p>}
                 <button type="submit" disabled={newPin.length !== 6 || saving} className="w-full bg-sky-500 text-white shadow-[0_8px_20px_rgba(14,165,233,0.3)] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none active:scale-95 transition-transform font-semibold py-4 rounded-[18px] text-[15px]">
                   {saving ? 'Menyimpan...' : 'Simpan PIN'}
                 </button>
