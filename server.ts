@@ -28,7 +28,12 @@ declare module "express-session" {
   }
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const DATABASE_URL = process.env.DATABASE_URL?.trim();
+if (!DATABASE_URL) {
+  throw new Error("DATABASE_URL tidak diset. Wajib diisi untuk koneksi database.");
+}
+
+const pool = new Pool({ connectionString: DATABASE_URL });
 
 const BCRYPT_ROUNDS = 10;
 
