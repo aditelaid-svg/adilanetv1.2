@@ -348,7 +348,7 @@ export class PpobService {
         message='Pemeriksaan terputus setelah permintaan dikirim. Hasil belum pasti; pengiriman ulang otomatis diblokir.',
         lease_until=NULL,updated_at=now()
         WHERE status='pending' AND attempts>0 AND response_code IS NULL
-          AND lease_until<now() AND next_check_at<=now()
+          AND (lease_until IS NULL OR lease_until<now()) AND next_check_at<=now()
         RETURNING id`);
       for (const row of abandoned.rows)
         await this.audit(db, null, 'order.review_required.ambiguous_submission', row.id);

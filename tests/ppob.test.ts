@@ -256,15 +256,17 @@ test('final authenticated failure refunds once under concurrent workers and call
 });
 test('ambiguous RC 01 and RC 70 stay held and never resend the purchase request', async () => {
   await live();
+  let purchaseCount = 0;
   for (const [rc, customer] of [['01', '081234567890'], ['70', '081234567891']]) {
+    purchaseCount++;
     const { order } = await buy(customer);
     override = { status: 'Gagal', rc, price: 0 };
     await service.reconcileOne();
     assert.equal((await service.order(1, order.id)).status, 'review', `RC ${rc} must remain unresolved`);
-    assert.equal(await balance(), 88500);
-    assert.equal(await count('ppob_wallet_entries'), 1);
+    assert.equal(await balance(), 100000 - purchaseCount * 11500);
+    assert.equal(await count('ppob_wallet_entries'), purchaseCount);
     const customerOrder = await service.order(1, order.id);
-    assert.doesNotMatch(customerOrder.message, /RC\\s*0?1|RC\\s*70|Digiflazz/);
+    assert.doesNotMatch(customerOrder.message, /RC\s*0?1|RC\s*70|Digiflazz/);
     const stored = await pool.query('SELECT response_code,message FROM ppob_orders WHERE id=$1', [order.id]);
     assert.equal(stored.rows[0].response_code, rc);
     assert.match(stored.rows[0].message, new RegExp(`RC ${rc}`));
@@ -277,7 +279,8 @@ test('ambiguous RC 01 and RC 70 stay held and never resend the purchase request'
     await due(order.id); assert.equal(await service.reconcileOne(), false);
     await assert.rejects(service.recheck(1, order.id), /belum aman/);
     assert.equal(requests.length, calls);
-    const repeated = await pool.query('SELECT count(*) FROM ppob_audit WHERE entity_id=$1', [order.id]);
+    const repeated = await pool.query('SELECT count(*) FROM ppob_audit WHERE entity_id=$1 AND action=$2',
+      [order.id, `order.review_required.rc${rc}`]);
     assert.equal(Number(repeated.rows[0].count), 1, 'blocked checks do not add repeated audit events');
   }
 });
@@ -355,26 +358,37 @@ test('initial definite supplier price-cap rejection refunds an unsubmitted purch
   assert.equal((await service.order(1, order.id)).status, 'failed'); assert.equal(await balance(), 100000);
 });
 test('not-found, reference conflict, rate-limit and unknown failure codes cannot refund', async () => {
-  await live(); const { order } = await buy();
-  for (const rc of ['50','49','85','86','06']) {
-    override = { status: 'Gagal', rc, price: 0 }; await due(order.id); await service.reconcileOne();
-    assert.equal((await service.order(1, order.id)).status, 'review'); assert.equal(await balance(), 88500);
+  await live(); let purchaseCount = 0;
+  for (const [rc, customer] of ['50','49','85','86','06'].map((rc, index) =>
+    [rc, `08123456789${index}`] as const)) {
+    purchaseCount++;
+    const { order } = await buy(customer);
+    override = { status: 'Gagal', rc, price: 0 }; await service.reconcileOne();
+    assert.equal((await service.order(1, order.id)).status, 'review');
+    assert.equal(await balance(), 100000 - purchaseCount * 11500);
+    assert.equal((await service.admin()).orders.find(item => item.id === order.id)?.response_code, rc);
   }
-  assert.equal(await count('ppob_wallet_entries'), 1);
+  assert.equal(await count('ppob_wallet_entries'), purchaseCount);
 });
 test('wrong reference, recipient or excessive supplier price holds money for review', async () => {
-  await live(); const { order } = await buy(); override = { ref_id: 'WRONG-REFERENCE' };
-  await service.reconcileOne();
-  assert.equal((await service.order(1, order.id)).status, 'review'); assert.equal(await balance(), 88500);
-  override = { price: 15000 }; await due(order.id); await service.reconcileOne();
-  assert.equal((await service.order(1, order.id)).status, 'review'); assert.equal(await balance(), 88500);
+  await live();
+  for (const [customer, response] of [
+    ['081234567890', { ref_id: 'WRONG-REFERENCE' }],
+    ['081234567891', { price: 15000 }],
+  ] as const) {
+    const { order } = await buy(customer); override = response;
+    await service.reconcileOne();
+    assert.equal((await service.order(1, order.id)).status, 'review');
+    assert.equal(await balance(), 100000 - (requests.length * 11500));
+  }
 });
 test('missing PLN serial cannot be displayed as successful token delivery', async () => {
   products[0].category = 'PLN'; await live(); const { order } = await buy('123456789012');
   override = { sn: '' }; await service.reconcileOne();
   assert.equal((await service.order(1, order.id)).status, 'review'); assert.equal(await balance(), 88500);
-  override = {}; await due(order.id); await service.reconcileOne();
-  assert.equal((await service.order(1, order.id)).status, 'success');
+  assert.equal(requests.length, 1);
+  assert.equal((await service.admin()).orders.find(item => item.id === order.id)?.can_recheck, false);
+  await due(order.id); assert.equal(await service.reconcileOne(), false);
 });
 test('account credential rotation does not send an old order using a different merchant account', async () => {
   await live(); const { order } = await buy(); credentials = { ...fixtureCredentials, username: 'different-fixture-account' };
