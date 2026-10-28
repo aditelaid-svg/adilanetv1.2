@@ -20,3 +20,9 @@ A Digiflazz response labelled `Gagal` is not always a failed financial transacti
 **Why:** Signature, IP whitelist and API-limit errors during a later status check say nothing conclusive about an earlier submitted purchase.
 
 **How to apply:** Distinguish documented final transaction failure from request rejection, and preserve submission-attempt history. Never refund an ambiguous earlier purchase merely because a subsequent check was rejected.
+
+Official Digiflazz docs may return HTTP 402 through the web-search scraper while their public documentation pages remain directly fetchable with `curl`.
+
+**Why:** A scraper failure alone does not prove the supplier's documentation is unavailable, and API contract claims must not be guessed.
+
+**How to apply:** Fetch the linked official Buyer API pages directly and inspect their request, response-code, and webhook tables before asserting contract compatibility.
