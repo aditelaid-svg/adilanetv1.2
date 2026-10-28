@@ -12,7 +12,8 @@ export type PpobOrder = {
   id: string; reference: string; product_name: string; sku: string; customer_no: string;
   amount: number; status: 'pending' | 'success' | 'failed' | 'review';
   message: string; serial: string | null; created_at: string; updated_at: string;
-  refunded_at: string | null; response_code?: string | null; cost_price?: number; user_name?: string;
+  refunded_at: string | null; response_code?: string | null; can_recheck?: boolean;
+  cost_price?: number; user_name?: string;
 };
 export type PpobConfig = {
   enabled: boolean; mode: 'test' | 'live'; configured: boolean;

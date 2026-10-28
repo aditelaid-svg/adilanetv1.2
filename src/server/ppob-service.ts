@@ -41,10 +41,17 @@ function customerNumber(value: unknown, category: string): string {
   return number;
 }
 function viewOrder(order: any, admin = false) {
+  const customerMessage = order.status === 'review'
+    ? 'Pesanan sedang ditinjau. Saldo tetap ditahan; mohon jangan membeli ulang.'
+    : order.status === 'pending'
+      ? 'Pesanan masih diproses. Status akan diperiksa otomatis; mohon jangan membeli ulang.'
+      : order.message;
   return { id: order.id, reference: order.reference, sku: order.sku, product_name: order.product_name,
     customer_no: order.customer_no, amount: Number(order.amount), status: order.status,
-    message: order.message, serial: order.serial, created_at: order.created_at, updated_at: order.updated_at,
+    message: admin ? order.message : customerMessage, serial: order.serial,
+    created_at: order.created_at, updated_at: order.updated_at,
     refunded_at: order.refunded_at, ...(admin ? { response_code: order.response_code,
+      can_recheck: Number(order.attempts) === 0 || ['03', '99'].includes(String(order.response_code)),
       cost_price: Number(order.provider_price ?? order.cost_price), user_name: order.user_name } : {}) };
 }
 function viewProduct(p: any, config: any, admin = false) {
@@ -311,8 +318,9 @@ export class PpobService {
     const db = await this.pool.connect();
     try {
       await db.query('BEGIN');
-      const row = await db.query("UPDATE ppob_orders SET next_check_at=now() WHERE id=$1 AND status IN ('pending','review') RETURNING id", [id]);
-      if (!row.rows.length) throw new PpobError(409, 'Pesanan sudah final atau tidak ditemukan.');
+      const row = await db.query(`UPDATE ppob_orders SET next_check_at=now() WHERE id=$1
+        AND status IN ('pending','review') AND (attempts=0 OR response_code IN ('03','99')) RETURNING id`, [id]);
+      if (!row.rows.length) throw new PpobError(409, 'Order ini belum aman untuk dikirim ulang ke API. Lakukan peninjauan manual.');
       await this.audit(db, actor, 'order.recheck_requested', id);
       await db.query('COMMIT'); return { queued: true };
     } catch (error) { await db.query('ROLLBACK'); throw error; } finally { db.release(); }
@@ -327,15 +335,26 @@ export class PpobService {
       throw new PpobError(400, 'Identitas callback tidak lengkap.');
     // Even a signed payload cannot debit/refund/fulfil: it only wakes API reconciliation.
     await this.pool.query(`UPDATE ppob_orders SET next_check_at=now() WHERE reference=$1 AND sku=$2 AND customer_no=$3
-      AND status IN ('pending','review')`, [data.ref_id, data.buyer_sku_code, data.customer_no]);
+      AND status IN ('pending','review')
+      AND (attempts=0 OR response_code IN ('03','99') OR lease_until>now())`,
+    [data.ref_id, data.buyer_sku_code, data.customer_no]);
   }
   async reconcileOne(): Promise<boolean> {
     const db = await this.pool.connect();
     let order: any;
     try {
       await db.query('BEGIN');
+      const abandoned = await db.query(`UPDATE ppob_orders SET status='review',
+        message='Pemeriksaan terputus setelah permintaan dikirim. Hasil belum pasti; pengiriman ulang otomatis diblokir.',
+        lease_until=NULL,updated_at=now()
+        WHERE status='pending' AND attempts>0 AND response_code IS NULL
+          AND lease_until<now() AND next_check_at<=now()
+        RETURNING id`);
+      for (const row of abandoned.rows)
+        await this.audit(db, null, 'order.review_required.ambiguous_submission', row.id);
       const result = await db.query(`SELECT * FROM ppob_orders WHERE status IN ('pending','review')
         AND next_check_at<=now() AND (lease_until IS NULL OR lease_until<now())
+        AND (attempts=0 OR response_code IN ('03','99'))
         ORDER BY next_check_at FOR UPDATE SKIP LOCKED LIMIT 1`);
       order = result.rows[0];
       if (!order) { await db.query('COMMIT'); return false; }
@@ -385,14 +404,14 @@ export class PpobService {
       } else {
         const inconsistent = result && (!matches || !safePrice);
         const unverifiedFailure = result?.status === 'Gagal' && !definiteFailure;
-        const review = accountUnavailable || inconsistent || missingToken || unverifiedFailure ||
+        const review = !result || accountUnavailable || inconsistent || missingToken || unverifiedFailure ||
           Date.now() - dateMs(order.created_at) > 24 * 60 * 60_000 || order.status === 'review';
         const delay = Math.min(300, 15 * 2 ** Math.min(Number(order.attempts), 5));
         const nextStatus = review ? 'review' : 'pending';
         const providerDetail = matches ? `Hasil Digiflazz: ${result!.status} (RC ${result!.rc}). ` : '';
         const message = review
           ? `${providerDetail}Perlu pemeriksaan admin. Saldo ditahan sampai hasil pemasok terverifikasi.`
-          : `${providerDetail}Masih diproses. Jangan membeli ulang; status akan diperiksa otomatis.`;
+          : 'Masih diproses. Status akan diperiksa otomatis; jangan membeli ulang.';
         const responseCode = matches ? result!.rc : order.response_code;
         const stateChanged = order.status !== nextStatus || order.message !== message || order.response_code !== responseCode;
         await db.query(`UPDATE ppob_orders SET status=$2,message=$3,lease_until=NULL,

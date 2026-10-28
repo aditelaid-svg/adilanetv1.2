@@ -219,12 +219,18 @@ test('outbox success verifies identity and records serial without refund', async
   assert.equal(await balance(), 88500); assert.equal(await count('ppob_wallet_entries'), 1);
   assert.equal(requests[0].max_price, 10000); assert.equal(requests[0].testing, false);
 });
-test('transport timeout remains pending and retries with the original reference', async () => {
+test('transport timeout stays in manual review and is never resent automatically', async () => {
   await live(); const { order } = await buy(); transportFails = true;
-  await service.reconcileOne(); assert.equal((await service.order(1, order.id)).status, 'pending');
-  assert.equal(await balance(), 88500); transportFails = false; await due(order.id); await service.reconcileOne();
-  assert.equal(requests.length, 2); assert.equal(requests[0].ref_id, requests[1].ref_id);
-  assert.equal((await service.order(1, order.id)).status, 'success');
+  await service.reconcileOne(); transportFails = false;
+  assert.equal((await service.order(1, order.id)).status, 'review');
+  assert.equal(await balance(), 88500); assert.equal(requests.length, 1);
+  assert.equal((await service.order(1, order.id)).message,
+    'Pesanan sedang ditinjau. Saldo tetap ditahan; mohon jangan membeli ulang.');
+  const adminOrder = (await service.admin()).orders.find(item => item.id === order.id);
+  assert.equal(adminOrder?.can_recheck, false);
+  await due(order.id); assert.equal(await service.reconcileOne(), false);
+  await assert.rejects(service.recheck(1, order.id), /belum aman/);
+  assert.equal(requests.length, 1);
 });
 test('reserved orders still reconcile through Buyer API if webhook secret is removed', async () => {
   await live(); const { order } = await buy();
@@ -248,35 +254,32 @@ test('final authenticated failure refunds once under concurrent workers and call
   assert.equal((await service.order(1, order.id)).status, 'failed');
   assert.equal(await count('ppob_wallet_entries'), 2);
 });
-test('documented RC 01 and RC 70 timeouts are ambiguous, then later success resolves without refund', async () => {
-  await live(); const { order } = await buy();
-  for (const rc of ['01', '70']) {
+test('ambiguous RC 01 and RC 70 stay held and never resend the purchase request', async () => {
+  await live();
+  for (const [rc, customer] of [['01', '081234567890'], ['70', '081234567891']]) {
+    const { order } = await buy(customer);
     override = { status: 'Gagal', rc, price: 0 };
-    if (rc !== '01') await due(order.id);
     await service.reconcileOne();
     assert.equal((await service.order(1, order.id)).status, 'review', `RC ${rc} must remain unresolved`);
     assert.equal(await balance(), 88500);
     assert.equal(await count('ppob_wallet_entries'), 1);
+    const customerOrder = await service.order(1, order.id);
+    assert.doesNotMatch(customerOrder.message, /RC\\s*0?1|RC\\s*70|Digiflazz/);
     const stored = await pool.query('SELECT response_code,message FROM ppob_orders WHERE id=$1', [order.id]);
     assert.equal(stored.rows[0].response_code, rc);
     assert.match(stored.rows[0].message, new RegExp(`RC ${rc}`));
     const adminOrder = (await service.admin()).orders.find(item => item.id === order.id);
     assert.equal(adminOrder?.response_code, rc, 'admin review includes the latest provider code');
+    assert.equal(adminOrder?.can_recheck, false, 'ambiguous outcomes cannot be resent from Admin');
     const event = await pool.query('SELECT action FROM ppob_audit WHERE entity_id=$1 ORDER BY created_at DESC LIMIT 1', [order.id]);
     assert.equal(event.rows[0].action, `order.review_required.rc${rc}`);
+    const calls = requests.length;
+    await due(order.id); assert.equal(await service.reconcileOne(), false);
+    await assert.rejects(service.recheck(1, order.id), /belum aman/);
+    assert.equal(requests.length, calls);
+    const repeated = await pool.query('SELECT count(*) FROM ppob_audit WHERE entity_id=$1', [order.id]);
+    assert.equal(Number(repeated.rows[0].count), 1, 'blocked checks do not add repeated audit events');
   }
-  await due(order.id); await service.reconcileOne();
-  const repeated = await pool.query("SELECT count(*) FROM ppob_audit WHERE entity_id=$1 AND action='order.review_required.rc70'", [order.id]);
-  assert.equal(Number(repeated.rows[0].count), 1, 'repeated identical checks do not flood the audit log');
-  override = {}; await due(order.id); await service.reconcileOne();
-  assert.equal((await service.order(1, order.id)).status, 'success');
-  assert.equal(await balance(), 88500);
-  assert.equal(await count('ppob_wallet_entries'), 1);
-  override = { status: 'Gagal', rc: '01', price: 0 };
-  await due(order.id); await service.reconcileOne();
-  assert.equal((await service.order(1, order.id)).status, 'success', 'a late stale result cannot reverse a final success');
-  assert.equal(requests.length, 4);
-  assert.ok(requests.every(request => request.ref_id === order.reference), 'every status retry reuses the immutable purchase reference');
 });
 test('official response-code classifications only refund known terminal failures or first request rejections', () => {
   const failed = (rc: string, attempts: number) => definiteProviderFailure({
@@ -322,15 +325,29 @@ test('callback arriving during a pending API check keeps the order immediately d
   outcome = 'Sukses'; await service.reconcileOne();
   assert.equal((await service.order(1, order.id)).status, 'success');
   assert.equal(await balance(), 88500);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].ref_id, requests[1].ref_id, 'documented Pending checks reuse the original reference');
+});
+test('a crashed ambiguous submission expires into manual review without another supplier call', async () => {
+  await live(); const { order } = await buy();
+  await pool.query(`UPDATE ppob_orders SET attempts=1,lease_until=now()-interval '1 second',
+    next_check_at=now()-interval '1 second' WHERE id=$1`, [order.id]);
+  assert.equal(await service.reconcileOne(), false);
+  assert.equal((await service.order(1, order.id)).status, 'review');
+  assert.equal(await balance(), 88500);
+  assert.equal(requests.length, 0);
+  const adminOrder = (await service.admin()).orders.find(item => item.id === order.id);
+  assert.equal(adminOrder?.can_recheck, false);
 });
 test('request-level error after an ambiguous submission cannot refund a possibly fulfilled order', async () => {
   await live(); const { order } = await buy(); transportFails = true;
   await service.reconcileOne(); transportFails = false;
-  override = { status: 'Gagal', rc: '41', price: 0 }; await due(order.id); await service.reconcileOne();
+  override = { status: 'Gagal', rc: '41', price: 0 }; await due(order.id);
+  assert.equal(await service.reconcileOne(), false, 'an ambiguous earlier submission is not retried to obtain a request error');
   assert.equal((await service.order(1, order.id)).status, 'review');
   assert.equal(await balance(), 88500); assert.equal(await count('ppob_wallet_entries'), 1);
-  override = {}; await due(order.id); await service.reconcileOne();
-  assert.equal((await service.order(1, order.id)).status, 'success'); assert.equal(await balance(), 88500);
+  await assert.rejects(service.recheck(1, order.id), /belum aman/);
+  assert.equal(requests.length, 1);
 });
 test('initial definite supplier price-cap rejection refunds an unsubmitted purchase', async () => {
   await live(); const { order } = await buy();
