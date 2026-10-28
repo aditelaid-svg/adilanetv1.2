@@ -8,7 +8,7 @@ import session from 'express-session';
 import type { Server } from 'node:http';
 import { Pool } from 'pg';
 import { ensurePpobSchema } from '../src/server/ppob-schema';
-import { DigiflazzClient, normalizeResult, normalizeProduct, rupiah } from '../src/server/digiflazz-client';
+import { DigiflazzClient, definiteProviderFailure, normalizeResult, normalizeProduct, rupiah } from '../src/server/digiflazz-client';
 import { PpobService, inCutOff, requireNonDefaultPpobPassword } from '../src/server/ppob-service';
 import { ppobCsrf, validPpobCsrf, sameOrigin, registerPpobRoutes } from '../src/server/ppob-routes';
 
@@ -22,6 +22,7 @@ const baseProduct = { buyer_sku_code: 'TEST10', product_name: 'Fixture Pulsa 10.
 let root: Pool, pool: Pool, service: PpobService, server: Server, baseUrl: string;
 let products: any[], requests: any[], credentials: typeof fixtureCredentials;
 let outcome: 'Sukses' | 'Pending' | 'Gagal', transportFails: boolean, override: Record<string, unknown>;
+let waitBeforeTransaction: (() => Promise<void>) | null;
 const fakeFetch: typeof fetch = async (url, options) => {
   assert.match(String(url), /^https:\/\/api\.digiflazz\.com\/v1\/(transaction|price-list|cek-saldo)$/);
   const body = JSON.parse(String(options?.body));
@@ -32,6 +33,7 @@ const fakeFetch: typeof fetch = async (url, options) => {
   if (String(url).endsWith('cek-saldo')) return Response.json({ data: { deposit: 500000 } });
   requests.push(body);
   if (transportFails) throw new Error('fixture timeout');
+  if (waitBeforeTransaction) await waitBeforeTransaction();
   return Response.json({ data: { ref_id: body.ref_id, buyer_sku_code: body.buyer_sku_code,
     customer_no: body.customer_no, status: outcome, rc: outcome === 'Sukses' ? '00' : outcome === 'Pending' ? '03' : '02',
     price: 10000, sn: 'FIXTURE-SERIAL-NOT-A-REAL-TOKEN', ...override } });
@@ -101,7 +103,7 @@ after(async () => {
 });
 beforeEach(async () => {
   products = [{ ...baseProduct }]; requests = []; credentials = { ...fixtureCredentials };
-  outcome = 'Sukses'; transportFails = false; override = {};
+  outcome = 'Sukses'; transportFails = false; override = {}; waitBeforeTransaction = null;
   await pool.query(`TRUNCATE ppob_wallet_entries,ppob_orders,ppob_quotes,ppob_products,ppob_pin_guard,ppob_audit,notifications CASCADE;
     UPDATE ppob_config SET enabled=false,mode='test',default_markup=1500,max_order=500000,daily_limit=1000000,
       last_sync_at=NULL,last_sync_attempt_at=NULL,last_connection_attempt_at=NULL,connection_checked_at=NULL,
@@ -237,8 +239,78 @@ test('final authenticated failure refunds once under concurrent workers and call
   await Promise.all([service.reconcileOne(), service.reconcileOne(), service.reconcileOne()]);
   assert.equal(await balance(), 100000); assert.equal((await service.order(1, order.id)).status, 'failed');
   assert.equal(await count('ppob_wallet_entries'), 2);
+  const raw = Buffer.from(JSON.stringify({ data: { ref_id: order.reference, buyer_sku_code: order.sku,
+    customer_no: order.customer_no, status: 'Sukses', rc: '00' } }));
+  const signature = 'sha1=' + crypto.createHmac('sha1', fixtureCredentials.webhookSecret).update(raw).digest('hex');
+  await service.webhook(raw, signature);
   await due(order.id); await service.reconcileOne();
   assert.equal(await balance(), 100000); assert.equal(requests.length, 1);
+  assert.equal((await service.order(1, order.id)).status, 'failed');
+  assert.equal(await count('ppob_wallet_entries'), 2);
+});
+test('documented RC 01 and RC 70 timeouts are ambiguous, then later success resolves without refund', async () => {
+  await live(); const { order } = await buy();
+  for (const rc of ['01', '70']) {
+    override = { status: 'Gagal', rc, price: 0 };
+    if (rc !== '01') await due(order.id);
+    await service.reconcileOne();
+    assert.equal((await service.order(1, order.id)).status, 'review', `RC ${rc} must remain unresolved`);
+    assert.equal(await balance(), 88500);
+    assert.equal(await count('ppob_wallet_entries'), 1);
+  }
+  override = {}; await due(order.id); await service.reconcileOne();
+  assert.equal((await service.order(1, order.id)).status, 'success');
+  assert.equal(await balance(), 88500);
+  assert.equal(await count('ppob_wallet_entries'), 1);
+  override = { status: 'Gagal', rc: '01', price: 0 };
+  await due(order.id); await service.reconcileOne();
+  assert.equal((await service.order(1, order.id)).status, 'success', 'a late stale result cannot reverse a final success');
+  assert.equal(requests.length, 3);
+});
+test('official response-code classifications only refund known terminal failures or first request rejections', () => {
+  const failed = (rc: string, attempts: number) => definiteProviderFailure({
+    reference: 'fixture-ref', sku: 'TEST10', customer: '081234567890',
+    status: 'Gagal', rc, price: 0, serial: '',
+  }, attempts);
+  for (const rc of ['02','51','52','53','54','55','57','58','59','60','71','72','73','74','84'])
+    assert.equal(failed(rc, 2), true, `documented transaction failure RC ${rc}`);
+  for (const rc of ['01','70','03','49','50','83','85','86','99','06'])
+    assert.equal(failed(rc, 1), false, `ambiguous/pending/unknown RC ${rc}`);
+  for (const rc of ['40','41','42','43','44','45','47','56','61','62','63','64','65','66','67','68','69','80','81','82','87','88']) {
+    assert.equal(failed(rc, 1), true, `first-attempt request rejection RC ${rc}`);
+    assert.equal(failed(rc, 2), false, `later request rejection RC ${rc} cannot refund an earlier purchase`);
+  }
+});
+test('response status and documented success/pending codes must agree', () => {
+  const response = (status: string, rc: string) => ({
+    ref_id: 'fixture-ref', buyer_sku_code: 'TEST10', customer_no: '081234567890',
+    status, rc, price: 10000, sn: '',
+  });
+  assert.equal(normalizeResult(response('Sukses', '00')).status, 'Sukses');
+  assert.equal(normalizeResult(response('Pending', '03')).status, 'Pending');
+  assert.equal(normalizeResult(response('Pending', '99')).status, 'Pending');
+  for (const [status, rc] of [['Sukses','99'], ['Pending','00'], ['Pending','01'], ['Gagal','99']])
+    assert.throws(() => normalizeResult(response(status, rc)), /tidak konsisten/);
+});
+test('callback arriving during a pending API check keeps the order immediately due', async () => {
+  await live(); const { order } = await buy(); outcome = 'Pending';
+  let announceStart!: () => void, release!: () => void;
+  const started = new Promise<void>(resolve => { announceStart = resolve; });
+  const paused = new Promise<void>(resolve => { release = resolve; });
+  waitBeforeTransaction = async () => { announceStart(); await paused; };
+  const check = service.reconcileOne();
+  await started;
+  const raw = Buffer.from(JSON.stringify({ data: { ref_id: order.reference, buyer_sku_code: order.sku,
+    customer_no: order.customer_no, status: 'Sukses', rc: '00' } }));
+  const signature = 'sha1=' + crypto.createHmac('sha1', fixtureCredentials.webhookSecret).update(raw).digest('hex');
+  await service.webhook(raw, signature);
+  release(); await check; waitBeforeTransaction = null;
+  assert.equal((await service.order(1, order.id)).status, 'pending');
+  const dueNow = await pool.query('SELECT next_check_at<=now() AS due FROM ppob_orders WHERE id=$1', [order.id]);
+  assert.equal(dueNow.rows[0].due, true, 'the callback wake-up must not be overwritten by the stale Pending response');
+  outcome = 'Sukses'; await service.reconcileOne();
+  assert.equal((await service.order(1, order.id)).status, 'success');
+  assert.equal(await balance(), 88500);
 });
 test('request-level error after an ambiguous submission cannot refund a possibly fulfilled order', async () => {
   await live(); const { order } = await buy(); transportFails = true;

@@ -24,12 +24,16 @@ export type ProviderResult = {
   reference: string; sku: string; customer: string; status: 'Sukses' | 'Pending' | 'Gagal';
   rc: string; price: number; serial: string;
 };
-// Official response-code table distinguishes failed TRANSACTIONS from rejected REQUESTS.
+// The official table labels RC 01 and RC 70 as Gagal, but does not say whether
+// either timeout is terminal. Keep their funds held until a later result resolves them.
+const AMBIGUOUS_TIMEOUTS = new Set(['01','70']);
+// Other documented transaction failures are distinct from rejected requests.
 // A rejected status check cannot prove an earlier ambiguous purchase did not succeed.
-const FINAL_TRANSACTION_FAILURES = new Set(['01','02','51','52','53','54','55','57','58','59','60','70','71','72','73','74','84']);
+const FINAL_TRANSACTION_FAILURES = new Set(['02','51','52','53','54','55','57','58','59','60','71','72','73','74','84']);
 const INITIAL_REQUEST_REJECTIONS = new Set(['40','41','42','43','44','45','47','56','61','62','63','64','65','66','67','68','69','80','81','82','87','88']);
 export function definiteProviderFailure(result: ProviderResult, attempts: number): boolean {
-  return result.status === 'Gagal' && (FINAL_TRANSACTION_FAILURES.has(result.rc) ||
+  return result.status === 'Gagal' && !AMBIGUOUS_TIMEOUTS.has(result.rc) &&
+    (FINAL_TRANSACTION_FAILURES.has(result.rc) ||
     (attempts === 1 && INITIAL_REQUEST_REJECTIONS.has(result.rc)));
 }
 export function normalizeProduct(raw: any): ProviderProduct | null {
@@ -58,7 +62,9 @@ export function normalizeResult(raw: any): ProviderResult {
       !['Sukses', 'Pending', 'Gagal'].includes(raw.status) || !/^\d{2}$/.test(raw.rc) ||
       !Number.isSafeInteger(price) || price < 0 || price > 5_000_000)
     throw new PpobError(502, 'Status pemasok belum dapat diverifikasi.');
-  if ((raw.status === 'Sukses' && raw.rc !== '00') || (raw.status === 'Gagal' && ['00', '03'].includes(raw.rc)))
+  if ((raw.status === 'Sukses' && raw.rc !== '00') ||
+      (raw.status === 'Pending' && !['03', '99'].includes(raw.rc)) ||
+      (raw.status === 'Gagal' && ['00', '03', '99'].includes(raw.rc)))
     throw new PpobError(502, 'Status pemasok tidak konsisten.');
   return { reference: raw.ref_id, sku: raw.buyer_sku_code, customer: raw.customer_no,
     status: raw.status, rc: raw.rc, price, serial: cleanText(raw.sn, 2000) };

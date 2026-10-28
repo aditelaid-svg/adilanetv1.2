@@ -338,7 +338,10 @@ export class PpobService {
         ORDER BY next_check_at FOR UPDATE SKIP LOCKED LIMIT 1`);
       order = result.rows[0];
       if (!order) { await db.query('COMMIT'); return false; }
-      await db.query("UPDATE ppob_orders SET lease_until=now()+interval '90 seconds',attempts=attempts+1 WHERE id=$1", [order.id]);
+      // Set the next due time before the network call. A webhook arriving while
+      // this lease is active can move it back to now without being overwritten.
+      await db.query(`UPDATE ppob_orders SET lease_until=now()+interval '90 seconds',
+        next_check_at=now()+interval '90 seconds',attempts=attempts+1 WHERE id=$1`, [order.id]);
       await db.query('COMMIT');
     } catch (error) { await db.query('ROLLBACK'); throw error; } finally { db.release(); }
     let result: ProviderResult | null = null;
@@ -384,7 +387,8 @@ export class PpobService {
         const review = accountUnavailable || inconsistent || missingToken || unverifiedFailure ||
           Date.now() - dateMs(order.created_at) > 24 * 60 * 60_000 || order.status === 'review';
         const delay = Math.min(300, 15 * 2 ** Math.min(Number(order.attempts), 5));
-        await db.query(`UPDATE ppob_orders SET status=$2,message=$3,lease_until=NULL,next_check_at=now()+($4*interval '1 second'),
+        await db.query(`UPDATE ppob_orders SET status=$2,message=$3,lease_until=NULL,
+          next_check_at=LEAST(next_check_at,now()+($4*interval '1 second')),
           updated_at=now() WHERE id=$1`, [id,review ? 'review' : 'pending',
           review ? 'Perlu pemeriksaan admin. Saldo ditahan sampai hasil pemasok terverifikasi.' :
             'Masih diproses. Jangan membeli ulang; status akan diperiksa otomatis.', delay]);
