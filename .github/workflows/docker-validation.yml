@@ -151,6 +151,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/adilanet_test
         run: |
+          npm run test:admin
           npm run test:ppob
           npm run test:qiospay
           npm run test:hotspot
