@@ -45,11 +45,12 @@ jobs:
           node --version
           npm --version
           echo "npm omit setting: $(npm config get omit)"
+          echo "npm bin-links setting: $(npm config get bin-links)"
 
       - name: Install locked dependencies
         id: npm_ci
         run: |
-          npm ci --include=dev
+          npm ci --include=dev --bin-links=true
           test -x node_modules/.bin/tsx
 
       - name: Print sanitized npm failure details
@@ -76,8 +77,20 @@ jobs:
 
           const logPath = path.join(logDir, logs[0].name);
           console.log(`Sanitized diagnostics from ${logs[0].name}:`);
+          console.log(`npm bin-links: ${require("node:child_process").execSync("npm config get bin-links", { encoding: "utf8" }).trim()}`);
+          console.log(`npm omit: ${require("node:child_process").execSync("npm config get omit", { encoding: "utf8" }).trim() || "(empty)"}`);
+          require("node:child_process").execSync("npm ls tsx --depth=0 || true", { stdio: "inherit" });
+          for (const name of ["node_modules/tsx/package.json", "node_modules/.bin/tsx"]) {
+            const fullPath = path.resolve(name);
+            if (!fs.existsSync(fullPath)) {
+              console.log(`${name}: missing`);
+              continue;
+            }
+            const stat = fs.lstatSync(fullPath);
+            console.log(`${name}: present, mode=${(stat.mode & 0o777).toString(8)}${stat.isSymbolicLink() ? `, link=${fs.readlinkSync(fullPath)}` : ""}`);
+          }
           const diagnosticLine =
-            /verbose cli|info using npm|info using node|verbose title|verbose argv|verbose cwd|verbose os|verbose arch|verbose exit|error/i;
+            /^\d+ (?:verbose (?:cli|title|argv|cwd|os|arch|exit|stack)|info using (?:npm|node)|error(?:\s|$))/i;
           for (const line of fs.readFileSync(logPath, "utf8").split(/\r?\n/)) {
             if (!diagnosticLine.test(line)) continue;
             const safeLine = line
