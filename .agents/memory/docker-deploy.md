@@ -19,8 +19,8 @@ Self-hosted database upgrades must not depend on Replit-managed migrations or a 
 
 **How to apply:** Verify startup against both an existing schema and a runtime containing only production build assets. Do not reset database volumes to resolve a missing table.
 
-ARM64 support is required: the user said their server is ARM64, usually an STB. Do not simplify a failing multi-platform build to AMD64 only.
+Both `linux/amd64` and `linux/arm64` support are required by the user. Do not simplify a failing multi-platform build to only one architecture.
 
-**Why:** An AMD64-only image cannot run natively on the user's deployment hardware. QEMU crashed during the ARM64 dependency installation while the AMD64 application build succeeded.
+**Why:** The application must run across both the user's ARM64 server hardware and AMD64 environments; one platform's successful build does not validate the other.
 
-**How to apply:** Preserve ARM64 when modifying deployment or CI. Prefer native ARM64 builds for Node dependencies rather than assuming a successful AMD64 build validates the STB image.
+**How to apply:** Preserve both targets in deployment and CI. Build dependencies on native AMD64 and ARM64 runners where available, use the committed lockfile, and verify a single multi-platform manifest contains both architectures.
