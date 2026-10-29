@@ -50,7 +50,9 @@ jobs:
       - name: Install locked dependencies
         id: npm_ci
         run: |
-          npm ci --include=dev --bin-links=true
+          npm ci --include=dev --bin-links=true \
+            --registry=https://registry.npmjs.org/ \
+            --replace-registry-host=always
           test -x node_modules/.bin/tsx
 
       - name: Print sanitized npm failure details
@@ -90,7 +92,7 @@ jobs:
             console.log(`${name}: present, mode=${(stat.mode & 0o777).toString(8)}${stat.isSymbolicLink() ? `, link=${fs.readlinkSync(fullPath)}` : ""}`);
           }
           const diagnosticLine =
-            /^\d+ (?:verbose (?:cli|title|argv|cwd|os|arch|exit|stack)|info using (?:npm|node)|error(?:\s|$))/i;
+            /^\d+ (?:verbose (?:cli|title|argv|cwd|os|arch|exit|stack)|info using (?:npm|node)|error(?:\s|$)|http fetch .* (?:4\d\d|5\d\d|ECONN|EAI_|ETIMEDOUT))/i;
           for (const line of fs.readFileSync(logPath, "utf8").split(/\r?\n/)) {
             if (!diagnosticLine.test(line)) continue;
             const safeLine = line
