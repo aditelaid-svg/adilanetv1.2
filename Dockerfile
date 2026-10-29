@@ -4,7 +4,8 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 COPY package.json package-lock.json ./
-RUN npm ci
+COPY scripts/normalize-npm-lockfile.mjs ./scripts/normalize-npm-lockfile.mjs
+RUN node ./scripts/normalize-npm-lockfile.mjs && npm ci
 
 COPY . .
 RUN npm run build
