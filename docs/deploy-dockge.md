@@ -8,8 +8,8 @@ published GHCR image tag; do not guess one. Compose intentionally requires
 On an empty production database, startup creates the schema and system-default
 settings but does not insert demo users, routers, packages, or promo banners.
 Demo fixtures are restricted to `NODE_ENV=test`. A secure first-admin
-provisioning path for a new production database is not included here; resolve
-that separately before making a fresh installation available to users.
+must be created by the one-time interactive CLI before exposing the app to
+public registration.
 
 ## Required configuration
 
@@ -32,6 +32,25 @@ Optional:
 - `COOKIE_SECURE`: use `true` only when the application is behind HTTPS; the
   default is `false` for local HTTP access.
 - `GEMINI_API_KEY` if that optional feature is used.
+
+## Provision the first administrator
+
+Public registration always creates a `user`. Startup never promotes users.
+After the app has initialized its schema, use the Dockge terminal (or an
+authorized SSH terminal) to run this once:
+
+```sh
+docker compose exec -it app node dist/provision-first-admin.cjs
+```
+
+The command prompts for the administrator identity and reads the password
+without echoing it. It hashes the password, serializes concurrent attempts with
+a PostgreSQL advisory transaction lock, and refuses to proceed if an `admin` or
+`superadmin` already exists. Do not expose the public registration page until
+this step has completed successfully. Compose publishes port 5000 on the host,
+so restrict it with the host firewall or reverse proxy until provisioning is
+complete. Retain the database backup and operator access; this command cannot
+reset or replace an existing administrator.
 
 The Compose file exposes application port 5000, keeps PostgreSQL on the
 internal `adilanet_net` network, and persists PostgreSQL data in `db_data`.

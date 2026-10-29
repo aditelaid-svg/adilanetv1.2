@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && cp src/server/qiospay-schema.sql dist/qiospay-schema.sql",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && esbuild scripts/provision-first-admin.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/provision-first-admin.cjs && cp src/server/qiospay-schema.sql dist/qiospay-schema.sql",
     "start": "node dist/server.cjs",
+    "provision:first-admin": "node dist/provision-first-admin.cjs",
     "lint": "tsc --noEmit",
+    "test:admin": "tsx --test tests/first-admin.test.ts",
     "test:qiospay": "tsx --test tests/qiospay.test.ts",
     "test:hotspot": "tsx --test tests/hotspot.test.ts",
     "test:ppob": "tsx --test tests/ppob.test.ts"

@@ -24,6 +24,8 @@ import {
   initializeDatabase,
   shouldSeedDemoData,
 } from "./src/server/startup-readiness";
+import { insertPublicUser } from "./src/server/first-admin-provisioning";
+import { ensureUserRoleSchema } from "./src/server/user-role-schema";
 
 dotenv.config();
 
@@ -337,20 +339,8 @@ async function initDb() {
 
   // Ensure pin column can hold a bcrypt hash (~60 chars) on pre-existing DBs
   await pool.query(`ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255)`);
-  // Widen role column to fit 'superadmin'
-  await pool.query(`ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(20)`);
-  // Guarantee a protected superadmin exists (promote oldest admin if none)
-  await pool.query(`
-    UPDATE users SET role = 'superadmin'
-    WHERE id = (SELECT id FROM users WHERE role IN ('admin','superadmin') ORDER BY id ASC LIMIT 1)
-      AND NOT EXISTS (SELECT 1 FROM users WHERE role = 'superadmin')
-  `);
-  // Fallback: if no admins exist at all, promote the oldest user so there is always a superadmin
-  await pool.query(`
-    UPDATE users SET role = 'superadmin'
-    WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)
-      AND NOT EXISTS (SELECT 1 FROM users WHERE role = 'superadmin')
-  `);
+  // Widen the role column but never assign or promote roles during startup.
+  await ensureUserRoleSchema(pool);
 
   // Migrate any plaintext password/pin values to bcrypt hashes (idempotent)
   const { rows: allUsers } = await pool.query("SELECT id, password, pin FROM users");
@@ -595,11 +585,12 @@ async function startServer() {
         }
       }
       const hashed = await hashSecret(password);
-      const { rows } = await pool.query(
-        `INSERT INTO users (name, email, phone_number, password, role, balance) VALUES ($1, $2, $3, $4, 'user', 0) RETURNING *`,
-        [name, email, phone_number || null, hashed]
-      );
-      const user = rows[0];
+      const user = await insertPublicUser(pool, {
+        name,
+        email,
+        phoneNumber: phone_number || null,
+        passwordHash: hashed,
+      });
       await new Promise<void>((resolve, reject) => req.session.regenerate(err => err ? reject(err) : resolve()));
       req.session.userId = user.id;
       req.session.role = user.role;

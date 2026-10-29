@@ -9,11 +9,7 @@ import type { Server } from 'node:http';
 import { Pool } from 'pg';
 import { ensurePpobSchema } from '../src/server/ppob-schema';
 import { createHealthHandler } from '../src/server/health';
-import {
-  createStartupReadiness,
-  initializeDatabase,
-  shouldSeedDemoData,
-} from '../src/server/startup-readiness';
+import { createStartupReadiness, initializeDatabase, shouldSeedDemoData } from '../src/server/startup-readiness';
 import { DigiflazzClient, definiteProviderFailure, normalizeResult, normalizeProduct, rupiah } from '../src/server/digiflazz-client';
 import { PpobService, inCutOff, requireNonDefaultPpobPassword } from '../src/server/ppob-service';
 import { ppobCsrf, validPpobCsrf, sameOrigin, registerPpobRoutes } from '../src/server/ppob-routes';
