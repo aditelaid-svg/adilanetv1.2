@@ -19,6 +19,7 @@ import { ensurePpobSchema } from "./src/server/ppob-schema";
 import { PpobService } from "./src/server/ppob-service";
 import { registerPpobRoutes, sameOrigin } from "./src/server/ppob-routes";
 import { createHealthHandler } from "./src/server/health";
+import { createStartupReadiness, initializeDatabase } from "./src/server/startup-readiness";
 
 dotenv.config();
 
@@ -388,6 +389,7 @@ function qiospayReady(settings: Record<string, string>): boolean {
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 5000;
+  const readiness = createStartupReadiness();
 
   const SESSION_SECRET = process.env.SESSION_SECRET;
   if (!SESSION_SECRET) {
@@ -484,12 +486,8 @@ async function startServer() {
     })
   );
 
-  // Init database
-  try {
-    await initDb();
-  } catch (err) {
-    console.error("[DB] Gagal inisialisasi database:", err);
-  }
+  // Do not start background workers or listen until all schema initialization succeeds.
+  await initializeDatabase(initDb, readiness);
 
   const qiospay = new QiospayPayments(pool, getSettings, generateUniqueVoucher, async (invoice, code) => {
     const { rows } = await pool.query("SELECT * FROM routers WHERE id=$1", [invoice.router_id]);
@@ -510,7 +508,7 @@ async function startServer() {
     readHotspotClient({ host: router.ip_address, user: router.username, pass: router.password, port: router.api_port }, mac, ip, code));
 
   // ─── HEALTH ─────────────────────────────────────────────────────────────
-  app.get("/api/health", createHealthHandler(pool));
+  app.get("/api/health", createHealthHandler(pool, readiness));
 
   // ─── AUTH ────────────────────────────────────────────────────────────────
   app.post("/api/auth/login", async (req, res) => {
@@ -2010,4 +2008,8 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch(async (error) => {
+  console.error("[Startup] Aplikasi tidak dapat dimulai karena inisialisasi gagal:", error);
+  await pool.end().catch(() => undefined);
+  process.exitCode = 1;
+});

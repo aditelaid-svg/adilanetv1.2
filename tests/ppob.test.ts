@@ -9,6 +9,7 @@ import type { Server } from 'node:http';
 import { Pool } from 'pg';
 import { ensurePpobSchema } from '../src/server/ppob-schema';
 import { createHealthHandler } from '../src/server/health';
+import { createStartupReadiness, initializeDatabase } from '../src/server/startup-readiness';
 import { DigiflazzClient, definiteProviderFailure, normalizeResult, normalizeProduct, rupiah } from '../src/server/digiflazz-client';
 import { PpobService, inCutOff, requireNonDefaultPpobPassword } from '../src/server/ppob-service';
 import { ppobCsrf, validPpobCsrf, sameOrigin, registerPpobRoutes } from '../src/server/ppob-routes';
@@ -44,13 +45,14 @@ const count = async (table: string) => Number((await pool.query(`SELECT count(*)
 const key = () => crypto.randomUUID();
 test('health endpoint returns unhealthy HTTP status when database query fails', async () => {
   let databaseFails = false;
+  const readiness = createStartupReadiness();
   const pool = {
     query: async () => {
       if (databaseFails) throw new Error('fixture database unavailable');
       return { rows: [{ '?column?': 1 }] };
     },
   } as unknown as Pick<Pool, 'query'>;
-  const handler = createHealthHandler(pool);
+  const handler = createHealthHandler(pool, readiness);
   const invoke = async () => {
     let status = 0, body: unknown;
     const response = {
@@ -60,9 +62,52 @@ test('health endpoint returns unhealthy HTTP status when database query fails', 
     await handler({} as any, response as any, () => {});
     return { status, body };
   };
-  assert.deepEqual(await invoke(), { status: 200, body: { status: 'ok', db_connected: true } });
+  assert.deepEqual(await invoke(), {
+    status: 503,
+    body: { status: 'starting', db_connected: true, schema_ready: false },
+  });
+  readiness.schemaReady = true;
+  assert.deepEqual(await invoke(), {
+    status: 200,
+    body: { status: 'ok', db_connected: true, schema_ready: true },
+  });
   databaseFails = true;
-  assert.deepEqual(await invoke(), { status: 503, body: { status: 'unhealthy', db_connected: false } });
+  assert.deepEqual(await invoke(), {
+    status: 503,
+    body: { status: 'unhealthy', db_connected: false, schema_ready: true },
+  });
+});
+
+test('failed schema initialization keeps readiness false and rejects startup', async () => {
+  const readiness = createStartupReadiness();
+  readiness.schemaReady = true;
+  await assert.rejects(
+    initializeDatabase(async () => { throw new Error('fixture schema failure'); }, readiness),
+    /fixture schema failure/,
+  );
+  assert.equal(readiness.schemaReady, false);
+});
+
+test('fresh isolated schema becomes ready only after the bootstrap succeeds', async () => {
+  const freshSchema = `test_bootstrap_${crypto.randomBytes(6).toString('hex')}`;
+  const readiness = createStartupReadiness();
+  await root.query(`CREATE SCHEMA ${freshSchema}`);
+  const freshPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    options: `-c search_path=${freshSchema}`,
+  });
+  try {
+    await freshPool.query('CREATE TABLE users(id integer PRIMARY KEY)');
+    await initializeDatabase(() => ensurePpobSchema(freshPool), readiness);
+    assert.equal(readiness.schemaReady, true);
+    assert.equal(
+      (await freshPool.query("SELECT to_regclass('ppob_orders') AS table_name")).rows[0].table_name,
+      'ppob_orders',
+    );
+  } finally {
+    await freshPool.end();
+    await root.query(`DROP SCHEMA IF EXISTS ${freshSchema} CASCADE`);
+  }
 });
 async function applyVerifiedResult(order: any, status: 'Sukses' | 'Gagal', rc: string) {
   // Inject an already-validated Buyer API result at the service boundary; this never calls Digiflazz.
