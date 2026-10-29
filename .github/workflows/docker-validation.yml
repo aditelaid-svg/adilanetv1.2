@@ -40,8 +40,16 @@ jobs:
         with:
           node-version: 20
 
+      - name: Report Node and npm versions
+        run: |
+          node --version
+          npm --version
+          echo "npm omit setting: $(npm config get omit)"
+
       - name: Install locked dependencies
-        run: npm ci
+        run: |
+          npm ci --include=dev
+          test -x node_modules/.bin/tsx
 
       - name: Run application tests
         run: |
