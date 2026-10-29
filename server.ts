@@ -18,6 +18,7 @@ import { registerHotspotRoutes } from "./src/server/hotspot-routes";
 import { ensurePpobSchema } from "./src/server/ppob-schema";
 import { PpobService } from "./src/server/ppob-service";
 import { registerPpobRoutes, sameOrigin } from "./src/server/ppob-routes";
+import { createHealthHandler } from "./src/server/health";
 
 dotenv.config();
 
@@ -509,14 +510,7 @@ async function startServer() {
     readHotspotClient({ host: router.ip_address, user: router.username, pass: router.password, port: router.api_port }, mac, ip, code));
 
   // ─── HEALTH ─────────────────────────────────────────────────────────────
-  app.get("/api/health", async (req, res) => {
-    try {
-      await pool.query("SELECT 1");
-      res.json({ status: "ok", db_connected: true });
-    } catch {
-      res.json({ status: "ok", db_connected: false });
-    }
-  });
+  app.get("/api/health", createHealthHandler(pool));
 
   // ─── AUTH ────────────────────────────────────────────────────────────────
   app.post("/api/auth/login", async (req, res) => {

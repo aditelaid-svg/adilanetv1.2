@@ -6,6 +6,7 @@
 - [Hotspot user list](hotspot-user-list.md) — two reads: active-users (live, /active) vs hotspot-users (full /user/print incl offline, merged w/ active). AdminHotspotUsers page = Mikhmon-style list, no demo fallback.
 - [WiFi auto-login](wifi-auto-login.md) — QRIS/saldo voucher purchases should log in automatically; verify provisioning/authentication and keep manual fallback.
 - [Docker deployment](docker-deploy.md) — ARM64/STB support is required; preserve native ARM builds and self-hosted database upgrades without resetting volumes.
+- [Dev workflow port leftovers](dev-workflow-port-leftovers.md) — A failed/restarted app workflow can leave a local tsx server occupying ports 5000/24678; inspect the process group before retrying.
 - [Mikrotik API](mikrotik-api.md) — createVoucher uses array param format `=key=value`, port passed from router.api_port; getProfiles with port support.
 - [Mikrotik profiles](mikrotik-profiles.md) — admin hotspot profile CRUD from UI; GET has demo fallback, writes never fall back; server-side field validation.
 - [Mikrotik validity](mikrotik-validity.md) — "masa aktif tetap" expiry = on-login stamps minutes into user comment; one global `an-voucher-reaper` scheduler counts down. Avoids scheduler immediate-fire + date math.

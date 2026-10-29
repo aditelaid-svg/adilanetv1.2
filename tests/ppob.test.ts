@@ -8,6 +8,7 @@ import session from 'express-session';
 import type { Server } from 'node:http';
 import { Pool } from 'pg';
 import { ensurePpobSchema } from '../src/server/ppob-schema';
+import { createHealthHandler } from '../src/server/health';
 import { DigiflazzClient, definiteProviderFailure, normalizeResult, normalizeProduct, rupiah } from '../src/server/digiflazz-client';
 import { PpobService, inCutOff, requireNonDefaultPpobPassword } from '../src/server/ppob-service';
 import { ppobCsrf, validPpobCsrf, sameOrigin, registerPpobRoutes } from '../src/server/ppob-routes';
@@ -41,6 +42,28 @@ const fakeFetch: typeof fetch = async (url, options) => {
 const balance = async (id = 1) => Number((await pool.query('SELECT balance FROM users WHERE id=$1', [id])).rows[0].balance);
 const count = async (table: string) => Number((await pool.query(`SELECT count(*) FROM ${table}`)).rows[0].count);
 const key = () => crypto.randomUUID();
+test('health endpoint returns unhealthy HTTP status when database query fails', async () => {
+  let databaseFails = false;
+  const pool = {
+    query: async () => {
+      if (databaseFails) throw new Error('fixture database unavailable');
+      return { rows: [{ '?column?': 1 }] };
+    },
+  } as unknown as Pick<Pool, 'query'>;
+  const handler = createHealthHandler(pool);
+  const invoke = async () => {
+    let status = 0, body: unknown;
+    const response = {
+      status(value: number) { status = value; return this; },
+      json(value: unknown) { body = value; return this; },
+    };
+    await handler({} as any, response as any, () => {});
+    return { status, body };
+  };
+  assert.deepEqual(await invoke(), { status: 200, body: { status: 'ok', db_connected: true } });
+  databaseFails = true;
+  assert.deepEqual(await invoke(), { status: 503, body: { status: 'unhealthy', db_connected: false } });
+});
 async function applyVerifiedResult(order: any, status: 'Sukses' | 'Gagal', rc: string) {
   // Inject an already-validated Buyer API result at the service boundary; this never calls Digiflazz.
   await (service as any).applyResult(order.id, {
