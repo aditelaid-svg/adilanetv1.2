@@ -41,6 +41,19 @@ const fakeFetch: typeof fetch = async (url, options) => {
 const balance = async (id = 1) => Number((await pool.query('SELECT balance FROM users WHERE id=$1', [id])).rows[0].balance);
 const count = async (table: string) => Number((await pool.query(`SELECT count(*) FROM ${table}`)).rows[0].count);
 const key = () => crypto.randomUUID();
+async function applyVerifiedResult(order: any, status: 'Sukses' | 'Gagal', rc: string) {
+  // Inject an already-validated Buyer API result at the service boundary; this never calls Digiflazz.
+  await (service as any).applyResult(order.id, {
+    reference: order.reference, sku: order.sku, customer: order.customer_no,
+    status, rc, price: 10000, serial: 'FIXTURE-SERIAL-NOT-A-REAL-TOKEN',
+  });
+}
+async function signedCallback(order: any, status = 'Sukses', rc = '00') {
+  const raw = Buffer.from(JSON.stringify({ data: { ref_id: order.reference,
+    buyer_sku_code: order.sku, customer_no: order.customer_no, status, rc } }));
+  const signature = 'sha1=' + crypto.createHmac('sha1', fixtureCredentials.webhookSecret).update(raw).digest('hex');
+  await service.webhook(raw, signature);
+}
 async function live() {
   await service.checkConnection(3);
   await service.sync(3);
@@ -245,16 +258,15 @@ test('final authenticated failure refunds once under concurrent workers and call
   await Promise.all([service.reconcileOne(), service.reconcileOne(), service.reconcileOne()]);
   assert.equal(await balance(), 100000); assert.equal((await service.order(1, order.id)).status, 'failed');
   assert.equal(await count('ppob_wallet_entries'), 2);
-  const raw = Buffer.from(JSON.stringify({ data: { ref_id: order.reference, buyer_sku_code: order.sku,
-    customer_no: order.customer_no, status: 'Sukses', rc: '00' } }));
-  const signature = 'sha1=' + crypto.createHmac('sha1', fixtureCredentials.webhookSecret).update(raw).digest('hex');
-  await service.webhook(raw, signature);
+  await signedCallback(order);
+  await signedCallback(order);
+  await signedCallback(order);
   await due(order.id); await service.reconcileOne();
   assert.equal(await balance(), 100000); assert.equal(requests.length, 1);
   assert.equal((await service.order(1, order.id)).status, 'failed');
   assert.equal(await count('ppob_wallet_entries'), 2);
 });
-test('RC 01 and RC 70 Gagal responses refund once; late callbacks cannot reopen them', async () => {
+test('RC 01 and RC 70 remain in review with funds held; no automatic recheck or refund', async () => {
   await live();
   let purchaseCount = 0;
   for (const [rc, customer] of [['01', '081234567890'], ['70', '081234567891']]) {
@@ -262,38 +274,76 @@ test('RC 01 and RC 70 Gagal responses refund once; late callbacks cannot reopen 
     const { order } = await buy(customer);
     override = { status: 'Gagal', rc, price: 0 };
     await Promise.all([service.reconcileOne(), service.reconcileOne(), service.reconcileOne()]);
-    assert.equal((await service.order(1, order.id)).status, 'failed', `RC ${rc} follows the selected Gagal refund policy`);
-    assert.equal(await balance(), 100000);
-    assert.equal(await count('ppob_wallet_entries'), purchaseCount * 2);
+    assert.equal((await service.order(1, order.id)).status, 'review', `RC ${rc} finality is unconfirmed`);
+    assert.equal(await balance(), 100000 - purchaseCount * 11500);
+    assert.equal(await count('ppob_wallet_entries'), purchaseCount);
     const customerOrder = await service.order(1, order.id);
     assert.doesNotMatch(customerOrder.message, /RC\s*0?1|RC\s*70|Digiflazz/);
-    assert.equal(customerOrder.message, 'Transaksi gagal final. Saldo telah dikembalikan.');
     const stored = await pool.query('SELECT response_code,message FROM ppob_orders WHERE id=$1', [order.id]);
     assert.equal(stored.rows[0].response_code, rc);
-    assert.equal(stored.rows[0].message, 'Transaksi gagal final. Saldo telah dikembalikan.');
     const adminOrder = (await service.admin()).orders.find(item => item.id === order.id);
     assert.equal(adminOrder?.response_code, rc, 'admin review includes the latest provider code');
-    assert.equal(adminOrder?.can_recheck, false, 'final refunds cannot be retried from Admin');
-    const raw = Buffer.from(JSON.stringify({ data: { ref_id: order.reference, buyer_sku_code: order.sku,
-      customer_no: order.customer_no, status: 'Sukses', rc: '00' } }));
-    const signature = 'sha1=' + crypto.createHmac('sha1', fixtureCredentials.webhookSecret).update(raw).digest('hex');
-    await service.webhook(raw, signature);
+    assert.equal(adminOrder?.can_recheck, false, 'unconfirmed timeout codes cannot trigger API retry from Admin');
+    await signedCallback(order);
     await due(order.id);
-    assert.equal(await service.reconcileOne(), false, 'a late callback cannot wake a final order');
-    assert.equal((await service.order(1, order.id)).status, 'failed');
-    assert.equal(await balance(), 100000);
-    assert.equal(await count('ppob_wallet_entries'), purchaseCount * 2);
-    assert.equal(requests.length, purchaseCount, 'no new provider request follows a final Gagal/refund');
+    assert.equal(await service.reconcileOne(), false, 'a late callback cannot schedule an unsafe RC 01/70 status request');
+    assert.equal((await service.order(1, order.id)).status, 'review');
+    assert.equal(await balance(), 100000 - purchaseCount * 11500);
+    assert.equal(await count('ppob_wallet_entries'), purchaseCount);
+    assert.equal(requests.length, purchaseCount, 'no new provider request follows an unconfirmed timeout response');
   }
 });
-test('documented Gagal transaction codes including RC 01/70 refund; pending/unknown codes do not', () => {
+test('timeout then verified success settles once without a second purchase', async () => {
+  await live(); const { order } = await buy(); transportFails = true;
+  await service.reconcileOne(); transportFails = false;
+  assert.equal((await service.order(1, order.id)).status, 'review');
+  assert.equal(await balance(), 88500);
+  assert.equal(await count('ppob_wallet_entries'), 1);
+  assert.equal(requests.length, 1);
+  await applyVerifiedResult(order, 'Sukses', '00');
+  assert.equal((await service.order(1, order.id)).status, 'success');
+  assert.equal(await balance(), 88500);
+  assert.equal(await count('ppob_wallet_entries'), 1);
+  assert.equal(requests.length, 1, 'late verified success is applied without a new supplier purchase');
+});
+test('timeout then verified terminal failure refunds exactly once', async () => {
+  await live(); const { order } = await buy(); transportFails = true;
+  await service.reconcileOne(); transportFails = false;
+  assert.equal((await service.order(1, order.id)).status, 'review');
+  assert.equal(await balance(), 88500);
+  await applyVerifiedResult(order, 'Gagal', '02');
+  assert.equal((await service.order(1, order.id)).status, 'failed');
+  assert.equal(await balance(), 100000);
+  assert.equal(await count('ppob_wallet_entries'), 2);
+  assert.equal(requests.length, 1, 'verification does not resubmit the purchase');
+});
+test('two simultaneous verified refund applications create one refund and repeated callbacks are inert', async () => {
+  await live(); const { order } = await buy();
+  await Promise.all([
+    applyVerifiedResult(order, 'Gagal', '02'),
+    applyVerifiedResult(order, 'Gagal', '02'),
+  ]);
+  assert.equal((await service.order(1, order.id)).status, 'failed');
+  assert.equal(await balance(), 100000);
+  assert.equal(await count('ppob_wallet_entries'), 2);
+  await signedCallback(order);
+  await signedCallback(order);
+  await signedCallback(order);
+  await due(order.id);
+  assert.equal(await service.reconcileOne(), false);
+  assert.equal((await service.order(1, order.id)).status, 'failed');
+  assert.equal(await balance(), 100000);
+  assert.equal(await count('ppob_wallet_entries'), 2);
+  assert.equal(requests.length, 0);
+});
+test('documented failure codes refund only when classified terminal; RC 01/70 remain unconfirmed', () => {
   const failed = (rc: string, attempts: number) => definiteProviderFailure({
     reference: 'fixture-ref', sku: 'TEST10', customer: '081234567890',
     status: 'Gagal', rc, price: 0, serial: '',
   }, attempts);
-  for (const rc of ['01','02','51','52','53','54','55','57','58','59','60','70','71','72','73','74','84'])
+  for (const rc of ['02','51','52','53','54','55','57','58','59','60','71','72','73','74','84'])
     assert.equal(failed(rc, 2), true, `Gagal transaction RC ${rc}`);
-  for (const rc of ['03','49','50','83','85','86','99','06'])
+  for (const rc of ['01','03','49','50','70','83','85','86','99','06'])
     assert.equal(failed(rc, 1), false, `ambiguous/pending/unknown RC ${rc}`);
   for (const rc of ['40','41','42','43','44','45','47','56','61','62','63','64','65','66','67','68','69','80','81','82','87','88']) {
     assert.equal(failed(rc, 1), true, `first-attempt request rejection RC ${rc}`);

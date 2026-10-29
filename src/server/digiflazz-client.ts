@@ -24,11 +24,9 @@ export type ProviderResult = {
   reference: string; sku: string; customer: string; status: 'Sukses' | 'Pending' | 'Gagal';
   rc: string; price: number; serial: string;
 };
-// Product policy: a matched, authenticated Gagal response refunds the customer,
-// including RC 01/70. Official docs do not guarantee timeout finality.
-// Other documented transaction failures are distinct from rejected requests.
-// A rejected status check cannot prove an earlier ambiguous purchase did not succeed.
-const FINAL_TRANSACTION_FAILURES = new Set(['01','02','51','52','53','54','55','57','58','59','60','70','71','72','73','74','84']);
+// RC 01/70 are documented as Gagal, but their timeout finality is unconfirmed.
+// Keep funds in review until the provider confirms those results are terminal.
+const FINAL_TRANSACTION_FAILURES = new Set(['02','51','52','53','54','55','57','58','59','60','71','72','73','74','84']);
 const INITIAL_REQUEST_REJECTIONS = new Set(['40','41','42','43','44','45','47','56','61','62','63','64','65','66','67','68','69','80','81','82','87','88']);
 export function definiteProviderFailure(result: ProviderResult, attempts: number): boolean {
   return result.status === 'Gagal' && (FINAL_TRANSACTION_FAILURES.has(result.rc) ||

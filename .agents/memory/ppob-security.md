@@ -9,11 +9,11 @@ The approved first phase is prepaid pulsa, data, and token PLN paid with custome
 
 **How to apply:** Keep merchant deposit separate from customer wallet money, keep hotspot voucher login separate from account ownership, and never substitute demo catalog/products when supplier credentials are missing. Test mode must not debit real customer wallets.
 
-Transport timeouts without an authenticated provider result retain the immutable reference and reserved funds. The user explicitly chose to refund when a matching authenticated API response has status `Gagal`, including RC 01 and RC 70, despite undocumented timeout finality. Authenticated webhooks are wake-ups, not financial authority.
+Transport timeouts without an authenticated provider result retain the immutable reference and reserved funds. RC 01 and RC 70 are documented as `Gagal` but finality is unconfirmed; hold the balance for review and do not refund or retry automatically. Authenticated webhooks are wake-ups, not financial authority.
 
-**Why:** Official Digiflazz docs label RC 01/70 `Gagal` and transaction formed `Ya`, but do not say whether those statuses are terminal. A late supplier success after the chosen refund policy can create unrecovered loss.
+**Why:** Official Digiflazz docs label RC 01/70 `Gagal` and transaction formed `Ya`, but do not say whether those statuses are terminal. A premature refund can create unrecovered loss if the supplier later succeeds.
 
-**How to apply:** Preserve committed purchase recovery across browser/server restarts and credential changes. Never retry without a provider response; only repeat the same `ref_id` for documented `Pending` checks. For a matching authenticated `Gagal` response, refund once per the user's choice, including RC 01/70; ignore later callbacks after the order is final. Require real token serials before marking PLN delivered.
+**How to apply:** Preserve committed purchase recovery across browser/server restarts and credential changes. Never retry without a provider response; only repeat the same `ref_id` for documented `Pending` checks. Keep RC 01/70 in manual review until written provider confirmation; do not let callbacks directly change money or final orders. Require real token serials before marking PLN delivered.
 
 A Digiflazz response labelled `Gagal` is not always a failed financial transaction: its official response-code table also uses that status for rejected requests.
 
