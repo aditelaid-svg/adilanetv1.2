@@ -19,7 +19,11 @@ import { ensurePpobSchema } from "./src/server/ppob-schema";
 import { PpobService } from "./src/server/ppob-service";
 import { registerPpobRoutes, sameOrigin } from "./src/server/ppob-routes";
 import { createHealthHandler } from "./src/server/health";
-import { createStartupReadiness, initializeDatabase } from "./src/server/startup-readiness";
+import {
+  createStartupReadiness,
+  initializeDatabase,
+  shouldSeedDemoData,
+} from "./src/server/startup-readiness";
 
 dotenv.config();
 
@@ -248,38 +252,50 @@ async function initDb() {
   await ensureQiospaySchema(pool);
   await ensurePpobSchema(pool);
 
-  // Seed demo data if empty
-  const { rows: userRows } = await pool.query("SELECT COUNT(*) as cnt FROM users");
-  if (parseInt(userRows[0].cnt) === 0) {
-    await pool.query(`
-      INSERT INTO users (name, email, phone_number, password, role, balance) VALUES
-      ('Super Admin', 'admin@wifivoucher.com', '08999999999', 'admin', 'superadmin', 0),
-      ('Ahmad Pelanggan', 'user@demo.com', '081234567890', 'user123', 'user', 50000),
-      ('Budi Santoso', 'budi@demo.com', '082211223344', 'user123', 'user', 15000)
-      ON CONFLICT DO NOTHING;
-    `);
-  }
+  // Demo fixtures are permitted only in an explicit test environment.
+  if (shouldSeedDemoData(process.env.NODE_ENV)) {
+    const { rows: userRows } = await pool.query("SELECT COUNT(*) as cnt FROM users");
+    if (parseInt(userRows[0].cnt) === 0) {
+      await pool.query(`
+        INSERT INTO users (name, email, phone_number, password, role, balance) VALUES
+        ('Super Admin', 'admin@wifivoucher.com', '08999999999', 'admin', 'superadmin', 0),
+        ('Ahmad Pelanggan', 'user@demo.com', '081234567890', 'user123', 'user', 50000),
+        ('Budi Santoso', 'budi@demo.com', '082211223344', 'user123', 'user', 15000)
+        ON CONFLICT DO NOTHING;
+      `);
+    }
 
-  const { rows: pkgRows } = await pool.query("SELECT COUNT(*) as cnt FROM packages");
-  if (parseInt(pkgRows[0].cnt) === 0) {
-    await pool.query(`
-      INSERT INTO packages (name, speed, quota, duration, price, badge_color) VALUES
-      ('Harian Hemat', '10 Mbps', 'Unlimited', '1 Hari', 5000, 'blue'),
-      ('Mingguan Ngebut', '20 Mbps', 'Unlimited', '7 Hari', 25000, 'purple'),
-      ('Bulanan Pro', '50 Mbps', 'Unlimited', '30 Hari', 95000, 'cyan'),
-      ('Gaming VIP', '100 Mbps', 'Unlimited', '30 Hari', 150000, 'emerald')
-      ON CONFLICT DO NOTHING;
-    `);
-  }
+    const { rows: pkgRows } = await pool.query("SELECT COUNT(*) as cnt FROM packages");
+    if (parseInt(pkgRows[0].cnt) === 0) {
+      await pool.query(`
+        INSERT INTO packages (name, speed, quota, duration, price, badge_color) VALUES
+        ('Harian Hemat', '10 Mbps', 'Unlimited', '1 Hari', 5000, 'blue'),
+        ('Mingguan Ngebut', '20 Mbps', 'Unlimited', '7 Hari', 25000, 'purple'),
+        ('Bulanan Pro', '50 Mbps', 'Unlimited', '30 Hari', 95000, 'cyan'),
+        ('Gaming VIP', '100 Mbps', 'Unlimited', '30 Hari', 150000, 'emerald')
+        ON CONFLICT DO NOTHING;
+      `);
+    }
 
-  const { rows: rtRows } = await pool.query("SELECT COUNT(*) as cnt FROM routers");
-  if (parseInt(rtRows[0].cnt) === 0) {
-    await pool.query(`
-      INSERT INTO routers (name, ip_address, api_port, username, password, status, connected_users) VALUES
-      ('Router Pusat', '192.168.1.1', '8728', 'admin', 'password', 'online', 142),
-      ('Cabang Utara', '192.168.2.1', '8728', 'admin', 'password', 'warning', 38)
-      ON CONFLICT DO NOTHING;
-    `);
+    const { rows: rtRows } = await pool.query("SELECT COUNT(*) as cnt FROM routers");
+    if (parseInt(rtRows[0].cnt) === 0) {
+      await pool.query(`
+        INSERT INTO routers (name, ip_address, api_port, username, password, status, connected_users) VALUES
+        ('Router Pusat', '192.168.1.1', '8728', 'admin', 'password', 'online', 142),
+        ('Cabang Utara', '192.168.2.1', '8728', 'admin', 'password', 'warning', 38)
+        ON CONFLICT DO NOTHING;
+      `);
+    }
+
+    const { rows: promoRows } = await pool.query("SELECT COUNT(*) as cnt FROM promos");
+    if (parseInt(promoRows[0].cnt) === 0) {
+      await pool.query(`
+        INSERT INTO promos (title, subtitle, color, icon, badge, link_type, button_text, active, sort_order, show_on) VALUES
+        ('Anti Buffering', 'Streaming & gaming lancar tanpa putus', 'iris', 'zap', 'Unggulan', 'packages', 'Lihat Paket', true, 1, 'both'),
+        ('Hemat Lebih Banyak', 'Beli paket mingguan, lebih irit!', 'gold', 'star', 'Promo', 'packages', 'Beli Sekarang', true, 2, 'both')
+        ON CONFLICT DO NOTHING;
+      `);
+    }
   }
 
   const { rows: setRows } = await pool.query("SELECT COUNT(*) as cnt FROM settings");
@@ -313,23 +329,11 @@ async function initDb() {
     ON CONFLICT (config_key) DO NOTHING;
   `);
 
-  // Retire the unused gateway configuration; financial history is preserved.
+  // Keep existing payment settings unchanged; only add a default if absent.
   await pool.query(`
-    DELETE FROM settings WHERE config_key IN ('sanpayApiKey','merchantId');
     INSERT INTO settings(config_key,config_value) VALUES('qrisProvider','qiospay')
-    ON CONFLICT(config_key) DO UPDATE SET config_value='qiospay';
+    ON CONFLICT(config_key) DO NOTHING;
   `);
-
-  // Seed a starter promo banner so the home screen isn't empty
-  const { rows: promoRows } = await pool.query("SELECT COUNT(*) as cnt FROM promos");
-  if (parseInt(promoRows[0].cnt) === 0) {
-    await pool.query(`
-      INSERT INTO promos (title, subtitle, color, icon, badge, link_type, button_text, active, sort_order, show_on) VALUES
-      ('Anti Buffering', 'Streaming & gaming lancar tanpa putus', 'iris', 'zap', 'Unggulan', 'packages', 'Lihat Paket', true, 1, 'both'),
-      ('Hemat Lebih Banyak', 'Beli paket mingguan, lebih irit!', 'gold', 'star', 'Promo', 'packages', 'Beli Sekarang', true, 2, 'both')
-      ON CONFLICT DO NOTHING;
-    `);
-  }
 
   // Ensure pin column can hold a bcrypt hash (~60 chars) on pre-existing DBs
   await pool.query(`ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255)`);

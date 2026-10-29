@@ -9,7 +9,11 @@ import type { Server } from 'node:http';
 import { Pool } from 'pg';
 import { ensurePpobSchema } from '../src/server/ppob-schema';
 import { createHealthHandler } from '../src/server/health';
-import { createStartupReadiness, initializeDatabase } from '../src/server/startup-readiness';
+import {
+  createStartupReadiness,
+  initializeDatabase,
+  shouldSeedDemoData,
+} from '../src/server/startup-readiness';
 import { DigiflazzClient, definiteProviderFailure, normalizeResult, normalizeProduct, rupiah } from '../src/server/digiflazz-client';
 import { PpobService, inCutOff, requireNonDefaultPpobPassword } from '../src/server/ppob-service';
 import { ppobCsrf, validPpobCsrf, sameOrigin, registerPpobRoutes } from '../src/server/ppob-routes';
@@ -86,6 +90,13 @@ test('failed schema initialization keeps readiness false and rejects startup', a
     /fixture schema failure/,
   );
   assert.equal(readiness.schemaReady, false);
+});
+
+test('demo fixtures are enabled only for NODE_ENV=test', () => {
+  assert.equal(shouldSeedDemoData('test'), true);
+  assert.equal(shouldSeedDemoData('production'), false);
+  assert.equal(shouldSeedDemoData('development'), false);
+  assert.equal(shouldSeedDemoData(undefined), false);
 });
 
 test('fresh isolated schema becomes ready only after the bootstrap succeeds', async () => {

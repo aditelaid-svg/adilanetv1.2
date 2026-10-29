@@ -5,6 +5,12 @@ changing an existing STB/VPS. The repository does not currently identify a
 published GHCR image tag; do not guess one. Compose intentionally requires
 `ADILANET_IMAGE` and fails validation when it is unset.
 
+On an empty production database, startup creates the schema and system-default
+settings but does not insert demo users, routers, packages, or promo banners.
+Demo fixtures are restricted to `NODE_ENV=test`. A secure first-admin
+provisioning path for a new production database is not included here; resolve
+that separately before making a fresh installation available to users.
+
 ## Required configuration
 
 Create the stack in Dockge using `docker-compose.yml` and a private `.env` in
