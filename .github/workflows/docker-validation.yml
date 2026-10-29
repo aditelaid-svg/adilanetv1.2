@@ -47,9 +47,50 @@ jobs:
           echo "npm omit setting: $(npm config get omit)"
 
       - name: Install locked dependencies
+        id: npm_ci
         run: |
           npm ci --include=dev
           test -x node_modules/.bin/tsx
+
+      - name: Print sanitized npm failure details
+        if: failure() && steps.npm_ci.outcome == 'failure'
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const logDir = path.join(process.env.HOME, ".npm", "_logs");
+          const logs = fs.existsSync(logDir)
+            ? fs.readdirSync(logDir)
+                .filter((name) => name.endsWith("-debug-0.log"))
+                .map((name) => ({
+                  name,
+                  mtime: fs.statSync(path.join(logDir, name)).mtimeMs,
+                }))
+                .sort((a, b) => b.mtime - a.mtime)
+            : [];
+
+          if (!logs.length) {
+            console.log("No npm debug log was available.");
+            process.exit(0);
+          }
+
+          const logPath = path.join(logDir, logs[0].name);
+          console.log(`Sanitized diagnostics from ${logs[0].name}:`);
+          const diagnosticLine =
+            /verbose cli|info using npm|info using node|verbose title|verbose argv|verbose cwd|verbose os|verbose arch|verbose exit|error/i;
+          for (const line of fs.readFileSync(logPath, "utf8").split(/\r?\n/)) {
+            if (!diagnosticLine.test(line)) continue;
+            const safeLine = line
+              .replace(/https?:\/\/\S+/gi, "[URL REDACTED]")
+              .replace(
+                /(authorization|_authToken|token|password|_auth)\s*[:=]\s*\S+/gi,
+                "$1=[REDACTED]",
+              )
+              .replace(/\bBearer\s+\S+/gi, "Bearer [REDACTED]")
+              .replace(/\b(?:npm_[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[TOKEN REDACTED]");
+            console.log(safeLine);
+          }
+          NODE
 
       - name: Run application tests
         run: |
