@@ -36,6 +36,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Normalize lockfile URLs in runner workspace
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+          const internalHosts = new Set([
+            "package-firewall.replit.local",
+            "package-firewall.replit.internal",
+          ]);
+          let normalized = 0;
+          for (const [name, entry] of Object.entries(lock.packages ?? {})) {
+            if (!entry.resolved) continue;
+            const url = new URL(entry.resolved);
+            if (!internalHosts.has(url.hostname)) continue;
+            if (!url.pathname.startsWith("/npm/")) {
+              throw new Error(`Unexpected package proxy path for ${name}`);
+            }
+            if (!entry.integrity) {
+              throw new Error(`Missing integrity hash for ${name}`);
+            }
+            entry.resolved = `https://registry.npmjs.org/${url.pathname.slice(5)}${url.search}`;
+            normalized++;
+          }
+          fs.writeFileSync("package-lock.json", `${JSON.stringify(lock, null, 2)}\n`);
+          console.log(`Normalized ${normalized} internal package URLs; integrity hashes preserved.`);
+          NODE
+
       - name: Prepare native platform and image name
         shell: bash
         env:
